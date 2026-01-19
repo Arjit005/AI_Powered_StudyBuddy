@@ -1,0 +1,10 @@
+fastapi
+uvicorn
+sqlalchemy
+pydantic
+huggingface_hub
+python-dotenv
+pandas
+matplotlib
+networkx
+google-generativeai

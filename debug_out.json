@@ -1,0 +1,10 @@
+{
+  "root": "Indian Judiciary System",
+  "edges": [
+    {
+      "source": "Indian Judiciary System",
+      "target": "System Offline",
+      "relationship": "error"
+    }
+  ]
+}
