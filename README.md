@@ -7,102 +7,82 @@ This project is built as a capstone project and product-style prototype, focusin
 
 📋 Table of Contents
 
-Features
-
-Tech Stack
-
-System Architecture
-
-Installation
-
-Configuration
-
-Usage
-
-API Endpoints
-
-Project Structure
-
-Troubleshooting
-
-Future Enhancements
-
-License
+- [Features](#-features)
+- [Tech Stack](#-tech-stack)
+- [System Architecture](#-system-architecture)
+- [Installation](#-installation)
+- [Configuration](#-configuration)
+- [Usage](#-usage)
+- [API Endpoints](#-api-endpoints)
+- [Project Structure](#-project-structure)
+- [Troubleshooting](#-troubleshooting)
+- [Future Enhancements](#-future-enhancements)
+- [License](#-license)
 
 ✨ Features
+
 🧠 AI-Powered Learning Tools
+
 🔹 AI Chat Assistant
 
-Chat-based interface for asking study-related questions
-
-Generates clear, structured answers using Gemini AI
-
-Supports follow-up questions for better understanding
+- Chat-based interface for asking study-related questions
+- Generates clear, structured answers using Gemini AI
+- Supports follow-up questions for better understanding
 
 🔹 Topic Explanation
 
-Explains academic topics in simple language
-
-Uses bullet points and structured format
-
-Suitable for quick learning and revision
+- Explains academic topics in simple language
+- Uses bullet points and structured format
+- Suitable for quick learning and revision
 
 🔹 Topic Summarizer
 
-Generates concise summaries of study material
-
-Highlights key concepts and important points
-
-Useful for last-minute revision
+- Generates concise summaries of study material
+- Highlights key concepts and important points
+- Useful for last-minute revision
 
 🔹 Quiz Generator
 
-Automatically generates multiple-choice quizzes
-
-Helps students test their understanding
-
-Instant response generation using AI
+- Automatically generates multiple-choice quizzes
+- Helps students test their understanding
+- Instant response generation using AI
 
 🔹 Flashcard Generator
 
-Creates question–answer flashcards for a given topic
-
-Designed for memorization and quick review
+- Creates question–answer flashcards for a given topic
+- Designed for memorization and quick review
 
 🔹 Concept Visualization (Limited Scope)
 
-Displays structured visual representations for selected topics
-
-Currently demonstrated using predefined mappings
-
-Designed to be extended in future versions
+- Displays structured visual representations for selected topics
+- Currently demonstrated using predefined mappings
+- Designed to be extended in future versions
 
 🛠️ Tech Stack
-Frontend
 
-React – User interface
+**Frontend**
 
-Vite – Development and build tool
+- React – User interface
+- Vite – Development and build tool
+- CSS3 – Styling
 
-CSS3 – Styling
+**Backend**
 
-Backend
+- Python 3.8+
+- FastAPI – High-performance backend framework
+- Uvicorn – ASGI server
 
-Python 3.8+
+**AI**
 
-FastAPI – High-performance backend framework
+- Google Gemini API – Primary Generative AI engine
 
-Uvicorn – ASGI server
+**Database (Optional / Basic)**
 
-AI
-
-Google Gemini API – Primary Generative AI engine
-
-Database (Optional / Basic)
-
-SQLite – Used for simple data storage (if enabled)
+- SQLite – Used for simple data storage (if enabled)
 
 🏗️ System Architecture
+
+```
 Frontend (React + Vite)
         |
         | REST API
@@ -111,34 +91,34 @@ Backend (FastAPI - Python)
         |
         |
 Google Gemini API
+```
 
+**Flow:**
 
-Flow:
-
-User enters a topic or query
-
-Frontend sends request to backend
-
-Backend constructs a structured prompt
-
-Prompt is sent to Gemini API
-
-AI-generated response is returned and displayed
+1. User enters a topic or query
+2. Frontend sends request to backend
+3. Backend constructs a structured prompt
+4. Prompt is sent to Gemini API
+5. AI-generated response is returned and displayed
 
 📦 Installation
-Prerequisites
 
-Node.js 16+
+**Prerequisites**
 
-Python 3.8+
+- Node.js 16+
+- Python 3.8+
+- Git
 
-Git
+**Step 1: Clone Repository**
 
-Step 1: Clone Repository
+```bash
 git clone https://github.com/Arjit005/AI_Powered_StudyBuddy.git
 cd AI_Powered_StudyBuddy
+```
 
-Step 2: Backend Setup
+**Step 2: Backend Setup**
+
+```bash
 python -m venv .venv
 
 # Activate virtual environment
@@ -149,44 +129,57 @@ python -m venv .venv
 source .venv/bin/activate
 
 pip install -r backend/requirements.txt
+```
 
-Step 3: Frontend Setup
+**Step 3: Frontend Setup**
+
+```bash
 npm install
+```
 
 ⚙️ Configuration
 
-Create a .env file in the root directory:
+Create a `.env` file in the root directory:
 
+```env
 GEMINI_API_KEY=your_gemini_api_key_here
+```
 
-
-You can generate the API key from Google AI Studio.
+You can generate the API key from [Google AI Studio](https://makersuite.google.com/app/apikey).
 
 🚀 Usage
-Development Mode
 
-Terminal 1 – Backend
+**Development Mode**
 
+**Terminal 1 – Backend**
+
+```bash
 uvicorn backend.main:app --reload
-
+```
 
 Backend runs on: http://localhost:8000
 
-Terminal 2 – Frontend
+**Terminal 2 – Frontend**
 
+```bash
 npm run dev
-
+```
 
 Frontend runs on: http://localhost:5173
 
 🔌 API Endpoints
-Method	Endpoint	Description
-POST	/api/chat	Chat with AI assistant
-POST	/api/explain	Explain a topic
-POST	/api/summarize	Summarize content
-POST	/api/generate-quiz	Generate quiz
-POST	/api/generate-flashcards	Generate flashcards
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/chat` | Chat with AI assistant |
+| POST | `/api/explain` | Explain a topic |
+| POST | `/api/summarize` | Summarize content |
+| POST | `/api/generate-quiz` | Generate quiz |
+| POST | `/api/generate-flashcards` | Generate flashcards |
+
 📁 Project Structure
+
+```
 AI_Powered_StudyBuddy/
 │
 ├── backend/
@@ -205,41 +198,40 @@ AI_Powered_StudyBuddy/
 ├── package.json
 ├── README.md
 └── vite.config.js
+```
 
 🐛 Troubleshooting
-1. Gemini API Error
 
-Check API key in .env
+**1. Gemini API Error**
 
-Verify API quota in Google AI Studio
+- Check API key in `.env`
+- Verify API quota in Google AI Studio
 
-2. Backend Not Starting
+**2. Backend Not Starting**
 
-Ensure port 8000 is free
+- Ensure port 8000 is free
+- Reinstall dependencies
 
-Reinstall dependencies
-
+```bash
 pip install -r backend/requirements.txt
+```
 
-3. Frontend Errors
+**3. Frontend Errors**
+
+```bash
 rm -rf node_modules package-lock.json
 npm install
+```
 
 🎯 Future Enhancements
 
-User authentication and profiles
-
-Save quiz results and learning history
-
-Voice-based interaction
-
-Multi-language support
-
-Mobile application
-
-Advanced concept visualization
-
-Spaced repetition for flashcards
+- User authentication and profiles
+- Save quiz results and learning history
+- Voice-based interaction
+- Multi-language support
+- Mobile application
+- Advanced concept visualization
+- Spaced repetition for flashcards
 
 📄 License
 
@@ -252,4 +244,4 @@ Some advanced features are conceptual and intended for future expansion.
 
 🙌 Made with passion for learning and AI
 
-GitHub: https://github.com/Arjit005/AI_Powered_StudyBuddy
+**GitHub:** https://github.com/Arjit005/AI_Powered_StudyBuddy
