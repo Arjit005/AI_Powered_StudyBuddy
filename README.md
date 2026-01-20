@@ -52,11 +52,14 @@ An intelligent study companion powered by AI that helps students learn more effe
    - Key concepts and main details highlighted
    - Clean paragraph formatting
 
-### 🔒 Robust Fallback System
+AI Provider Strategy
 
-- **Multi-tier AI Provider Chain**: Gemini → Hugging Face → Pollinations.ai
-- **Graceful Degradation**: Shows relevant fallback content if all AI providers fail
-- **Smart Error Handling**: Clear error messages with actionable suggestions
+The system is designed with extensibility in mind.
+Google Gemini API is used as the primary AI provider.
+
+The architecture allows integration of additional AI providers in the future to improve availability and reliability.
+
+Currently, Gemini API handles all AI-generated responses.
 
 ---
 
