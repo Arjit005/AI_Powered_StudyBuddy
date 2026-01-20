@@ -3,86 +3,108 @@
 AI Study Buddy is an intelligent, web-based learning assistant powered by Google Gemini Generative AI.
 It helps students study more effectively by providing explanations, summaries, quizzes, flashcards, and interactive chat-based assistance.
 
-This project is built as a capstone project and product-style prototype, focusing on practical use of Generative AI in education.
+This project is built as a capstone project and product-oriented prototype, focusing on the practical use of Generative AI in education.
 
-📋 Table of Contents
+� Project Status: Capstone Prototype
 
-- [Features](#-features)
-- [Tech Stack](#-tech-stack)
-- [System Architecture](#-system-architecture)
-- [Installation](#-installation)
-- [Configuration](#-configuration)
-- [Usage](#-usage)
-- [API Endpoints](#-api-endpoints)
-- [Project Structure](#-project-structure)
-- [Troubleshooting](#-troubleshooting)
-- [Future Enhancements](#-future-enhancements)
-- [License](#-license)
+�📋 Table of Contents
+
+Features
+
+Tech Stack
+
+System Architecture
+
+Installation
+
+Configuration
+
+Usage
+
+API Endpoints
+
+Project Structure
+
+Troubleshooting
+
+Future Enhancements
+
+License
 
 ✨ Features
-
 🧠 AI-Powered Learning Tools
-
 🔹 AI Chat Assistant
 
-- Chat-based interface for asking study-related questions
-- Generates clear, structured answers using Gemini AI
-- Supports follow-up questions for better understanding
+Chat-based interface for asking study-related questions
+
+Generates clear, structured answers using Gemini AI
+
+Supports follow-up questions for better understanding
 
 🔹 Topic Explanation
 
-- Explains academic topics in simple language
-- Uses bullet points and structured format
-- Suitable for quick learning and revision
+Explains academic topics in simple language
+
+Uses bullet points and structured format
+
+Suitable for quick learning and revision
 
 🔹 Topic Summarizer
 
-- Generates concise summaries of study material
-- Highlights key concepts and important points
-- Useful for last-minute revision
+Generates concise summaries of study material
+
+Highlights key concepts and important points
+
+Useful for last-minute revision
 
 🔹 Quiz Generator
 
-- Automatically generates multiple-choice quizzes
-- Helps students test their understanding
-- Instant response generation using AI
+Automatically generates multiple-choice quizzes
+
+Helps students test their understanding
+
+Instant AI-generated responses
 
 🔹 Flashcard Generator
 
-- Creates question–answer flashcards for a given topic
-- Designed for memorization and quick review
+Creates question–answer flashcards for a given topic
+
+Designed for memorization and quick review
 
 🔹 Concept Visualization (Limited Scope)
 
-- Displays structured visual representations for selected topics
-- Currently demonstrated using predefined mappings
-- Designed to be extended in future versions
+Displays structured visual representations for selected topics
+
+Currently demonstrated using predefined mappings
+
+Designed to be extended in future versions
 
 🛠️ Tech Stack
+Frontend
 
-**Frontend**
+React – User interface
 
-- React – User interface
-- Vite – Development and build tool
-- CSS3 – Styling
+Vite – Development and build tool
 
-**Backend**
+CSS3 – Styling
 
-- Python 3.8+
-- FastAPI – High-performance backend framework
-- Uvicorn – ASGI server
+Backend
 
-**AI**
+Python 3.8+
 
-- Google Gemini API – Primary Generative AI engine
+FastAPI – High-performance backend framework
 
-**Database (Optional / Basic)**
+Uvicorn – ASGI server
 
-- SQLite – Used for simple data storage (if enabled)
+AI
+
+Google Gemini API – Generative AI engine
+
+Database (Optional / Basic)
+
+SQLite – Used for simple data storage (if enabled)
 
 🏗️ System Architecture
-
-```
 Frontend (React + Vite)
         |
         | REST API
@@ -91,34 +113,33 @@ Backend (FastAPI - Python)
         |
         |
 Google Gemini API
-```
 
-**Flow:**
+Flow
 
-1. User enters a topic or query
-2. Frontend sends request to backend
-3. Backend constructs a structured prompt
-4. Prompt is sent to Gemini API
-5. AI-generated response is returned and displayed
+User enters a topic or query
+
+Frontend sends request to backend
+
+Backend constructs a structured prompt
+
+Prompt is sent to Gemini API
+
+AI-generated response is returned and displayed
 
 📦 Installation
+Prerequisites
 
-**Prerequisites**
+Node.js 16+
 
-- Node.js 16+
-- Python 3.8+
-- Git
+Python 3.8+
 
-**Step 1: Clone Repository**
+Git
 
-```bash
+Step 1: Clone Repository
 git clone https://github.com/Arjit005/AI_Powered_StudyBuddy.git
 cd AI_Powered_StudyBuddy
-```
 
-**Step 2: Backend Setup**
-
-```bash
+Step 2: Backend Setup
 python -m venv .venv
 
 # Activate virtual environment
@@ -129,75 +150,76 @@ python -m venv .venv
 source .venv/bin/activate
 
 pip install -r backend/requirements.txt
-```
 
-**Step 3: Frontend Setup**
-
-```bash
+Step 3: Frontend Setup
 npm install
-```
 
 ⚙️ Configuration
 
-Create a `.env` file in the root directory:
+Create a .env file in the root directory:
 
-```env
 GEMINI_API_KEY=your_gemini_api_key_here
-```
 
-You can generate the API key from [Google AI Studio](https://makersuite.google.com/app/apikey).
+
+Generate the API key from Google AI Studio.
 
 🚀 Usage
+Development Mode
 
-**Development Mode**
+Terminal 1 – Backend
 
-**Terminal 1 – Backend**
-
-```bash
 uvicorn backend.main:app --reload
-```
+
 
 Backend runs on: http://localhost:8000
 
-**Terminal 2 – Frontend**
+Terminal 2 – Frontend
 
-```bash
 npm run dev
-```
+
 
 Frontend runs on: http://localhost:5173
 
 🔌 API Endpoints
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/api/chat` | Chat with AI assistant |
-| POST | `/api/explain` | Explain a topic |
-| POST | `/api/summarize` | Summarize content |
-| POST | `/api/generate-quiz` | Generate quiz |
-| POST | `/api/generate-flashcards` | Generate flashcards |
-
+Method	Endpoint	Description
+POST	/api/chat	Chat with AI assistant
+POST	/api/explain	Explain a topic
+POST	/api/summarize	Summarize content
+POST	/api/generate-quiz	Generate quiz
+POST	/api/generate-flashcards	Generate flashcards
 📁 Project Structure
-
-```
 AI_Powered_StudyBuddy/
-│
 ├── backend/
-│   ├── main.py          # FastAPI app
-│   ├── ai_service.py    # Gemini API logic
-│   ├── requirements.txt
+│   ├── analytics.py         # Analytics & chart generation
+│   ├── maps.py              # Concept map visualization
+│   └── requirements.txt     # Python dependencies
 │
 ├── src/
-│   ├── components/
+│   ├── components/          # Reusable React components
 │   ├── pages/
-│   ├── App.jsx
-│   ├── main.jsx
+│   │   ├── LoginPage.jsx    # User login
+│   │   ├── SignupPage.jsx   # User registration
+│   │   ├── Home.jsx         # Landing page
+│   │   ├── Chat.jsx         # AI chat interface
+│   │   ├── Quiz.jsx         # Quiz generator
+│   │   ├── Flashcards.jsx   # Flashcard creator
+│   │   ├── Maps.jsx         # Concept map viewer
+│   │   ├── Summarize.jsx    # Topic summarizer
+│   │   ├── Timer.jsx        # Study timer
+│   │   ├── Progress.jsx     # Progress tracking
+│   │   ├── Voice.jsx        # Voice assistant
+│   │   └── Pricing.jsx      # Pricing information
+│   ├── App.jsx              # Main app component
+│   ├── main.jsx             # React entry point
+│   └── index.css            # Global styles
 │
 ├── public/
-├── .env
-├── package.json
+├── .env                     # API keys (gitignored)
+├── .gitignore
+├── package.json             # Node dependencies
 ├── README.md
-└── vite.config.js
+├── study_buddy.db           # SQLite database
+└── vite.config.js           # Vite configuration
 ```
 
 🐛 Troubleshooting
@@ -225,13 +247,16 @@ npm install
 
 🎯 Future Enhancements
 
-- User authentication and profiles
-- Save quiz results and learning history
-- Voice-based interaction
+
+- Enhanced voice interaction with speech recognition
 - Multi-language support
-- Mobile application
-- Advanced concept visualization
-- Spaced repetition for flashcards
+- Mobile application (React Native)
+- Advanced AI-generated concept maps for more topics
+- Spaced repetition algorithm for flashcards
+- Export study materials to PDF
+- Collaborative study rooms
+- Integration with calendar apps
+- Gamification and achievement badges
 
 📄 License
 
