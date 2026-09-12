@@ -9,7 +9,7 @@
 [![JWT Auth](https://img.shields.io/badge/Auth-JWT_%2B_Bcrypt-blue?style=flat)](https://pyjwt.readthedocs.io/)
 [![License](https://img.shields.io/badge/License-MIT-green?style=flat)](LICENSE)
 
----
+**🟡 Project Status: Capstone Prototype**
 
 ## 🌟 Overview
 
@@ -103,7 +103,7 @@ Interactive Swagger documentation is available at `http://127.0.0.1:8000/docs`.
 * **AI & Data**: Google Gemini API, Hugging Face Hub, Matplotlib, NetworkX, Pandas.
 * **Database**: SQLite (`study_buddy.db`).
 
----
+## 🏗️ System Architecture
 
 ## 📦 Installation & Setup
 
