@@ -3,19 +3,44 @@ import { useNavigate, Link } from 'react-router-dom';
 import { Brain, Lock, User, ArrowRight, ShieldCheck } from 'lucide-react';
 
 const LoginPage = () => {
-    const [username, setUsername] = useState('user@example.com');
-    const [password, setPassword] = useState('password123');
+    const [username, setUsername] = useState('testuser1@example.com');
+    const [password, setPassword] = useState('secretpassword123');
     const [error, setError] = useState('');
+    const [isLoading, setIsLoading] = useState(false);
     const navigate = useNavigate();
 
-    const handleLogin = (e) => {
+    const handleLogin = async (e) => {
         e.preventDefault();
-        // Updated to accept dummy credentials
-        if (username === 'user@example.com' && password === 'password123') {
+        setError('');
+        setIsLoading(true);
+
+        try {
+            const isEmail = username.includes('@');
+            const res = await fetch('/api/auth/login', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    email: isEmail ? username : undefined,
+                    username: !isEmail ? username : undefined,
+                    password: password
+                }),
+            });
+
+            const data = await res.json();
+            if (!res.ok) {
+                throw new Error(data.detail || 'Invalid username/email or password');
+            }
+
             localStorage.setItem('isAuthenticated', 'true');
+            localStorage.setItem('auth_token', data.access_token);
+            localStorage.setItem('user', JSON.stringify(data.user));
             navigate('/');
-        } else {
-            setError('Invalid username or password');
+        } catch (err) {
+            setError(err.message || 'Login failed. Please try again.');
+        } finally {
+            setIsLoading(false);
         }
     };
 
@@ -78,9 +103,10 @@ const LoginPage = () => {
 
                         <button
                             type="submit"
-                            className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-4 rounded-2xl font-bold shadow-lg shadow-emerald-600/30 transition-all hover:-translate-y-1 active:translate-y-0 flex items-center justify-center gap-2 group"
+                            disabled={isLoading}
+                            className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white py-4 rounded-2xl font-bold shadow-lg shadow-emerald-600/30 transition-all hover:-translate-y-1 active:translate-y-0 flex items-center justify-center gap-2 group"
                         >
-                            Sign In
+                            {isLoading ? 'Signing In...' : 'Sign In'}
                             <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
                         </button>
                     </form>
@@ -94,7 +120,7 @@ const LoginPage = () => {
 
                     <div className="mt-4 text-center">
                         <span className="bg-emerald-50 text-emerald-600 text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-widest border border-emerald-100">
-                            Demo: user@example.com / password123
+                            Demo: testuser1@example.com / secretpassword123
                         </span>
                     </div>
 

@@ -1,358 +1,164 @@
-🎓 AI Study Buddy
+# 🎓 AI Study Buddy
+> **Your Intelligent, AI-Powered Learning Companion & Study Ecosystem.**
+> *A full-stack modern learning platform featuring context-aware AI tutoring, dynamic quizzes, concept mapping, and secure JWT authentication.*
 
-AI Study Buddy is an intelligent, web-based learning assistant powered by Google Gemini Generative AI.
-It helps students study more effectively by providing explanations, summaries, quizzes, flashcards, and interactive chat-based assistance.
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.128-009688?style=flat&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
+[![React 19](https://img.shields.io/badge/React-19.0-61DAFB?style=flat&logo=react&logoColor=black)](https://react.dev/)
+[![Tailwind CSS v4](https://img.shields.io/badge/TailwindCSS-v4.0-38B2AC?style=flat&logo=tailwind-css&logoColor=white)](https://tailwindcss.com/)
+[![Gemini](https://img.shields.io/badge/Google_Gemini-Pro-4285F4?style=flat&logo=google&logoColor=white)](https://ai.google.dev/)
+[![JWT Auth](https://img.shields.io/badge/Auth-JWT_%2B_Bcrypt-blue?style=flat)](https://pyjwt.readthedocs.io/)
+[![License](https://img.shields.io/badge/License-MIT-green?style=flat)](LICENSE)
 
-This project is built as a capstone project and product-style prototype, focusing on practical use of Generative AI in education.
+---
 
-📋 Table of Contents
+## 🌟 Overview
 
-- [Features](#-features)
-- [Tech Stack](#-tech-stack)
-- [System Architecture](#-system-architecture)
-- [Installation](#-installation)
-- [Configuration](#-configuration)
-- [Usage](#-usage)
-- [API Endpoints](#-api-endpoints)
-- [Project Structure](#-project-structure)
-- [Troubleshooting](#-troubleshooting)
-- [Future Enhancements](#-future-enhancements)
-- [License](#-license)
+**AI Study Buddy** is an end-to-end full-stack educational web application designed to help students master complex subjects faster while reducing cognitive load. It pairs a **React 19 + Tailwind CSS v4** glassmorphic frontend with a robust **FastAPI & SQLite** backend, orchestrated by **Google Gemini** generative AI with automatic fallback failover.
 
-✨ Features
+---
 
-🧠 AI-Powered Learning Tools
+## 🏛️ System Architecture
 
-🔹 AI Chat Assistant
+```mermaid
+flowchart TD
+    subgraph Client ["Client (React 19 + Vite)"]
+        UI["🖥️ Modern Emerald UI\n(Tailwind CSS v4)"]
+        AuthCtx["🔐 JWT Token Storage\n(Bearer Headers)"]
+    end
 
-- Chat-based interface for asking study-related questions
-- Generates clear, structured answers using Gemini AI
-- Supports follow-up questions for better understanding
+    subgraph Backend ["Backend (FastAPI REST Service)"]
+        Router["⚡ API Gateway & CORS"]
+        AuthEngine["🛡️ Auth Engine\n(Bcrypt Hashing + PyJWT)"]
+        MemoryMgr["🧠 Context Memory Manager\n(Multi-Turn History)"]
+        Analytics["📊 Study Session Analytics"]
+    end
 
-🔹 Topic Summarizer
+    subgraph Database ["Persistence Layer (SQLite / SQLAlchemy)"]
+        DB[("study_buddy.db\nUsers, Chats, Quizzes, Sessions")]
+    end
 
-- Generates concise summaries of study material
-- Highlights key concepts and important points
-- Useful for last-minute revision
+    subgraph AIEngine ["Resilient AI Provider Pipeline"]
+        Gemini["🥇 Primary: Google Gemini Pro"]
+        HuggingFace["🥈 Fallback: Hugging Face Mistral-7B"]
+        Pollinations["🥉 Public Fallback: Pollinations.ai"]
+    end
 
-🔹 Quiz Generator
-
-- Automatically generates multiple-choice quizzes
-- Helps students test their understanding
-- Instant response generation using AI
-- Track quiz completion in progress dashboard
-
-🔹 Flashcard Generator
-
-- Creates question–answer flashcards for a given topic
-- Interactive flip animation
-- Designed for memorization and quick review
-
-🔹 Concept Map Visualizer
-
-- Displays structured visual representations for selected topics
-- Interactive network graphs showing topic relationships
-- Generated using NetworkX and Matplotlib
-- Designed to be extended in future versions
-
-📊 Productivity Features
-
-🔹 Study Timer
-
-- Focus timer for study sessions
-- Track study duration
-- Activity logging for analytics
-
-🔹 Progress Tracking
-
-- Monitor total study hours
-- Track quizzes taken
-- View study streak days
-- Visual analytics dashboard
-
-🔹 Analytics Dashboard
-
-- Study activity charts and visualizations
-- Performance insights
-- Session history tracking
-
-🔐 User Management
-
-🔹 Authentication System
-
-- User login and signup pages
-- Secure account management
-- Session persistence
-
-🎤 Additional Features
-
-🔹 Voice Assistant (Experimental)
-
-- Voice-based interaction capabilities
-- Enhanced accessibility
-
-🔹 Pricing Page
-
-- Feature comparison
-- Subscription tiers (if applicable)
-
-🛠️ Tech Stack
-
-**Frontend**
-
-- React 18.3 – User interface
-- Vite – Development and build tool
-- React Router – Client-side routing
-- CSS3 – Modern styling
-
-**Backend**
-
-- Python 3.8+
-- FastAPI – High-performance backend framework
-- Uvicorn – ASGI server
-- SQLAlchemy – ORM for database operations
-
-**AI**
-
-- Google Gemini API – Primary Generative AI engine
-
-**Database**
-
-- SQLite – User data, chat history, study sessions, and analytics
-
-**Visualization & Analytics**
-
-- NetworkX – Graph structure for concept maps
-- Matplotlib – Chart generation and visualizations
-
-🏗️ System Architecture
-
-```
-Frontend (React + Vite)
-        |
-        | REST API
-        |
-Backend (FastAPI - Python)
-        |
-        |
-Google Gemini API
+    UI -->|"HTTP + Bearer Token"| Router
+    Router --> AuthEngine
+    Router --> MemoryMgr
+    Router --> Analytics
+    AuthEngine --> DB
+    MemoryMgr --> DB
+    Analytics --> DB
+    MemoryMgr -->|"Augmented Prompt + History"| Gemini
+    Gemini -.->|"Failover on Quota"| HuggingFace
+    HuggingFace -.->|"Failover"| Pollinations
 ```
 
-**Flow:**
+---
 
-1. User enters a topic or query
-2. Frontend sends request to backend
-3. Backend constructs a structured prompt
-4. Prompt is sent to Gemini API
-5. AI-generated response is returned and displayed
+## 💎 Core Features
 
-📦 Installation
+### 🔹 Intelligent Learning Suite
+* **🤖 Context-Aware AI Chat Tutor**: Remembers recent conversation history per user, providing personalized, grounded explanations rather than isolated responses.
+* **📝 Instant Topic Summarizer**: Synthesizes lengthy academic articles or topics into clear, key bullet points in seconds.
+* **⚡ Smart MCQ Quiz Generator**: Dynamically crafts 10-question multiple-choice quizzes with instant grading, correct answer validation, and explanations.
+* **🃏 Digital Flashcard Engine**: Generates question-answer flashcard decks for active recall and spaced repetition.
+* **🗺️ Concept Map Generator**: Visualizes relationships between conceptual ideas using dynamic NetworkX node graphs.
 
-**Prerequisites**
+### 🔹 Security & Productivity
+* **🔒 JWT Authentication**: Secure user registration and login with salt-based password hashing (`bcrypt`) and bearer token verification (`PyJWT`).
+* **⏱️ Pomodoro Focus Timer**: Built-in study timer tracking real focused seconds and study streaks.
+* **📊 Analytics Dashboard**: User-isolated study session statistics, total study hours, and quiz performance metrics.
+* **🛡️ Triple-Layer AI Failover**: If Gemini encounters API quota limitations (`429`), the service automatically cascades to Hugging Face or public inference without crashing the user session.
 
-- Node.js 16+
-- Python 3.8+
-- Git
+---
 
-**Step 1: Clone Repository**
+## 🔌 API Reference
 
+| Method | Endpoint | Description | Auth Required |
+| :--- | :--- | :--- | :---: |
+| `POST` | `/api/auth/register` | Create a new user account with hashed password | No |
+| `POST` | `/api/auth/login` | Authenticate and obtain a JWT access token | No |
+| `GET` | `/api/auth/me` | Fetch currently authenticated user profile | Yes (Bearer) |
+| `POST` | `/api/chat` | Send message to AI assistant (context-aware memory) | Optional |
+| `DELETE` | `/api/chat` | Clear user chat history | Optional |
+| `POST` | `/api/summarize` | Generate topic summary | No |
+| `POST` | `/api/generate-quiz` | Generate 10-question MCQ quiz | Optional |
+| `POST` | `/api/generate-flashcards` | Generate active recall flashcards | No |
+| `POST` | `/api/generate-map` | Generate concept map diagram | No |
+| `POST` | `/api/track-activity` | Record study or quiz session duration | Optional |
+| `GET` | `/api/progress` | Retrieve study hours, quizzes taken, and streak days | Optional |
+| `GET` | `/api/analytics/dashboard` | Generate visual study activity chart | Optional |
+
+Interactive Swagger documentation is available at `http://127.0.0.1:8000/docs`.
+
+---
+
+## 🛠️ Tech Stack
+
+* **Frontend**: React 19, Vite, Tailwind CSS v4, Lucide React Icons, React Router v7.
+* **Backend**: FastAPI, Uvicorn (ASGI), SQLAlchemy ORM, Pydantic v2.
+* **Authentication**: PyJWT, Bcrypt password hashing.
+* **AI & Data**: Google Gemini API, Hugging Face Hub, Matplotlib, NetworkX, Pandas.
+* **Database**: SQLite (`study_buddy.db`).
+
+---
+
+## 📦 Installation & Setup
+
+### Prerequisites
+* **Node.js**: v18+
+* **Python**: v3.10+
+* **Git**
+
+### 1. Clone the Repository
 ```bash
 git clone https://github.com/Arjit005/AI_Powered_StudyBuddy.git
 cd AI_Powered_StudyBuddy
 ```
 
-**Step 2: Backend Setup**
-
-```bash
-python -m venv .venv
-
-# Activate virtual environment
-# Windows
-.venv\Scripts\activate
-
-# macOS / Linux
-source .venv/bin/activate
-
-pip install -r backend/requirements.txt
-```
-
-**Step 3: Frontend Setup**
-
-```bash
-npm install
-```
-
-⚙️ Configuration
-
-Create a `.env` file in the root directory:
-
+### 2. Environment Configuration
+Create a `.env` file in the project root:
 ```env
 GEMINI_API_KEY=your_gemini_api_key_here
+JWT_SECRET_KEY=your_secure_random_jwt_secret_here
+# Optional fallbacks
+HUGGINGFACE_API_KEY=your_huggingface_api_key_here
 ```
 
-You can generate the API key from [Google AI Studio](https://makersuite.google.com/app/apikey).
-
-🚀 Usage
-
-**Development Mode**
-
-**Terminal 1 – Backend**
-
+### 3. Backend Setup
 ```bash
-uvicorn backend.main:app --reload
-```
+# Create and activate virtual environment
+python -m venv .venv
 
-Backend runs on: http://localhost:8000
+# On Windows:
+.venv\Scripts\activate
+# On macOS/Linux:
+# source .venv/bin/activate
 
-**Terminal 2 – Frontend**
-
-```bash
-npm run dev
-```
-
-Frontend runs on: http://localhost:5173
-
-🔌 API Endpoints
-
-### Core AI Endpoints
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/api/chat` | Chat with AI assistant |
-| POST | `/api/summarize` | Summarize a topic |
-| POST | `/api/generate-quiz` | Generate quiz for a topic |
-| POST | `/api/generate-flashcards` | Generate flashcards |
-| POST | `/api/generate-map` | Generate concept map visualization |
-
-### Progress & Analytics Endpoints
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/api/track-activity` | Track study session activity |
-| GET | `/api/progress` | Get user progress statistics |
-| GET | `/api/analytics/dashboard` | Get analytics chart visualization |
-| DELETE | `/api/chat` | Clear chat history |
-| DELETE | `/api/progress` | Reset progress data |
-
-### Request/Response Examples
-
-**Generate Quiz:**
-```json
-POST /api/generate-quiz
-{
-  "topic": "Photosynthesis"
-}
-```
-
-**Track Study Activity:**
-```json
-POST /api/track-activity
-{
-  "activity_type": "quiz",
-  "duration_seconds": 300
-}
-```
-
-**Get Progress:**
-```json
-GET /api/progress
-
-Response:
-{
-  "study_hours": 12.5,
-  "quizzes_taken": 8,
-  "streak_days": 5
-}
-```
-
-📁 Project Structure
-
-```
-AI_Powered_StudyBuddy/
-│
-├── backend/
-│   ├── main.py              # FastAPI app & routes
-│   ├── ai_service.py        # Gemini API logic & AI service
-│   ├── models.py            # Database models
-│   ├── database.py          # SQLite connection
-│   ├── analytics.py         # Analytics & chart generation
-│   ├── maps.py              # Concept map visualization
-│   └── requirements.txt     # Python dependencies
-│
-├── src/
-│   ├── components/          # Reusable React components
-│   ├── pages/
-│   │   ├── LoginPage.jsx    # User login
-│   │   ├── SignupPage.jsx   # User registration
-│   │   ├── Home.jsx         # Landing page
-│   │   ├── Chat.jsx         # AI chat interface
-│   │   ├── Quiz.jsx         # Quiz generator
-│   │   ├── Flashcards.jsx   # Flashcard creator
-│   │   ├── Maps.jsx         # Concept map viewer
-│   │   ├── Summarize.jsx    # Topic summarizer
-│   │   ├── Timer.jsx        # Study timer
-│   │   ├── Progress.jsx     # Progress tracking
-│   │   ├── Voice.jsx        # Voice assistant
-│   │   └── Pricing.jsx      # Pricing information
-│   ├── App.jsx              # Main app component
-│   ├── main.jsx             # React entry point
-│   └── index.css            # Global styles
-│
-├── public/
-├── .env                     # API keys (gitignored)
-├── .gitignore
-├── package.json             # Node dependencies
-├── README.md
-├── study_buddy.db           # SQLite database
-└── vite.config.js           # Vite configuration
-```
-
-🐛 Troubleshooting
-
-**1. Gemini API Error**
-
-- Check API key in `.env`
-- Verify API quota in Google AI Studio
-
-**2. Backend Not Starting**
-
-- Ensure port 8000 is free
-- Reinstall dependencies
-
-```bash
+# Install dependencies
 pip install -r backend/requirements.txt
 ```
 
-**3. Frontend Errors**
-
+### 4. Frontend Setup
 ```bash
-rm -rf node_modules package-lock.json
 npm install
 ```
 
-🎯 Future Enhancements
+### 5. Running the Application
+* **Start Backend Server:**
+  ```bash
+  uvicorn backend.main:app --reload --port 8000
+  ```
+* **Start Frontend Dev Server:**
+  ```bash
+  npm run dev
+  ```
+Open `http://localhost:5173` in your browser.
 
-- ✅ ~~User authentication~~ (Already implemented)
-- ✅ ~~Progress tracking~~ (Already implemented)
-- Enhanced voice interaction with speech recognition
-- Multi-language support
-- Mobile application (React Native)
-- Advanced AI-generated concept maps for more topics
-- Spaced repetition algorithm for flashcards
-- Export study materials to PDF
-- Collaborative study rooms
-- Integration with calendar apps
-- Gamification and achievement badges
+---
 
-📄 License
+## 📄 License
+This project is open-source under the [MIT License](LICENSE).
 
-This project is licensed under the MIT License.
-
-📌 Project Note
-
-This project is developed as a capstone and learning-oriented prototype.
-Some advanced features are conceptual and intended for future expansion.
-
-🙌 Made with passion for learning and AI
-
-**GitHub:** https://github.com/Arjit005/AI_Powered_StudyBuddy

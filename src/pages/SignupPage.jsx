@@ -6,17 +6,47 @@ const SignupPage = () => {
     const [username, setUsername] = useState('');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+    const [error, setError] = useState('');
+    const [isLoading, setIsLoading] = useState(false);
     const [isSuccess, setIsSuccess] = useState(false);
     const navigate = useNavigate();
 
-    const handleSignup = (e) => {
+    const handleSignup = async (e) => {
         e.preventDefault();
-        // In a real app, you'd send this to your backend
-        // For now, we simulate success and redirect
-        setIsSuccess(true);
-        setTimeout(() => {
-            navigate('/login');
-        }, 2000);
+        setError('');
+        setIsLoading(true);
+
+        try {
+            const res = await fetch('/api/auth/register', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    username: username.trim(),
+                    email: email.trim(),
+                    password: password
+                }),
+            });
+
+            const data = await res.json();
+            if (!res.ok) {
+                throw new Error(data.detail || 'Failed to create account.');
+            }
+
+            localStorage.setItem('isAuthenticated', 'true');
+            localStorage.setItem('auth_token', data.access_token);
+            localStorage.setItem('user', JSON.stringify(data.user));
+
+            setIsSuccess(true);
+            setTimeout(() => {
+                navigate('/');
+            }, 1500);
+        } catch (err) {
+            setError(err.message || 'Error creating account. Please try again.');
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     if (isSuccess) {
@@ -100,11 +130,18 @@ const SignupPage = () => {
                             </div>
                         </div>
 
+                        {error && (
+                            <div className="bg-red-50 text-red-600 px-4 py-3 rounded-xl text-sm font-medium animate-shake">
+                                {error}
+                            </div>
+                        )}
+
                         <button
                             type="submit"
-                            className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-4 mt-4 rounded-2xl font-bold shadow-lg shadow-emerald-600/30 transition-all hover:-translate-y-1 active:translate-y-0 flex items-center justify-center gap-2 group"
+                            disabled={isLoading}
+                            className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white py-4 mt-2 rounded-2xl font-bold shadow-lg shadow-emerald-600/30 transition-all hover:-translate-y-1 active:translate-y-0 flex items-center justify-center gap-2 group"
                         >
-                            Create Account
+                            {isLoading ? 'Creating Account...' : 'Create Account'}
                             <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
                         </button>
                     </form>

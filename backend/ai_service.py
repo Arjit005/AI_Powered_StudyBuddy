@@ -187,9 +187,22 @@ class AIService:
 
 
     @staticmethod
-    def generate_response(prompt: str) -> str:
+    def generate_response(prompt: str, chat_history: list = None) -> str:
         try:
-            response = AIService._generate_content_safe(prompt)
+            full_prompt = prompt
+            if chat_history and len(chat_history) > 0:
+                history_text = "Here is the previous conversation context for reference:\n"
+                for msg in chat_history[-8:]:
+                    speaker = "Student" if msg.get("role") in ["user", "student"] else "AI Tutor"
+                    content = msg.get("content", "").strip()
+                    history_text += f"{speaker}: {content}\n"
+                full_prompt = (
+                    f"{history_text}\n"
+                    f"Now respond to the Student's latest message as an encouraging and helpful AI Study Buddy:\n"
+                    f"Student: {prompt}\n"
+                    f"AI Tutor:"
+                )
+            response = AIService._generate_content_safe(full_prompt)
             return response.text
         except Exception as e:
             error_msg = str(e)

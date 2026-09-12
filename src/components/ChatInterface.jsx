@@ -12,7 +12,10 @@ const ChatInterface = () => {
     const clearChat = async () => {
         if (!confirm("Are you sure you want to delete your chat history?")) return;
         try {
-            await fetch('/api/chat', { method: 'DELETE' });
+            const token = localStorage.getItem('auth_token');
+            const headers = {};
+            if (token) headers['Authorization'] = `Bearer ${token}`;
+            await fetch('/api/chat', { method: 'DELETE', headers });
             setMessages([{ role: 'ai', content: 'Chat history cleared. How can I help you today?' }]);
         } catch (err) {
             console.error(err);
@@ -29,11 +32,15 @@ const ChatInterface = () => {
         setIsLoading(true);
 
         try {
+            const token = localStorage.getItem('auth_token');
+            const headers = {
+                'Content-Type': 'application/json',
+            };
+            if (token) headers['Authorization'] = `Bearer ${token}`;
+
             const response = await fetch('/api/chat', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
+                headers,
                 body: JSON.stringify({ message: input }),
             });
 
