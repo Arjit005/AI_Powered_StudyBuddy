@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Zap, CheckCircle2, XCircle, Award, RotateCcw, ArrowRight, ShieldCheck, HelpCircle, Trophy } from 'lucide-react';
+import { Zap, CheckCircle2, XCircle, Award, RotateCcw, ArrowRight, ShieldCheck, HelpCircle, Trophy, Save, Check } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
 const Quiz = () => {
@@ -8,6 +8,7 @@ const Quiz = () => {
     const [loading, setLoading] = useState(false);
     const [answers, setAnswers] = useState({});
     const [submitted, setSubmitted] = useState(false);
+    const [savedSuccess, setSavedSuccess] = useState(false);
     const [error, setError] = useState('');
 
     const generateQuiz = async () => {
@@ -81,6 +82,43 @@ const Quiz = () => {
                     origin: { y: 0.6 }
                 });
             } catch (_) {}
+        }
+    };
+
+    const handleSaveQuiz = async () => {
+        if (!quiz || !quiz.questions) return;
+        try {
+            const token = localStorage.getItem('auth_token');
+            const headers = { 'Content-Type': 'application/json' };
+            if (token) headers['Authorization'] = `Bearer ${token}`;
+
+            const score = calculateScore();
+            const res = await fetch('/api/library', {
+                method: 'POST',
+                headers,
+                body: JSON.stringify({
+                    material_type: 'quiz',
+                    title: `Quiz: ${topic || 'Practice Assessment'} (${score}/${quiz.questions.length})`,
+                    topic: topic || 'Quiz',
+                    content_json: JSON.stringify({
+                        topic,
+                        score,
+                        total: quiz.questions.length,
+                        questions: quiz.questions,
+                        user_answers: answers
+                    }),
+                    tags: 'quiz,mcq,assessment'
+                })
+            });
+
+            if (res.ok) {
+                setSavedSuccess(true);
+                setTimeout(() => setSavedSuccess(false), 3000);
+            } else {
+                alert('Could not save quiz to personal library.');
+            }
+        } catch (err) {
+            alert('Failed to save quiz: ' + err.message);
         }
     };
 
@@ -250,16 +288,26 @@ const Quiz = () => {
                                             <div className="text-xs font-mono text-slate-400">Activity logged to your study dashboard.</div>
                                         </div>
                                     </div>
-                                    <button
-                                        onClick={() => {
-                                            setQuiz(null);
-                                            setAnswers({});
-                                            setSubmitted(false);
-                                        }}
-                                        className="w-full sm:w-auto px-6 py-2.5 rounded-xl font-mono text-xs bg-slate-900 border border-slate-700 hover:border-emerald-500 text-emerald-300 transition-all"
-                                    >
-                                        Practice Another Topic
-                                    </button>
+                                    <div className="flex items-center gap-2 w-full sm:w-auto">
+                                        <button
+                                            onClick={handleSaveQuiz}
+                                            className="px-5 py-2.5 rounded-xl font-mono text-xs bg-slate-900 border border-slate-700 hover:border-emerald-500 text-emerald-400 flex items-center justify-center gap-1.5 transition-all"
+                                            title="Save Quiz & answers to Library"
+                                        >
+                                            {savedSuccess ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Save className="w-3.5 h-3.5" />}
+                                            <span>{savedSuccess ? 'Saved' : 'Save Quiz'}</span>
+                                        </button>
+                                        <button
+                                            onClick={() => {
+                                                setQuiz(null);
+                                                setAnswers({});
+                                                setSubmitted(false);
+                                            }}
+                                            className="flex-1 sm:flex-initial px-6 py-2.5 rounded-xl font-mono text-xs bg-emerald-500/20 border border-emerald-500/40 hover:bg-emerald-500/30 text-emerald-300 transition-all text-center"
+                                        >
+                                            Practice Another Topic
+                                        </button>
+                                    </div>
                                 </>
                             )}
                         </div>
