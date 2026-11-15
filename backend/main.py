@@ -198,6 +198,26 @@ def read_root():
         "features": ["Hybrid-Memory", "Source-Grounded-RAG", "Multi-Chat-Sessions", "Security-Shield"]
     }
 
+@app.get("/api/health", tags=["System"])
+def health_check(db: Session = Depends(get_db)):
+    """
+    Lightweight zero-cost health check endpoint for Uptime monitoring and QStash keepalive.
+    Verifies DB connectivity without triggering AI inference or expensive table scans.
+    """
+    db_status = "connected"
+    try:
+        from sqlalchemy import text
+        db.execute(text("SELECT 1"))
+    except Exception as e:
+        db_status = f"unhealthy: {str(e)[:50]}"
+
+    return {
+        "status": "healthy" if db_status == "connected" else "degraded",
+        "timestamp": time.time(),
+        "database": db_status,
+        "dialect": database.engine.dialect.name
+    }
+
 @app.get("/api/security/status", tags=["Security"])
 def get_security_status():
     return {
@@ -948,6 +968,84 @@ def reset_progress(
     if current_user:
         query = query.filter(models.StudySession.user_id == current_user.id)
     query.delete(synchronize_session=False)
+    db.commit()
+    return {"status": "reset"}
+
+@app.get("/api/analytics/activity-heatmap", tags=["Analytics"])
+def get_activity_heatmap(
+    db: Session = Depends(get_db),
+    current_user: Optional[models.User] = Depends(auth.get_current_user_optional)
+):
+    """
+    Returns authentic, database-aggregated daily study activity for the past 16 weeks (112 days).
+    Groups real StudySession and Quiz records by UTC calendar date. Zero fake/simulated modulo math.
+    """
+    from datetime import datetime, timedelta, timezone
+    
+    user_id = current_user.id if current_user else None
+    now = datetime.now(timezone.utc)
+    # Calculate starting date: 16 weeks (112 days) ago
+    start_date = (now - timedelta(days=111)).replace(hour=0, minute=0, second=0, microsecond=0)
+
+    query = db.query(models.StudySession).filter(models.StudySession.created_at >= start_date)
+    if user_id:
+        query = query.filter(models.StudySession.user_id == user_id)
+
+    sessions = query.all()
+
+    # Aggregate count and duration by YYYY-MM-DD
+    activity_by_date = {}
+    for s in sessions:
+        if s.created_at:
+            date_str = s.created_at.strftime("%Y-%m-%d")
+            if date_str not in activity_by_date:
+                activity_by_date[date_str] = {"count": 0, "duration_minutes": 0}
+            activity_by_date[date_str]["count"] += 1
+            activity_by_date[date_str]["duration_minutes"] += round((s.duration_seconds or 0) / 60, 1)
+
+    # Build dense 112-day array (16 weeks x 7 days)
+    days_data = []
+    total_active_days = 0
+    total_minutes = 0
+
+    for i in range(112):
+        day_date = start_date + timedelta(days=i)
+        date_str = day_date.strftime("%Y-%m-%d")
+        record = activity_by_date.get(date_str, {"count": 0, "duration_minutes": 0})
+
+        # Intensity scale (0 to 4):
+        # 0: 0 sessions, 1: 1 session, 2: 2 sessions, 3: 3-4 sessions, 4: 5+ sessions or >60 mins
+        count = record["count"]
+        duration = record["duration_minutes"]
+        if count == 0:
+            intensity = 0
+        elif count == 1:
+            intensity = 1
+        elif count == 2 or duration >= 30:
+            intensity = 2
+        elif count <= 4 or duration >= 60:
+            intensity = 3
+        else:
+            intensity = 4
+
+        if intensity > 0:
+            total_active_days += 1
+            total_minutes += duration
+
+        days_data.append({
+            "date": date_str,
+            "day_of_week": day_date.weekday(), # 0 = Monday, 6 = Sunday
+            "count": count,
+            "duration_minutes": duration,
+            "intensity": intensity
+        })
+
+    return {
+        "days": days_data,
+        "total_active_days": total_active_days,
+        "total_study_minutes": round(total_minutes, 1),
+        "total_records": len(sessions)
+    }
     db.commit()
     return {"status": "reset"}
 

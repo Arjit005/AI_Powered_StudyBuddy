@@ -3,6 +3,7 @@ import { BarChart3, Calendar, TrendingUp, RotateCcw, Award, Flame, Shield, Activ
 
 const Progress = () => {
     const [stats, setStats] = useState({ study_hours: 0, quizzes_taken: 0, streak_days: 0 });
+    const [heatmapData, setHeatmapData] = useState([]);
     const [chartImage, setChartImage] = useState(null);
     const [sessions, setSessions] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -17,6 +18,15 @@ const Progress = () => {
             .then(res => res.json())
             .then(data => setStats(data))
             .catch(err => console.error("Error fetching progress:", err));
+
+        fetch('/api/analytics/activity-heatmap', { headers })
+            .then(res => res.json())
+            .then(data => {
+                if (data && Array.isArray(data.days)) {
+                    setHeatmapData(data.days);
+                }
+            })
+            .catch(err => console.error("Error fetching heatmap:", err));
 
         fetch('/api/analytics/dashboard', { headers })
             .then(res => res.json())
@@ -156,45 +166,55 @@ const Progress = () => {
                     <div className="flex items-center justify-between mb-4 pb-3 border-b border-white/5">
                         <div className="flex items-center gap-2">
                             <Activity className="w-4 h-4 text-emerald-400" />
-                            <h2 className="text-sm font-bold text-white font-mono">Revision & Activity Heatmap</h2>
+                            <h2 className="text-sm font-bold text-white font-mono">Verified Activity Heatmap (16 Weeks)</h2>
                         </div>
                         <div className="flex items-center gap-2 text-[11px] font-mono text-slate-400">
-                            <span>Less</span>
-                            <span className="w-2.5 h-2.5 rounded bg-slate-800" />
-                            <span className="w-2.5 h-2.5 rounded bg-emerald-900" />
-                            <span className="w-2.5 h-2.5 rounded bg-emerald-700" />
-                            <span className="w-2.5 h-2.5 rounded bg-emerald-500" />
-                            <span className="w-2.5 h-2.5 rounded bg-emerald-300" />
-                            <span>More</span>
+                            <span>0</span>
+                            <span className="w-2.5 h-2.5 rounded bg-slate-800/80" />
+                            <span className="w-2.5 h-2.5 rounded bg-emerald-950 border border-emerald-800/40" />
+                            <span className="w-2.5 h-2.5 rounded bg-emerald-800" />
+                            <span className="w-2.5 h-2.5 rounded bg-emerald-600" />
+                            <span className="w-2.5 h-2.5 rounded bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.5)]" />
+                            <span>5+</span>
                         </div>
                     </div>
-                    {/* 16-week simulated contribution grid backed by real activity */}
+                    
+                    {/* Real Database-Aggregated 16-Week Grid */}
                     <div className="flex gap-1.5 overflow-x-auto pb-2">
-                        {Array.from({ length: 16 }).map((_, weekIdx) => (
-                            <div key={weekIdx} className="flex flex-col gap-1.5">
-                                {Array.from({ length: 7 }).map((_, dayIdx) => {
-                                    const intensity = ((weekIdx * 7 + dayIdx + stats.streak_days) % 5);
-                                    const colors = [
-                                        'bg-slate-800/80 hover:bg-slate-700',
-                                        'bg-emerald-950 border border-emerald-800/40',
-                                        'bg-emerald-800 border border-emerald-600/50',
-                                        'bg-emerald-600 border border-emerald-400/60',
-                                        'bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.5)]'
-                                    ];
-                                    return (
-                                        <div
-                                            key={dayIdx}
-                                            title={`Study intensity level: ${intensity}`}
-                                            className={`w-3 h-3 rounded-[3px] transition-colors cursor-pointer ${colors[intensity]}`}
-                                        />
-                                    );
-                                })}
-                            </div>
-                        ))}
+                        {Array.from({ length: 16 }).map((_, weekIdx) => {
+                            const weekDays = heatmapData.slice(weekIdx * 7, (weekIdx + 1) * 7);
+                            return (
+                                <div key={weekIdx} className="flex flex-col gap-1.5">
+                                    {(weekDays.length > 0 ? weekDays : Array.from({ length: 7 })).map((day, dayIdx) => {
+                                        const intensity = day ? day.intensity : 0;
+                                        const dateLabel = day ? day.date : `Day ${dayIdx}`;
+                                        const countLabel = day ? day.count : 0;
+                                        const durationLabel = day ? day.duration_minutes : 0;
+
+                                        const colors = [
+                                            'bg-slate-800/60 hover:bg-slate-700/80',
+                                            'bg-emerald-950 border border-emerald-800/40',
+                                            'bg-emerald-800 border border-emerald-600/50',
+                                            'bg-emerald-600 border border-emerald-400/60',
+                                            'bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.5)]'
+                                        ];
+
+                                        return (
+                                            <div
+                                                key={dayIdx}
+                                                title={`${dateLabel}: ${countLabel} study sessions (${durationLabel} mins)`}
+                                                className={`w-3.5 h-3.5 rounded-[3px] transition-all cursor-pointer ${colors[intensity]}`}
+                                            />
+                                        );
+                                    })}
+                                </div>
+                            );
+                        })}
                     </div>
-                    <p className="text-[11px] font-mono text-slate-500 mt-3 text-right">
-                        Reflecting verified database records in Neon PostgreSQL
-                    </p>
+                    <div className="flex items-center justify-between text-[11px] font-mono text-slate-500 mt-3">
+                        <span>Data grouped by UTC Calendar Day</span>
+                        <span>Source: Verified PostgreSQL study_sessions</span>
+                    </div>
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
