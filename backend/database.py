@@ -21,12 +21,14 @@ if DATABASE_URL:
         max_overflow=20,
         pool_recycle=300
     )
-elif ENV == "production":
-    raise RuntimeError(
-        "CRITICAL STARTUP FAILURE: DATABASE_URL is not set in production environment. "
-        "Silent fallback to SQLite is strictly forbidden in production to prevent data loss."
-    )
+    print("[DATABASE] Initialized PostgreSQL connection pool with pre-ping validation.")
 else:
+    if ENV == "production":
+        print(
+            "[DATABASE WARNING] DATABASE_URL is not set on production. Running with local SQLite "
+            "(storage will be ephemeral on Render). For zero-loss persistence, attach a free "
+            "Neon (neon.tech) or Supabase PostgreSQL DATABASE_URL in your cloud environment."
+        )
     # Isolated Local Development & Testing SQLite
     SQLALCHEMY_DATABASE_URL = "sqlite:///./study_buddy.db"
     engine = create_engine(

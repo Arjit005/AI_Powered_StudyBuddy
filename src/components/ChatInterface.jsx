@@ -245,46 +245,132 @@ const ChatInterface = () => {
             const headers = { 'Content-Type': 'application/json' };
             if (token) headers['Authorization'] = `Bearer ${token}`;
 
-            const response = await fetch('/api/chat', {
-                method: 'POST',
-                headers,
-                body: JSON.stringify({ 
-                    message: textToSend,
-                    conversation_id: originatingConvId
-                }),
-            });
+            // 1. Attempt Real-Time SSE Token Streaming
+            let streamSuccess = false;
+            try {
+                const streamResponse = await fetch('/api/chat/stream', {
+                    method: 'POST',
+                    headers,
+                    body: JSON.stringify({ 
+                        message: textToSend,
+                        conversation_id: originatingConvId
+                    }),
+                });
 
-            if (!response.ok) {
-                const errData = await response.json();
-                throw new Error(errData.detail || 'Network response failed');
+                if (streamResponse.ok && streamResponse.body) {
+                    const reader = streamResponse.body.getReader();
+                    const decoder = new TextDecoder('utf-8');
+                    let accumulatedText = '';
+                    let streamConvId = originatingConvId;
+                    const streamMsgId = Date.now();
+
+                    // Insert initial streaming message
+                    setMessages(prev => [
+                        ...prev,
+                        {
+                            id: streamMsgId,
+                            role: 'ai',
+                            content: '',
+                            isStreaming: true,
+                            shield: 'Active',
+                            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                        }
+                    ]);
+
+                    let doneReading = false;
+                    let buffer = '';
+
+                    while (!doneReading) {
+                        const { value, done } = await reader.read();
+                        if (done) break;
+                        buffer += decoder.decode(value, { stream: true });
+
+                        const lines = buffer.split('\n');
+                        buffer = lines.pop() || '';
+
+                        for (const line of lines) {
+                            const trimmed = line.trim();
+                            if (!trimmed.startsWith('data:')) continue;
+                            const dataStr = trimmed.replace(/^data:\s*/, '');
+                            if (dataStr === '[DONE]') {
+                                doneReading = true;
+                                break;
+                            }
+
+                            try {
+                                const parsed = JSON.parse(dataStr);
+                                if (parsed.conversation_id && parsed.conversation_id !== activeConvIdRef.current) {
+                                    streamConvId = parsed.conversation_id;
+                                    setActiveConvId(parsed.conversation_id);
+                                    fetchConversations();
+                                }
+                                if (parsed.token) {
+                                    accumulatedText += parsed.token;
+                                    if (originatingConvId === activeConvIdRef.current || activeConvIdRef.current === streamConvId) {
+                                        setMessages(prev => prev.map(m => m.id === streamMsgId ? { ...m, content: accumulatedText } : m));
+                                    }
+                                }
+                                if (parsed.error) {
+                                    throw new Error(parsed.error);
+                                }
+                            } catch (parseErr) {
+                                if (parseErr.message && parseErr.message.includes('token')) console.error(parseErr);
+                            }
+                        }
+                    }
+
+                    // Mark streaming complete
+                    setMessages(prev => prev.map(m => m.id === streamMsgId ? { ...m, isStreaming: false } : m));
+                    fetchConversations();
+                    streamSuccess = true;
+                    return;
+                }
+            } catch (streamErr) {
+                console.warn('SSE Streaming connection failed, falling back to standard endpoint:', streamErr);
             }
 
-            const data = await response.json();
-            
-            // If user switched conversation during in-flight generation, do not append to new room
-            if (originatingConvId !== activeConvIdRef.current && activeConvIdRef.current !== null) {
-                return;
-            }
+            if (!streamSuccess) {
+                // 2. Fallback to standard synchronous endpoint
+                const response = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers,
+                    body: JSON.stringify({ 
+                        message: textToSend,
+                        conversation_id: originatingConvId
+                    }),
+                });
 
-            // If new session was automatically allocated
-            if (data.conversation_id && data.conversation_id !== activeConvId) {
-                setActiveConvId(data.conversation_id);
-                fetchConversations();
-            } else {
-                fetchConversations();
-            }
+                if (!response.ok) {
+                    const errData = await response.json();
+                    throw new Error(errData.detail || 'Network response failed');
+                }
 
-            if (data.hybrid_memory) {
-                setHybridTelemetry(data.hybrid_memory);
-            }
+                const data = await response.json();
+                
+                // If user switched conversation during in-flight generation, do not append to new room
+                if (originatingConvId !== activeConvIdRef.current && activeConvIdRef.current !== null) {
+                    return;
+                }
 
-            const aiMessage = {
-                role: 'ai',
-                content: data.response,
-                shield: data.safety_shield || 'Active',
-                timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-            };
-            setMessages(prev => [...prev, aiMessage]);
+                if (data.conversation_id && data.conversation_id !== activeConvId) {
+                    setActiveConvId(data.conversation_id);
+                    fetchConversations();
+                } else {
+                    fetchConversations();
+                }
+
+                if (data.hybrid_memory) {
+                    setHybridTelemetry(data.hybrid_memory);
+                }
+
+                const aiMessage = {
+                    role: 'ai',
+                    content: data.response,
+                    shield: data.safety_shield || 'Active',
+                    timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                };
+                setMessages(prev => [...prev, aiMessage]);
+            }
         } catch (error) {
             console.error('Error:', error);
             if (originatingConvId === activeConvIdRef.current) {
@@ -503,6 +589,9 @@ const ChatInterface = () => {
                                         </button>
 
                                         <StructuredMessage content={msg.content} />
+                                        {msg.isStreaming && (
+                                            <span className="inline-block w-2 h-4 bg-emerald-400 animate-pulse ml-1 translate-y-0.5 rounded-sm" title="Streaming response..." />
+                                        )}
 
                                         <div className="mt-2.5 pt-2 border-t border-white/5 flex items-center justify-between text-[10px] font-mono text-slate-500">
                                             {msg.role === 'ai' && !msg.isError ? (
@@ -528,7 +617,7 @@ const ChatInterface = () => {
                                 </div>
                             ))}
 
-                            {isLoading && (
+                            {isLoading && !messages.some(m => m.isStreaming) && (
                                 <div className="flex gap-3 justify-start">
                                     <div className="w-8 h-8 rounded-xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0">
                                         <Bot className="w-4 h-4 animate-pulse" />

@@ -57,6 +57,21 @@ class RAGService:
                                 text += pt + "\n"
                 except Exception as e:
                     print(f"pdfplumber extraction error: {e}")
+
+            # Fallback to Gemini Multimodal OCR for scanned image/handwritten PDFs
+            if (not text.strip() or len(text.strip()) < 25) and os.getenv("GEMINI_API_KEY"):
+                try:
+                    import google.generativeai as genai
+                    genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+                    ocr_model = genai.GenerativeModel("gemini-2.5-flash")
+                    ocr_res = ocr_model.generate_content([
+                        {"mime_type": "application/pdf", "data": file_bytes},
+                        "Perform OCR: Transcribe all readable text, formulas, headings, and notes from this scanned PDF document accurately."
+                    ])
+                    if ocr_res and hasattr(ocr_res, "text") and ocr_res.text:
+                        text = ocr_res.text
+                except Exception as ocr_e:
+                    print(f"Gemini Multimodal OCR extraction error: {ocr_e}")
         else:
             # Assume text/note
             try:
