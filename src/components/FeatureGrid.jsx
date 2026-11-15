@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { MessageSquare, FileText, BookOpen, Zap, Clock, BarChart, Mic, Share2 } from 'lucide-react';
+import { MessageSquare, FileText, BookOpen, Zap, Clock, BarChart3, Mic, Share2, ArrowUpRight } from 'lucide-react';
 
 const icons = {
     Chat: MessageSquare,
@@ -8,45 +8,69 @@ const icons = {
     Flashcards: BookOpen,
     Quiz: Zap,
     Timer: Clock,
-    Progress: BarChart,
+    Progress: BarChart3,
     Voice: Mic,
     Maps: Share2
 };
 
 const features = [
-    { icon: 'Chat', title: 'AI Chat', desc: 'Ask questions and get instant explanations from your AI tutor', link: '/chat' },
-    { icon: 'Summarize', title: 'Smart Summarization', desc: 'Condense study materials into concise, focused summaries', link: '/summarize' },
-    { icon: 'Flashcards', title: 'Flashcards', desc: 'Auto-generate flashcards for effective spaced repetition', link: '/flashcards' },
-    { icon: 'Quiz', title: 'Quiz Generation', desc: 'Create interactive quizzes to test your knowledge', link: '/quiz' },
-    { icon: 'Timer', title: 'Study Timer', desc: 'Track focus time with smart break reminders', link: '/timer' },
-    { icon: 'Progress', title: 'Progress Tracking', desc: 'Monitor your learning journey with detailed analytics', link: '/progress' },
-    { icon: 'Voice', title: 'Voice Notes', desc: 'Record and transcribe study notes automatically', link: '/voice' },
-    { icon: 'Maps', title: 'Concept Maps', desc: 'Visualize complex topics with AI-generated diagrams', link: '/maps' },
+    { icon: 'Chat', title: 'Contextual AI Chat', desc: 'Engage with a tutor that retains multi-turn session history and formats code gracefully.', link: '/chat', tag: 'AI Engine' },
+    { icon: 'Summarize', title: 'Smart Summarization', desc: 'Synthesize research papers, textbook chapters, and topics into high-retention bullet points.', link: '/summarize', tag: 'Core' },
+    { icon: 'Flashcards', title: 'Recall Flashcards', desc: 'Auto-generate digital flashcard decks optimized for spaced repetition learning.', link: '/flashcards', tag: 'Study' },
+    { icon: 'Quiz', title: 'Dynamic MCQ Quizzes', desc: 'Challenge yourself with AI-generated quizzes featuring instant grading and answer rationales.', link: '/quiz', tag: 'Testing' },
+    { icon: 'Timer', title: 'Pomodoro Focus Timer', desc: 'Track deep-work intervals and build persistent learning streaks with zero distractions.', link: '/timer', tag: 'Productivity' },
+    { icon: 'Progress', title: 'Learning Analytics', desc: 'Inspect study duration, total quizzes taken, and session metrics powered by SQLite.', link: '/progress', tag: 'Telemetry' },
+    { icon: 'Maps', title: 'Concept Graphs', desc: 'Generate visual knowledge maps depicting structural relationships between concepts.', link: '/maps', tag: 'Visuals' },
+    { icon: 'Voice', title: 'Voice Study Room', desc: 'Speech-enabled study sessions for auditory learners and active recitation.', link: '/voice', tag: 'Audio' },
 ];
 
 const FeatureGrid = () => {
     return (
-        <section id="features" className="py-24 bg-white">
+        <section id="features" className="py-20 relative">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="text-center mb-16">
-                    <h2 className="text-3xl font-bold text-slate-900 mb-4">Powerful Study Features</h2>
-                    <p className="text-slate-600 max-w-2xl mx-auto">Everything you need to master your subjects in one place.</p>
+                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-900 border border-slate-800 text-slate-400 font-mono text-xs mb-3">
+                        Integrated Modules
+                    </div>
+                    <h2 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight mb-4">
+                        Comprehensive Developer Study Ecosystem
+                    </h2>
+                    <p className="text-slate-400 max-w-2xl mx-auto text-sm sm:text-base">
+                        Every tool architected to maximize conceptual clarity, retention, and exam readiness.
+                    </p>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                     {features.map((feature, idx) => {
                         const Icon = icons[feature.icon];
                         return (
-                            <Link key={idx} to={feature.link} className="block group p-8 rounded-2xl border border-slate-100 hover:border-blue-100 hover:shadow-xl hover:shadow-blue-900/5 transition-all duration-300 bg-white hover:-translate-y-1">
-                                <div className="w-12 h-12 bg-blue-50 rounded-xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300">
-                                    <Icon className="w-6 h-6 text-blue-600" />
+                            <Link
+                                key={idx}
+                                to={feature.link}
+                                className="group p-6 rounded-2xl glass-panel hover:glass-panel-glow transition-all duration-300 relative flex flex-col justify-between hover:-translate-y-1.5"
+                            >
+                                <div>
+                                    <div className="flex items-center justify-between mb-4">
+                                        <div className="w-11 h-11 bg-emerald-500/10 border border-emerald-500/20 rounded-xl flex items-center justify-center text-emerald-400 group-hover:bg-emerald-500 group-hover:text-slate-950 transition-all duration-300">
+                                            <Icon className="w-5 h-5" />
+                                        </div>
+                                        <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700/50">
+                                            {feature.tag}
+                                        </span>
+                                    </div>
+                                    <h3 className="text-lg font-bold text-white mb-2 group-hover:text-emerald-300 transition-colors flex items-center justify-between">
+                                        <span>{feature.title}</span>
+                                        <ArrowUpRight className="w-4 h-4 opacity-0 group-hover:opacity-100 transition-all text-emerald-400" />
+                                    </h3>
+                                    <p className="text-slate-400 leading-relaxed text-xs">
+                                        {feature.desc}
+                                    </p>
                                 </div>
-                                <h3 className="text-xl font-bold text-slate-900 mb-3 group-hover:text-blue-600 transition-colors">
-                                    {feature.title}
-                                </h3>
-                                <p className="text-slate-600 leading-relaxed text-sm">
-                                    {feature.desc}
-                                </p>
+
+                                <div className="mt-6 pt-3 border-t border-white/5 flex items-center justify-between text-[11px] font-mono text-slate-500 group-hover:text-emerald-400 transition-colors">
+                                    <span>Launch module</span>
+                                    <span>&rarr;</span>
+                                </div>
                             </Link>
                         );
                     })}

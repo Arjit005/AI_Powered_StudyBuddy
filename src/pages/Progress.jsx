@@ -1,81 +1,225 @@
-
 import React, { useEffect, useState } from 'react';
-import { BarChart, Calendar, TrendingUp } from 'lucide-react';
+import { BarChart3, Calendar, TrendingUp, RotateCcw, Award, Flame, Shield, Activity, Clock, CheckCircle2, Bot, Zap } from 'lucide-react';
 
 const Progress = () => {
     const [stats, setStats] = useState({ study_hours: 0, quizzes_taken: 0, streak_days: 0 });
     const [chartImage, setChartImage] = useState(null);
+    const [sessions, setSessions] = useState([]);
+    const [loading, setLoading] = useState(true);
 
-    useEffect(() => {
-        fetch('/api/progress')
+    const fetchAnalytics = () => {
+        setLoading(true);
+        const token = localStorage.getItem('auth_token');
+        const headers = {};
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+
+        fetch('/api/progress', { headers })
             .then(res => res.json())
             .then(data => setStats(data))
             .catch(err => console.error("Error fetching progress:", err));
 
-        fetch('/api/analytics/dashboard')
+        fetch('/api/analytics/dashboard', { headers })
             .then(res => res.json())
             .then(data => {
                 if (data.chart) setChartImage(`data:image/png;base64,${data.chart}`);
             })
             .catch(err => console.error("Error fetching chart:", err));
+
+        fetch('/api/sessions/history', { headers })
+            .then(res => res.json())
+            .then(data => {
+                if (Array.isArray(data)) setSessions(data);
+            })
+            .catch(err => console.error("Error fetching session history:", err))
+            .finally(() => setLoading(false));
+    };
+
+    useEffect(() => {
+        fetchAnalytics();
     }, []);
 
     const resetStats = async () => {
-        if (!confirm("Reset all study progress?")) return;
-        await fetch('/api/progress', { method: 'DELETE' });
+        if (!confirm("Are you sure you want to reset all recorded study progress?")) return;
+        const token = localStorage.getItem('auth_token');
+        const headers = {};
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+        await fetch('/api/progress', { method: 'DELETE', headers });
         setStats({ study_hours: 0, quizzes_taken: 0, streak_days: 0 });
+        setChartImage(null);
+        setSessions([]);
+    };
+
+    const getActivityIcon = (type) => {
+        switch (type) {
+            case 'timer_focus':
+                return <Clock className="w-4 h-4 text-emerald-400" />;
+            case 'quiz':
+                return <Zap className="w-4 h-4 text-amber-400" />;
+            case 'ai_chat':
+                return <Bot className="w-4 h-4 text-cyan-400" />;
+            default:
+                return <Activity className="w-4 h-4 text-slate-400" />;
+        }
+    };
+
+    const formatActivityName = (type) => {
+        switch (type) {
+            case 'timer_focus':
+                return 'Pomodoro Deep Focus';
+            case 'quiz':
+                return 'Quiz Assessment';
+            case 'ai_chat':
+                return 'AI Tutor Chat Session';
+            default:
+                return type;
+        }
     };
 
     return (
-        <div className="pt-24 pb-12 min-h-screen bg-slate-50">
+        <div className="py-12 min-h-screen">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                <div className="mb-12 flex justify-between items-end">
+                {/* Header */}
+                <div className="mb-10 flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4 pb-6 border-b border-white/5">
                     <div>
-                        <h1 className="text-4xl font-bold text-slate-900 mb-4">Your Progress</h1>
-                        <p className="text-xl text-slate-600">Track your study habits and improvements over time.</p>
+                        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-mono text-xs mb-2">
+                            <Activity className="w-3.5 h-3.5" />
+                            <span>Learning Activity & Milestones</span>
+                        </div>
+                        <h1 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">
+                            Study Analytics & Learning Progress
+                        </h1>
+                        <p className="text-slate-400 text-sm mt-1">
+                            Real-time focus tracking, learning metrics, and assessment history across all study sessions.
+                        </p>
                     </div>
-                    <button onClick={resetStats} className="text-red-500 hover:text-red-700 text-sm font-semibold">
-                        Reset Data
-                    </button>
-                </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                    <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-                        <div className="flex items-center gap-4 mb-4">
-                            <div className="p-3 bg-blue-100 rounded-xl text-blue-600"><TrendingUp className="w-6 h-6" /></div>
-                            <h3 className="font-bold text-slate-900">Active Days</h3>
-                        </div>
-                        <p className="text-4xl font-black text-slate-900">{stats.streak_days} <span className="text-lg font-medium text-slate-500">days</span></p>
-                    </div>
-                    <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-                        <div className="flex items-center gap-4 mb-4">
-                            <div className="p-3 bg-green-100 rounded-xl text-green-600"><Calendar className="w-6 h-6" /></div>
-                            <h3 className="font-bold text-slate-900">Hours Studied</h3>
-                        </div>
-                        <p className="text-4xl font-black text-slate-900">{stats.study_hours} <span className="text-lg font-medium text-slate-500">hours</span></p>
-                    </div>
-                    <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-                        <div className="flex items-center gap-4 mb-4">
-                            <div className="p-3 bg-amber-100 rounded-xl text-amber-600"><BarChart className="w-6 h-6" /></div>
-                            <h3 className="font-bold text-slate-900">Quizzes Taken</h3>
-                        </div>
-                        <p className="text-4xl font-black text-slate-900">{stats.quizzes_taken} <span className="text-lg font-medium text-slate-500">quizzes</span></p>
+                    <div className="flex items-center gap-3">
+                        <button
+                            onClick={fetchAnalytics}
+                            className="px-3.5 py-2 rounded-xl glass-panel text-slate-300 hover:text-white font-mono text-xs flex items-center gap-1.5 transition-all"
+                        >
+                            <RotateCcw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} /> Refresh
+                        </button>
+                        <button
+                            onClick={resetStats}
+                            className="px-3.5 py-2 rounded-xl bg-rose-950/40 border border-rose-800/50 hover:bg-rose-900/40 text-rose-300 font-mono text-xs transition-all"
+                        >
+                            Reset Data
+                        </button>
                     </div>
                 </div>
 
-                <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-200 flex flex-col items-center justify-center min-h-[400px] text-center overflow-hidden">
-                    {chartImage ? (
-                        <>
-                            <h3 className="text-xl font-bold text-slate-900 mb-6 self-start">Study Analytics (Generated by Python/Pandas)</h3>
-                            <img src={chartImage} alt="Python Generated Chart" className="max-w-full rounded-xl shadow-lg border border-slate-100" />
-                        </>
-                    ) : (
-                        <>
-                            <img src="https://placehold.co/600x300/e2e8f0/94a3b8?text=Generating+Python+Chart..." alt="Chart Placeholder" className="rounded-xl mb-6 opacity-50" />
-                            <h3 className="text-xl font-bold text-slate-900 mb-2">No Data Yet</h3>
-                            <p className="text-slate-500 max-w-md">Complete a quiz or study session to see your Python-generated analytics.</p>
-                        </>
-                    )}
+                {/* Metrics Grid */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
+                    <div className="glass-panel p-6 rounded-3xl relative overflow-hidden border border-white/5">
+                        <div className="flex items-center justify-between mb-4">
+                            <div className="w-12 h-12 bg-amber-500/20 text-amber-400 rounded-2xl flex items-center justify-center border border-amber-500/30">
+                                <Flame className="w-6 h-6" />
+                            </div>
+                            <span className="text-xs font-mono text-amber-400 font-bold px-2 py-0.5 rounded-full bg-amber-500/10">Active Streak</span>
+                        </div>
+                        <p className="text-xs font-mono text-slate-400 mb-1">Study Sessions Recorded</p>
+                        <div className="text-4xl font-extrabold text-white font-mono">
+                            {stats.streak_days} <span className="text-sm font-sans font-normal text-slate-500">sessions</span>
+                        </div>
+                    </div>
+
+                    <div className="glass-panel p-6 rounded-3xl relative overflow-hidden border border-white/5">
+                        <div className="flex items-center justify-between mb-4">
+                            <div className="w-12 h-12 bg-emerald-500/20 text-emerald-400 rounded-2xl flex items-center justify-center border border-emerald-500/30">
+                                <Calendar className="w-6 h-6" />
+                            </div>
+                            <span className="text-xs font-mono text-emerald-400 font-bold px-2 py-0.5 rounded-full bg-emerald-500/10">Deep Work</span>
+                        </div>
+                        <p className="text-xs font-mono text-slate-400 mb-1">Total Hours Studied</p>
+                        <div className="text-4xl font-extrabold text-white font-mono">
+                            {stats.study_hours} <span className="text-sm font-sans font-normal text-slate-500">hours</span>
+                        </div>
+                    </div>
+
+                    <div className="glass-panel p-6 rounded-3xl relative overflow-hidden border border-white/5">
+                        <div className="flex items-center justify-between mb-4">
+                            <div className="w-12 h-12 bg-teal-500/20 text-teal-400 rounded-2xl flex items-center justify-center border border-teal-500/30">
+                                <Award className="w-6 h-6" />
+                            </div>
+                            <span className="text-xs font-mono text-teal-400 font-bold px-2 py-0.5 rounded-full bg-teal-500/10">Assessments</span>
+                        </div>
+                        <p className="text-xs font-mono text-slate-400 mb-1">Total Quizzes Attempted</p>
+                        <div className="text-4xl font-extrabold text-white font-mono">
+                            {stats.quizzes_taken} <span className="text-sm font-sans font-normal text-slate-500">quizzes</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+                    {/* Recent Sessions Table */}
+                    <div className="glass-panel p-6 sm:p-8 rounded-3xl border border-white/5">
+                        <div className="flex items-center justify-between mb-6 pb-3 border-b border-white/5">
+                            <div>
+                                <h2 className="text-base font-bold text-white flex items-center gap-2">
+                                    <Clock className="w-4 h-4 text-emerald-400" />
+                                    Recent Study Sessions Log
+                                </h2>
+                                <p className="text-xs text-slate-400 font-mono mt-0.5">Persisted in SQLite database</p>
+                            </div>
+                            <span className="text-xs font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-400">{sessions.length} Logged</span>
+                        </div>
+
+                        {sessions.length > 0 ? (
+                            <div className="space-y-3 max-h-80 overflow-y-auto pr-1">
+                                {sessions.map((s) => (
+                                    <div key={s.id} className="p-3.5 rounded-2xl bg-slate-900/60 border border-slate-800/80 flex items-center justify-between text-xs">
+                                        <div className="flex items-center gap-3">
+                                            <div className="p-2 rounded-xl bg-slate-800/80">
+                                                {getActivityIcon(s.activity_type)}
+                                            </div>
+                                            <div>
+                                                <div className="font-semibold text-slate-200">{formatActivityName(s.activity_type)}</div>
+                                                <div className="text-[11px] font-mono text-slate-500">
+                                                    {s.created_at ? new Date(s.created_at).toLocaleString() : 'Recent'}
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div className="font-mono text-emerald-400 font-bold">
+                                            {s.duration_seconds > 0 ? `${Math.round(s.duration_seconds / 60)} min` : '< 1 min'}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="h-60 flex flex-col items-center justify-center text-slate-600 font-mono text-xs">
+                                <Clock className="w-8 h-8 text-slate-700 mb-2" />
+                                <span>No study sessions recorded yet. Start a chat or focus timer!</span>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Visual Activity Graph */}
+                    <div className="glass-panel p-6 sm:p-8 rounded-3xl border border-white/5 flex flex-col justify-between">
+                        <div>
+                            <div className="flex items-center justify-between mb-6 pb-3 border-b border-white/5">
+                                <div>
+                                    <h2 className="text-base font-bold text-white flex items-center gap-2">
+                                        <BarChart3 className="w-4 h-4 text-emerald-400" />
+                                        Activity Distribution Chart
+                                    </h2>
+                                    <p className="text-xs text-slate-400 font-mono mt-0.5">Pandas + Matplotlib rendering</p>
+                                </div>
+                                <span className="text-xs font-mono px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-bold">LIVE</span>
+                            </div>
+
+                            {chartImage ? (
+                                <div className="flex justify-center bg-slate-950/70 p-3 rounded-2xl border border-slate-900 overflow-hidden">
+                                    <img src={chartImage} alt="Study Activity Analytics" className="max-h-64 rounded-xl object-contain" />
+                                </div>
+                            ) : (
+                                <div className="h-60 flex flex-col items-center justify-center text-slate-600 font-mono text-xs border border-dashed border-slate-800 rounded-2xl">
+                                    <BarChart3 className="w-8 h-8 text-slate-700 mb-2" />
+                                    <span>Visual chart generates automatically after your sessions.</span>
+                                </div>
+                            )}
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>

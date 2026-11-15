@@ -1,8 +1,13 @@
+import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Header from './components/Header';
 import Layout from './components/Layout';
+import CommandPalette from './components/CommandPalette';
+
 import Home from './pages/Home';
 import Chat from './pages/Chat';
+import CanvasStudio from './pages/CanvasStudio';
+import Library from './pages/Library';
 import Summarize from './pages/Summarize';
 import Quiz from './pages/Quiz';
 import Flashcards from './pages/Flashcards';
@@ -10,6 +15,7 @@ import Progress from './pages/Progress';
 import Timer from './pages/Timer';
 import Voice from './pages/Voice';
 import Maps from './pages/Maps';
+import Sources from './pages/Sources';
 import Pricing from './pages/Pricing';
 import LoginPage from './pages/LoginPage';
 import SignupPage from './pages/SignupPage';
@@ -21,9 +27,20 @@ const ProtectedRoute = ({ children }) => {
 };
 
 function App() {
+  const [paletteOpen, setPaletteOpen] = useState(false);
+
+  useEffect(() => {
+    const handleOpen = () => setPaletteOpen(true);
+    window.addEventListener('study-buddy:open-palette', handleOpen);
+    return () => window.removeEventListener('study-buddy:open-palette', handleOpen);
+  }, []);
+
   return (
     <Router>
       <Layout>
+        {/* Global Command Palette */}
+        <CommandPalette isOpen={paletteOpen} onClose={() => setPaletteOpen(false)} />
+
         <Routes>
           {/* Public Routes */}
           <Route path="/login" element={<LoginPage />} />
@@ -43,6 +60,30 @@ function App() {
               <>
                 <Header />
                 <Chat />
+              </>
+            </ProtectedRoute>
+          } />
+          <Route path="/canvas" element={
+            <ProtectedRoute>
+              <>
+                <Header />
+                <CanvasStudio />
+              </>
+            </ProtectedRoute>
+          } />
+          <Route path="/library" element={
+            <ProtectedRoute>
+              <>
+                <Header />
+                <Library />
+              </>
+            </ProtectedRoute>
+          } />
+          <Route path="/sources" element={
+            <ProtectedRoute>
+              <>
+                <Header />
+                <Sources />
               </>
             </ProtectedRoute>
           } />

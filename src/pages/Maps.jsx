@@ -1,142 +1,260 @@
 import React, { useState } from 'react';
-import { Share2, Loader2, Sparkles, X, ZoomIn } from 'lucide-react';
+import { Share2, Sparkles, X, ZoomIn, Download, Network, ArrowRight, Layers, Cpu, CheckCircle2 } from 'lucide-react';
+import MermaidViewer from '../components/MermaidViewer';
+
+const SUGGESTIONS = [
+    "Microservices & API Gateway Architecture",
+    "OAuth 2.0 Authorization Code Flow",
+    "Kafka Event-Driven Architecture",
+    "Database Sharding & Read Replicas",
+    "Kubernetes Pod Lifecycle & Ingress"
+];
 
 const Maps = () => {
     const [topic, setTopic] = useState('');
     const [loading, setLoading] = useState(false);
+    const [viewMode, setViewMode] = useState('mermaid'); // 'mermaid' or 'networkx'
+    
+    // Diagram data
+    const [diagramData, setDiagramData] = useState(null);
     const [mapImage, setMapImage] = useState(null);
     const [isZoomed, setIsZoomed] = useState(false);
     const [error, setError] = useState(null);
 
-    const generateMap = async () => {
-        if (!topic.trim()) return;
+    const generateDiagram = async (targetTopic) => {
+        const topicToUse = targetTopic || topic;
+        if (!topicToUse.trim()) return;
         setLoading(true);
-        setMapImage(null);
         setError(null);
         setIsZoomed(false);
 
+        const token = localStorage.getItem('auth_token');
+        const headers = { 'Content-Type': 'application/json' };
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+
         try {
-            const res = await fetch('/api/generate-map', {
+            // 1. Fetch detailed Mermaid diagram
+            const diagramRes = await fetch('/api/generate-diagram', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ topic })
+                headers,
+                body: JSON.stringify({ topic: topicToUse.trim() })
             });
 
-            if (!res.ok) {
-                const errText = await res.text();
-                throw new Error(`Error ${res.status}: ${errText || res.statusText}`);
+            if (diagramRes.ok) {
+                const data = await diagramRes.json();
+                setDiagramData(data);
             }
 
-            const data = await res.json();
-            if (data.map_image) {
-                setMapImage(`data:image/png;base64,${data.map_image}`);
-            } else {
-                throw new Error("No image data received from AI");
+            // 2. Fetch NetworkX fallback topology graph
+            const mapRes = await fetch('/api/generate-map', {
+                method: 'POST',
+                headers,
+                body: JSON.stringify({ topic: topicToUse.trim() })
+            });
+
+            if (mapRes.ok) {
+                const mapJson = await mapRes.json();
+                if (mapJson.map_image) {
+                    setMapImage(`data:image/png;base64,${mapJson.map_image}`);
+                }
             }
         } catch (err) {
-            console.error(err);
-            setError(err.message || "Failed to generate map. Please try again.");
+            console.error("Error generating diagram:", err);
+            setError(err.message || "Failed to synthesize system diagram.");
         } finally {
             setLoading(false);
         }
     };
 
     return (
-        <div className="pt-24 pb-12 min-h-screen bg-slate-50">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                <div className="text-center mb-16">
-                    <h1 className="text-4xl font-bold text-slate-900 mb-4">AI Concept Maps</h1>
-                    <p className="text-xl text-slate-600">Visualize connections between complex topics.</p>
+        <div className="py-12 min-h-screen">
+            <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+                {/* Header */}
+                <div className="text-center mb-10">
+                    <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-cyan-500/20 border border-cyan-500/30 text-cyan-400 mb-3 shadow-[0_0_20px_rgba(6,182,212,0.25)]">
+                        <Network className="w-7 h-7" />
+                    </div>
+                    <h1 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight mb-2">
+                        Interactive Architecture & Concept Diagrams
+                    </h1>
+                    <p className="text-slate-400 text-sm max-w-xl mx-auto">
+                        Generate production-grade Mermaid.js system architectures, data flows, and NetworkX knowledge graphs with deep technical breakdown.
+                    </p>
                 </div>
 
-                <div className="bg-white rounded-3xl shadow-xl border border-slate-200 p-8 min-h-[600px] flex items-center justify-center relative overflow-hidden">
-                    <div className="absolute inset-0 bg-grid-slate-100 [mask-image:linear-gradient(0deg,white,rgba(255,255,255,0.6))]"></div>
+                {/* Generator Bar */}
+                <div className="max-w-xl mx-auto mb-4 flex gap-3">
+                    <input
+                        type="text"
+                        value={topic}
+                        onChange={(e) => setTopic(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && generateDiagram()}
+                        placeholder="Enter system/topic (e.g. Distributed Consensus, OAuth 2.0)..."
+                        className="flex-1 px-4 py-3 rounded-xl glass-input text-sm font-mono placeholder:text-slate-500"
+                    />
+                    <button
+                        onClick={() => generateDiagram()}
+                        disabled={loading || !topic.trim()}
+                        className="px-6 py-3 rounded-xl font-semibold text-sm bg-gradient-to-r from-emerald-500 to-teal-500 text-slate-950 hover:brightness-110 active:scale-95 transition-all shadow-[0_0_20px_rgba(16,185,129,0.3)] disabled:opacity-40 flex items-center gap-2"
+                    >
+                        {loading ? (
+                            <div className="w-4 h-4 border-2 border-slate-950 border-t-transparent rounded-full animate-spin" />
+                        ) : (
+                            <Sparkles className="w-4 h-4" />
+                        )}
+                        <span>Architect</span>
+                    </button>
+                </div>
 
-                    <div className="text-center relative z-10 w-full max-w-2xl mx-auto">
-                        <Share2 className="w-16 h-16 text-indigo-300 mx-auto mb-6" />
-                        <h3 className="text-2xl font-bold text-slate-900 mb-3">Interactive Canvas</h3>
-                        <p className="text-slate-500 max-w-md mx-auto mb-8">
-                            Enter a central topic to generate a mind map.
-                        </p>
+                {/* Quick suggestions */}
+                <div className="flex flex-wrap justify-center gap-2 mb-8 text-xs font-mono text-slate-400">
+                    <span className="text-slate-500">Quick explore:</span>
+                    {SUGGESTIONS.map((s, idx) => (
+                        <button
+                            key={idx}
+                            onClick={() => {
+                                setTopic(s);
+                                generateDiagram(s);
+                            }}
+                            className="px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-800 hover:border-emerald-500/50 hover:text-emerald-300 transition-colors"
+                        >
+                            {s}
+                        </button>
+                    ))}
+                </div>
 
-                        <div className="flex max-w-md mx-auto gap-2">
-                            <input
-                                type="text"
-                                value={topic}
-                                onChange={(e) => setTopic(e.target.value)}
-                                placeholder="Enter central topic..."
-                                className="flex-1 px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                            />
+                {error && (
+                    <div className="max-w-md mx-auto mb-6 p-4 rounded-xl bg-rose-950/50 border border-rose-800/60 text-rose-300 text-xs text-center font-mono">
+                        {error}
+                    </div>
+                )}
+
+                {/* Mode Selector Tabs (Visible when data exists) */}
+                {(diagramData || mapImage) && (
+                    <div className="flex justify-center mb-6">
+                        <div className="p-1 rounded-xl bg-slate-900 border border-slate-800 flex gap-1 text-xs font-mono">
                             <button
-                                onClick={generateMap}
-                                disabled={loading || !topic.trim()}
-                                className="px-6 py-3 bg-indigo-600 disabled:opacity-50 text-white rounded-xl font-bold hover:bg-indigo-700 transition-colors flex items-center gap-2"
+                                onClick={() => setViewMode('mermaid')}
+                                className={`px-4 py-2 rounded-lg font-bold transition-all flex items-center gap-2 ${
+                                    viewMode === 'mermaid'
+                                        ? 'bg-emerald-500 text-slate-950 shadow-[0_0_12px_rgba(16,185,129,0.3)]'
+                                        : 'text-slate-400 hover:text-white'
+                                }`}
                             >
-                                {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Sparkles className="w-5 h-5" />}
-                                Generate
+                                <Cpu className="w-3.5 h-3.5" />
+                                <span>Interactive Architecture (Mermaid SVG)</span>
+                            </button>
+                            <button
+                                onClick={() => setViewMode('networkx')}
+                                className={`px-4 py-2 rounded-lg font-bold transition-all flex items-center gap-2 ${
+                                    viewMode === 'networkx'
+                                        ? 'bg-cyan-500 text-slate-950 shadow-[0_0_12px_rgba(6,182,212,0.3)]'
+                                        : 'text-slate-400 hover:text-white'
+                                }`}
+                            >
+                                <Network className="w-3.5 h-3.5" />
+                                <span>Topology Graph (NetworkX)</span>
                             </button>
                         </div>
-
-                        {error && (
-                            <div className="mt-6 p-4 bg-red-50 text-red-600 rounded-xl border border-red-200 animate-in fade-in slide-in-from-bottom-2">
-                                <p className="font-semibold">Generation Failed</p>
-                                <p className="text-sm opacity-80">{error}</p>
-                            </div>
-                        )}
                     </div>
+                )}
 
-                    {mapImage && (
-                        <div className="relative z-10 w-full max-w-4xl mt-8">
-                            <div
-                                className="bg-white p-4 rounded-xl shadow-lg border border-slate-200 cursor-zoom-in group relative"
-                                onClick={() => setIsZoomed(true)}
-                            >
-                                <img src={mapImage} alt="Generated Concept Map" className="w-full rounded-lg" />
-                                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-colors rounded-lg flex items-center justify-center">
-                                    <ZoomIn className="text-white opacity-0 group-hover:opacity-100 w-10 h-10 transition-opacity drop-shadow-lg" />
-                                </div>
+                {/* Viewport Card */}
+                <div className="glass-panel p-6 sm:p-8 rounded-3xl border border-white/5 relative min-h-[480px]">
+                    {loading && (
+                        <div className="flex flex-col items-center justify-center min-h-[400px] gap-3 text-slate-400 font-mono text-xs">
+                            <div className="w-8 h-8 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin" />
+                            <span>Designing Subsystem Boundaries & Compiling Vector Flowchart...</span>
+                        </div>
+                    )}
+
+                    {/* Mode 1: Detailed Interactive Mermaid Diagram */}
+                    {!loading && diagramData && viewMode === 'mermaid' && (
+                        <div className="space-y-6">
+                            <div>
+                                <h2 className="text-xl font-bold text-white mb-1">{diagramData.title}</h2>
+                                <p className="text-xs text-slate-400 font-mono">{diagramData.description}</p>
                             </div>
-                            <div className="text-center mt-4">
-                                <p className="text-sm text-slate-500 italic">Click the image to expand</p>
+
+                            <MermaidViewer
+                                chart={diagramData.mermaid_code}
+                                title={diagramData.title}
+                            />
+
+                            {/* Structured Component Breakdown */}
+                            {diagramData.key_components && diagramData.key_components.length > 0 && (
+                                <div className="mt-6 pt-6 border-t border-white/5 space-y-3">
+                                    <h3 className="text-sm font-bold text-emerald-400 font-mono uppercase tracking-wider flex items-center gap-2">
+                                        <Layers className="w-4 h-4" /> Subsystem Architectural Breakdown
+                                    </h3>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                        {diagramData.key_components.map((comp, idx) => (
+                                            <div key={idx} className="p-3.5 rounded-2xl bg-slate-900/60 border border-slate-800 text-xs text-slate-300 flex items-start gap-2.5">
+                                                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                                                <span className="leading-relaxed font-sans">{comp}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {/* Mode 2: NetworkX Matplotlib Graph */}
+                    {!loading && mapImage && viewMode === 'networkx' && (
+                        <div className="relative group w-full flex flex-col items-center">
+                            <img
+                                src={mapImage}
+                                alt="AI Concept Map"
+                                className="max-h-[500px] w-auto object-contain rounded-2xl border border-slate-800 shadow-2xl cursor-pointer hover:scale-[1.01] transition-transform"
+                                onClick={() => setIsZoomed(true)}
+                            />
+                            <div className="mt-4 flex gap-3">
+                                <button
+                                    onClick={() => setIsZoomed(true)}
+                                    className="px-4 py-2 rounded-xl glass-panel text-xs font-mono text-slate-300 hover:text-white flex items-center gap-1.5"
+                                >
+                                    <ZoomIn className="w-3.5 h-3.5" /> Fullscreen View
+                                </button>
+                                <a
+                                    href={mapImage}
+                                    download={`${topic || 'concept'}_topology.png`}
+                                    className="px-4 py-2 rounded-xl glass-panel text-xs font-mono text-slate-300 hover:text-white flex items-center gap-1.5"
+                                >
+                                    <Download className="w-3.5 h-3.5" /> Download PNG
+                                </a>
                             </div>
                         </div>
                     )}
+
+                    {/* Empty State */}
+                    {!loading && !diagramData && !mapImage && !error && (
+                        <div className="text-center text-slate-600 font-mono text-xs py-20">
+                            <Network className="w-12 h-12 text-slate-700 mx-auto mb-3" />
+                            <p className="text-slate-400">Diagram synthesis canvas is ready.</p>
+                            <p className="text-slate-600 mt-1">Enter a topic above or pick a sample to generate an architecture diagram.</p>
+                        </div>
+                    )}
                 </div>
-            </div>
 
-            {/* Lightbox Modal */}
-            {isZoomed && (
-                <div
-                    className="fixed inset-0 z-[100] bg-slate-900/95 overflow-y-auto backdrop-blur-sm animate-in fade-in duration-300"
-                    onClick={() => setIsZoomed(false)}
-                >
-                    <div className="min-h-screen w-full flex items-center justify-center p-4">
-                        <button
-                            className="fixed top-6 right-6 p-3 bg-white/10 hover:bg-white/20 text-white rounded-full transition-all hover:rotate-90 z-[110]"
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                setIsZoomed(false);
-                            }}
-                        >
-                            <X className="w-8 h-8" />
-                        </button>
-
-                        <div
-                            className="relative max-w-7xl w-full animate-in zoom-in duration-300"
-                            onClick={(e) => e.stopPropagation()}
-                        >
-                            <img
-                                src={mapImage}
-                                alt="Full Screen Concept Map"
-                                className="w-full h-auto rounded-xl shadow-2xl border border-white/10"
-                            />
-                            <p className="text-center text-white/70 text-sm mt-4">
-                                Click background or 'X' to close • Scroll to view details
-                            </p>
+                {/* NetworkX Fullscreen Zoom Modal */}
+                {isZoomed && mapImage && (
+                    <div
+                        className="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex items-center justify-center p-4"
+                        onClick={() => setIsZoomed(false)}
+                    >
+                        <div className="relative max-w-5xl max-h-[90vh]">
+                            <button
+                                onClick={() => setIsZoomed(false)}
+                                className="absolute -top-12 right-0 p-2 text-white hover:text-emerald-400"
+                            >
+                                <X className="w-6 h-6" />
+                            </button>
+                            <img src={mapImage} alt="Fullscreen Map" className="max-h-[85vh] w-auto rounded-xl object-contain border border-slate-800 shadow-2xl" />
                         </div>
                     </div>
-                </div>
-            )}
+                )}
+            </div>
         </div>
     );
 };
