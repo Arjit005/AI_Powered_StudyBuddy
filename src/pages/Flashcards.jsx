@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import FlipCard3D from '../components/ui/FlipCard3D';
 import { 
   FlipHorizontal, 
   ChevronLeft, 
@@ -260,59 +261,18 @@ const Flashcards = () => {
                     </div>
                 </div>
 
-                {/* Main Flashcard Container */}
+                {/* Main Flashcard Container with ReactBits 3D Perspective */}
                 <div className="max-w-xl mx-auto">
-                    <div
-                        onClick={() => setIsFlipped(!isFlipped)}
-                        className={`relative h-80 rounded-3xl glass-panel-glow p-8 flex flex-col justify-between cursor-pointer transition-all duration-500 hover:scale-[1.01] shadow-2xl border select-none group ${
-                            currentRating === 'mastered' 
-                                ? 'border-emerald-500/60 shadow-emerald-950/60' 
-                                : currentRating === 'hard' 
-                                ? 'border-rose-500/50' 
-                                : 'border-emerald-500/30'
-                        }`}
-                    >
-                        {/* Top Indicator */}
-                        <div className="flex justify-between items-center text-xs font-mono text-slate-400">
-                            <span className="px-2.5 py-1 rounded-full bg-slate-900 border border-slate-800 text-emerald-400 flex items-center gap-1.5">
-                                {isFlipped ? 'ANSWER / CONCEPT' : 'QUESTION / PROMPT'}
-                                {currentRating && (
-                                    <span className="text-[10px] uppercase font-bold text-white px-1.5 py-0.2 rounded bg-white/10">
-                                        {currentRating}
-                                    </span>
-                                )}
-                            </span>
-
-                            <div className="flex items-center gap-2">
-                                <button
-                                    onClick={handleReadCard}
-                                    className={`p-1.5 rounded-lg border text-slate-400 hover:text-white transition-colors ${
-                                        isSpeaking ? 'bg-emerald-500/20 border-emerald-400 text-emerald-300' : 'bg-slate-900 border-slate-800'
-                                    }`}
-                                    title="Listen to card (TTS)"
-                                >
-                                    {isSpeaking ? <VolumeX className="w-3.5 h-3.5" /> : <Volume2 className="w-3.5 h-3.5" />}
-                                </button>
-                                <span className="flex items-center gap-1.5 text-slate-500 group-hover:text-slate-300 transition-colors">
-                                    <FlipHorizontal className="w-3.5 h-3.5" />
-                                    Flip (Space)
-                                </span>
-                            </div>
-                        </div>
-
-                        {/* Card Center Content */}
-                        <div className="my-auto text-center px-4">
-                            <p className="text-lg sm:text-xl font-semibold text-white leading-relaxed font-sans">
-                                {isFlipped ? activeCardData.back : activeCardData.front}
-                            </p>
-                        </div>
-
-                        {/* Card Footer */}
-                        <div className="flex justify-between items-center text-xs font-mono text-slate-500 pt-4 border-t border-white/5">
-                            <span>Card {cards.length > 0 ? currentCard + 1 : 0} of {cards.length}</span>
-                            <span>{cards.length > 0 ? Math.round(((currentCard + 1) / cards.length) * 100) : 0}% Progress</span>
-                        </div>
-                    </div>
+                    <FlipCard3D
+                        frontContent={activeCardData.front}
+                        backContent={activeCardData.back}
+                        isFlipped={isFlipped}
+                        onFlip={() => setIsFlipped(!isFlipped)}
+                        cardCategory={topic || 'Core Concept'}
+                        currentRating={currentRating}
+                        onReadCard={handleReadCard}
+                        isSpeaking={isSpeaking}
+                    />
 
                     {/* Active Recall Self-Rating Buttons */}
                     <div className="grid grid-cols-3 gap-2 mt-4">

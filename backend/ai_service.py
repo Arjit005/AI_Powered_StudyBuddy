@@ -309,9 +309,26 @@ class AIService:
                         "openrouter/meta-llama/llama-3.3-70b-instruct:free"
                     ])
 
+                GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+                if GROQ_API_KEY:
+                    fallbacks.append("groq/llama-3.3-70b-versatile")
+                if NVIDIA_API_KEY:
+                    fallbacks.append("nvidia_nim/meta/llama-3.1-70b-instruct")
+
                 kwargs = {}
                 if is_json:
                     kwargs["response_format"] = {"type": "json_object"}
+
+                # Portkey Semantic Caching & Telemetry Integration
+                if PORTKEY_API_KEY:
+                    portkey_headers = {
+                        "x-portkey-api-key": PORTKEY_API_KEY,
+                        "x-portkey-cache": "semantic",
+                        "x-portkey-retry-count": "2"
+                    }
+                    if PORTKEY_VIRTUAL_KEY:
+                        portkey_headers["x-portkey-virtual-key"] = PORTKEY_VIRTUAL_KEY
+                    kwargs["extra_headers"] = portkey_headers
 
                 response = litellm.completion(
                     model=primary_model,

@@ -201,24 +201,41 @@ const Header = () => {
                             <kbd className="px-1.5 py-0.2 rounded bg-slate-800 text-[10px] text-slate-300 border border-white/10">⌘K</kbd>
                         </button>
 
-                        {user && (
-                            <div className="hidden sm:flex items-center gap-2 pl-3 py-1 pr-1 bg-slate-900/80 border border-slate-800 rounded-xl">
-                                <div className="w-6 h-6 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold text-xs uppercase">
-                                    {typeof user.username === 'string' && user.username ? user.username.slice(0, 2) : 'SB'}
+                        {user ? (
+                            <>
+                                <div className="hidden sm:flex items-center gap-2 pl-3 py-1 pr-1 bg-slate-900/80 border border-slate-800 rounded-xl">
+                                    <div className="w-6 h-6 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold text-xs uppercase">
+                                        {typeof user.username === 'string' && user.username ? user.username.slice(0, 2) : 'SB'}
+                                    </div>
+                                    <span className="text-xs font-mono text-slate-300 max-w-[100px] truncate">{user.username}</span>
+                                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-mono font-bold border border-emerald-500/20">PRO</span>
                                 </div>
-                                <span className="text-xs font-mono text-slate-300 max-w-[100px] truncate">{user.username}</span>
-                                <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-mono font-bold border border-emerald-500/20">PRO</span>
+
+                                <button
+                                    onClick={handleLogout}
+                                    className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-rose-400 px-3 py-1.5 rounded-xl border border-transparent hover:border-rose-900/40 hover:bg-rose-950/20 transition-all font-medium"
+                                    title="Sign out of session"
+                                >
+                                    <LogOut className="w-3.5 h-3.5" />
+                                    <span className="hidden sm:inline">Logout</span>
+                                </button>
+                            </>
+                        ) : (
+                            <div className="flex items-center gap-2">
+                                <Link
+                                    to="/login"
+                                    className="text-xs font-medium text-slate-300 hover:text-white px-3 py-1.5 rounded-xl border border-slate-800 hover:border-slate-700 bg-slate-900/60 transition-all"
+                                >
+                                    Sign In
+                                </Link>
+                                <Link
+                                    to="/signup"
+                                    className="hidden sm:inline-block text-xs font-medium text-emerald-400 hover:text-emerald-300 px-3 py-1.5 rounded-xl border border-emerald-500/30 hover:border-emerald-500/60 bg-emerald-500/10 transition-all"
+                                >
+                                    Sign Up
+                                </Link>
                             </div>
                         )}
-
-                        <button
-                            onClick={handleLogout}
-                            className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-rose-400 px-3 py-1.5 rounded-xl border border-transparent hover:border-rose-900/40 hover:bg-rose-950/20 transition-all font-medium"
-                            title="Sign out of session"
-                        >
-                            <LogOut className="w-3.5 h-3.5" />
-                            <span className="hidden sm:inline">Logout</span>
-                        </button>
 
                         <Link
                             to="/chat"
