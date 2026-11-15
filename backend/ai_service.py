@@ -99,14 +99,14 @@ class AIService:
             all_models = [m for m in all_models if 'gemini' in m.lower() and 'gemma' not in m.lower()]
             
             if not all_models:
-                return ['models/gemini-2.0-flash', 'models/gemini-1.5-flash']
+                return ['models/gemini-2.5-flash', 'models/gemini-flash-latest']
 
             preference = [
-                'gemini-2.0-flash', 
-                'gemini-1.5-flash', 
-                'gemini-1.5-pro', 
-                'gemini-pro',
-                'gemini-1.0-pro'
+                'gemini-2.5-flash',
+                'gemini-flash-latest',
+                'gemini-2.5-flash-lite',
+                'gemini-2.5-pro',
+                'gemini-pro-latest'
             ]
             
             prioritized_models = []
@@ -125,7 +125,7 @@ class AIService:
 
         except Exception as e:
             print(f"Model discovery note: {e}")
-            return ['models/gemini-2.0-flash', 'models/gemini-1.5-flash']
+            return ['models/gemini-2.5-flash', 'models/gemini-flash-latest']
 
     @staticmethod
     def _generate_with_openrouter(prompt: str):
@@ -133,11 +133,11 @@ class AIService:
             raise Exception("No OpenRouter API Key available for fallback.")
 
         free_models = [
-            "deepseek/deepseek-chat:free",
+            "nvidia/nemotron-3.5-lightning:free",
+            "nvidia/nemotron-3.5-super-vl:free",
+            "inclusionai/ling-3.2-flash:free",
             "meta-llama/llama-3.3-70b-instruct:free",
-            "mistralai/mistral-7b-instruct:free",
-            "google/gemini-2.0-flash-exp:free",
-            "google/gemini-flash-1.5"
+            "deepseek/deepseek-chat:free"
         ]
 
         headers = {
@@ -293,16 +293,16 @@ class AIService:
         # 1. Primary Route: LiteLLM AI Gateway (Multi-model failover)
         if litellm and circuit_breaker.is_available("litellm"):
             try:
-                # Prioritize Gemini, automatically fall back to OpenRouter free models
-                primary_model = "gemini/gemini-2.0-flash" if GEMINI_API_KEY else "openrouter/deepseek/deepseek-chat:free"
+                # Prioritize Gemini 2.5 Flash, automatically fall back to verified active free models
+                primary_model = "gemini/gemini-2.5-flash" if GEMINI_API_KEY else "openrouter/nvidia/nemotron-3.5-lightning:free"
                 fallbacks = []
                 if GEMINI_API_KEY:
-                    fallbacks.append("gemini/gemini-1.5-flash")
+                    fallbacks.append("gemini/gemini-flash-latest")
                 if OPENROUTER_API_KEY:
                     fallbacks.extend([
-                        "openrouter/deepseek/deepseek-chat:free",
-                        "openrouter/meta-llama/llama-3.3-70b-instruct:free",
-                        "openrouter/mistralai/mistral-7b-instruct:free"
+                        "openrouter/nvidia/nemotron-3.5-lightning:free",
+                        "openrouter/inclusionai/ling-3.2-flash:free",
+                        "openrouter/meta-llama/llama-3.3-70b-instruct:free"
                     ])
 
                 kwargs = {}

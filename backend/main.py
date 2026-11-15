@@ -1054,8 +1054,6 @@ def get_activity_heatmap(
         "total_study_minutes": round(total_minutes, 1),
         "total_records": len(sessions)
     }
-    db.commit()
-    return {"status": "reset"}
 
 @app.get("/api/analytics/dashboard", tags=["Analytics"])
 def get_analytics_dashboard(db: Session = Depends(get_db)):
