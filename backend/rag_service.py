@@ -8,6 +8,7 @@ from typing import List, Dict, Any, Tuple, Optional
 from sqlalchemy.orm import Session
 from backend.models import Source, SourceChunk, MessageSourceLink
 from backend.ai_service import AIService
+from backend.embedding_service import EmbeddingService, EmbeddingProviderError
 
 # Optional PDF & Web extractors
 try:
@@ -207,11 +208,16 @@ class RAGService:
         # 1. Store in local SQL database chunks
         created_chunks = []
         vectors_to_upsert = []
-        dim_1536 = 1536
+
+        # Generate genuine neural embeddings via EmbeddingService in batch
+        try:
+            batch_embeddings = EmbeddingService.embed_batch(chunks_data, task_type="retrieval_document")
+        except Exception as e:
+            print(f"EmbeddingService Warning (falling back to deterministic projection): {e}")
+            batch_embeddings = [RAGService._compute_semantic_embedding(t, dim=1536) for t in chunks_data]
 
         for idx, text in enumerate(chunks_data):
-            # Compute semantic embedding (1536 dimensions for Pinecone index compatibility)
-            embedding_1536 = RAGService._compute_semantic_embedding(text, dim=dim_1536)
+            embedding_1536 = batch_embeddings[idx]
             token_count = len(text.split())
 
             chunk = SourceChunk(
@@ -298,6 +304,79 @@ class RAGService:
             print(f"Pinecone Upsert Warning (Graceful Fallback to Local SQL): {e}")
 
     @staticmethod
+    def _delete_from_pinecone(vector_ids: List[str], namespace: str = "global"):
+        """
+        Deletes vector IDs from the Pinecone serverless index to avoid orphaned records.
+        """
+        pinecone_api_key = os.getenv("PINECONE_API")
+        if not pinecone_api_key or not vector_ids:
+            return
+
+        try:
+            from pinecone import Pinecone
+            pc = Pinecone(api_key=pinecone_api_key)
+            index = pc.Index("study-buddy-kb")
+            index.delete(ids=vector_ids, namespace=namespace)
+            print(f"Pinecone: Deleted {len(vector_ids)} vectors from namespace '{namespace}'.")
+        except Exception as e:
+            print(f"Pinecone Delete Warning: {e}")
+
+    @staticmethod
+    def delete_source_vectors(source_id: int, user_id: Optional[int], chunk_ids: Optional[List[int]] = None):
+        """
+        Removes all vectors belonging to a source from Pinecone.
+        """
+        namespace = f"user_{user_id}" if user_id else "global"
+        # Pinecone vector format: src_{source_id}_chunk_{idx}
+        # If chunk indices are provided, delete specific ones; otherwise prefix/batch delete up to 200 chunks
+        ids_to_delete = []
+        if chunk_ids:
+            ids_to_delete = [f"src_{source_id}_chunk_{cid}" for cid in chunk_ids]
+        else:
+            ids_to_delete = [f"src_{source_id}_chunk_{idx}" for idx in range(250)]
+        RAGService._delete_from_pinecone(ids_to_delete, namespace=namespace)
+
+    @staticmethod
+    def _query_pinecone(query_vec: List[float], top_k: int = 6, namespace: str = "global", source_ids: Optional[List[int]] = None) -> List[Dict[str, Any]]:
+        """
+        Queries Pinecone serverless index using genuine neural embedding vector with optional metadata filtering.
+        """
+        pinecone_api_key = os.getenv("PINECONE_API")
+        if not pinecone_api_key or not query_vec:
+            return []
+
+        try:
+            from pinecone import Pinecone
+            pc = Pinecone(api_key=pinecone_api_key)
+            index = pc.Index("study-buddy-kb")
+
+            filter_dict = None
+            if source_ids:
+                if len(source_ids) == 1:
+                    filter_dict = {"source_id": {"$eq": source_ids[0]}}
+                else:
+                    filter_dict = {"source_id": {"$in": source_ids}}
+
+            res = index.query(
+                vector=query_vec,
+                top_k=top_k,
+                namespace=namespace,
+                filter=filter_dict,
+                include_metadata=True
+            )
+            return [
+                {
+                    "id": m.id,
+                    "score": float(m.score),
+                    "metadata": m.metadata or {}
+                }
+                for m in (res.matches or [])
+            ]
+        except Exception as e:
+            print(f"Pinecone Query Warning (falling back to database): {e}")
+            return []
+
+    @staticmethod
     def _compute_fallback_embedding(text: str, dim: int = 64) -> List[float]:
         """
         Deterministic fallback embedding vector (bag-of-words hash projection).
@@ -322,11 +401,62 @@ class RAGService:
     @staticmethod
     def retrieve(db: Session, user_id: Optional[int], query: str, top_k: int = 6, source_ids: Optional[List[int]] = None) -> List[Tuple[SourceChunk, float]]:
         """
-        Retrieves top_k relevant source chunks using cosine similarity + keyword overlap tiebreaker.
+        Retrieves top_k relevant source chunks using genuine neural embedding vector search
+        in Pinecone with fallback to relational database cosine similarity + keyword overlap.
         """
-        query_emb = RAGService._compute_fallback_embedding(query)
+        namespace = f"user_{user_id}" if user_id else "global"
 
-        # Build query for chunks
+        # 1. Generate neural query embedding
+        query_emb_1536 = None
+        try:
+            query_emb_1536 = EmbeddingService.embed_text(query, task_type="retrieval_query")
+        except Exception as e:
+            print(f"EmbeddingService Query Warning (falling back): {e}")
+
+        # 2. Try Pinecone Vector Retrieval first
+        if query_emb_1536:
+            pinecone_matches = RAGService._query_pinecone(
+                query_vec=query_emb_1536,
+                top_k=top_k,
+                namespace=namespace,
+                source_ids=source_ids
+            )
+            if pinecone_matches:
+                # Map vector IDs (src_{source_id}_chunk_{idx}) back to SourceChunk entities
+                scored_results = []
+                for match in pinecone_matches:
+                    m_id = match["id"]
+                    # Extract source_id and chunk_index from ID or metadata
+                    meta = match.get("metadata", {})
+                    src_id = meta.get("source_id")
+                    c_idx = meta.get("chunk_index")
+                    score = match["score"]
+
+                    chunk = None
+                    if src_id is not None and c_idx is not None:
+                        chunk = db.query(SourceChunk).filter(
+                            SourceChunk.source_id == int(src_id),
+                            SourceChunk.chunk_index == int(c_idx)
+                        ).first()
+
+                    if chunk:
+                        scored_results.append((chunk, score))
+                    elif meta.get("text"):
+                        # Reconstruct temporary SourceChunk representation if DB row was delayed
+                        mock_chunk = SourceChunk(
+                            source_id=int(src_id) if src_id else 0,
+                            chunk_index=int(c_idx) if c_idx else 0,
+                            text=meta.get("text", ""),
+                            token_count=len(meta.get("text", "").split())
+                        )
+                        scored_results.append((mock_chunk, score))
+
+                if scored_results:
+                    return scored_results
+
+        # 3. Fallback: Database-level cosine similarity + keyword overlap
+        query_emb_fallback = query_emb_1536[:64] if query_emb_1536 else RAGService._compute_fallback_embedding(query)
+
         chunk_query = db.query(SourceChunk).join(Source, SourceChunk.source_id == Source.id)
         if user_id:
             chunk_query = chunk_query.filter((Source.user_id == user_id) | (Source.user_id.is_(None)))
@@ -343,10 +473,7 @@ class RAGService:
         for chunk in chunks:
             try:
                 emb = json.loads(chunk.embedding)
-                # Cosine similarity
-                dot = sum(a * b for a, b in zip(query_emb, emb))
-
-                # Keyword overlap boost
+                dot = sum(a * b for a, b in zip(query_emb_fallback, emb[:len(query_emb_fallback)]))
                 chunk_words = set(re.findall(r'\w+', chunk.text.lower()))
                 overlap = len(query_words.intersection(chunk_words))
                 score = dot + (0.05 * overlap)

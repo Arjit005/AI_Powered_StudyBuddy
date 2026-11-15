@@ -485,6 +485,14 @@ def delete_source(source_id: int, db: Session = Depends(get_db)):
     source = db.query(models.Source).filter(models.Source.id == source_id).first()
     if not source:
         raise HTTPException(status_code=404, detail="Source not found.")
+    
+    user_id = source.user_id
+    # Clean up Pinecone vectors for this source
+    try:
+        rag_service.RAGService.delete_source_vectors(source_id=source_id, user_id=user_id)
+    except Exception as e:
+        print(f"Warning: Failed to delete Pinecone vectors for source {source_id}: {e}")
+
     db.delete(source)
     db.commit()
     return {"status": "success", "message": f"Source {source_id} deleted with cascade."}
