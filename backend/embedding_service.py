@@ -2,6 +2,8 @@ import os
 import time
 import math
 from typing import List, Optional
+import warnings
+warnings.filterwarnings("ignore", category=FutureWarning)
 import google.generativeai as genai
 from dotenv import load_dotenv
 

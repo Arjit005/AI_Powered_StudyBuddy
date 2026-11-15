@@ -4,6 +4,8 @@ import json
 import math
 import hashlib
 import re
+import warnings
+warnings.filterwarnings("ignore", category=FutureWarning)
 from typing import List, Dict, Any, Tuple, Optional
 from sqlalchemy.orm import Session
 from backend.models import Source, SourceChunk, MessageSourceLink

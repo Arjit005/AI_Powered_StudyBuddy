@@ -2,7 +2,8 @@ import os
 import time
 import json
 from typing import List, Optional, Any
-from fastapi import FastAPI, Depends, HTTPException, Request, status, UploadFile, File, Form
+from fastapi import FastAPI, Depends, HTTPException, Request, status, UploadFile, File, Form, BackgroundTasks
+from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import func
 from sqlalchemy.orm import Session
@@ -758,6 +759,115 @@ def chat_endpoint(
         },
         "citations": citations_list
     }
+
+@app.post("/api/chat/stream", tags=["AI Learning"])
+async def chat_with_ai_stream(
+    req: ChatRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: Optional[models.User] = Depends(auth.get_current_user_optional)
+):
+    """
+    Streaming SSE endpoint for real-time typewriter AI tutoring responses.
+    Yields data chunks via Server-Sent Events (SSE).
+    """
+    security.limiter.check_rate_limit(request, category="chat", max_requests=20, window_seconds=60)
+    user_id = current_user.id if current_user else None
+
+    # Guardrails check
+    clean_message = security.InputSanitizer.sanitize_text(req.message, max_length=3000)
+    is_safe_prompt, _ = security.PromptGuard.check_prompt_safety(clean_message)
+    if not is_safe_prompt:
+        def err_stream():
+            yield f"data: {json.dumps({'error': 'Safety shield flagged unsafe input.'})}\n\n"
+        return StreamingResponse(err_stream(), media_type="text/event-stream")
+
+    is_appropriate, _ = security.ContentSafetyFilter.evaluate_content(clean_message)
+    if not is_appropriate:
+        def filter_stream():
+            yield f"data: {json.dumps({'error': 'Educational scope filter flagged query.'})}\n\n"
+        return StreamingResponse(filter_stream(), media_type="text/event-stream")
+
+    # Resolve conversation
+    conv = None
+    if req.conversation_id:
+        conv = db.query(models.Conversation).filter(models.Conversation.id == req.conversation_id).first()
+    if not conv:
+        auto_title = clean_message[:35] + ("..." if len(clean_message) > 35 else "")
+        conv = models.Conversation(user_id=user_id, title=auto_title or "Study Session")
+        db.add(conv)
+        db.commit()
+        db.refresh(conv)
+
+    # Check RAG sources
+    sources_query = db.query(models.Source)
+    if user_id:
+        sources_query = sources_query.filter((models.Source.user_id == user_id) | (models.Source.user_id.is_(None)))
+    has_sources = sources_query.count() > 0
+
+    sources_context_block = ""
+    citations_list = []
+    if has_sources:
+        retrieved = rag_service.RAGService.retrieve(db, user_id, clean_message, top_k=6)
+        if retrieved:
+            sources_context_block = "\n--- RETRIEVED SOURCE EXCERPTS ---\n"
+            for idx, (chunk, score) in enumerate(retrieved, start=1):
+                src = chunk.source
+                sources_context_block += f"[{idx}] (Source: {src.title}, ID: {src.id})\n{chunk.text}\n\n"
+                citations_list.append({
+                    "n": idx,
+                    "chunk_id": chunk.id,
+                    "source_id": src.id,
+                    "quote": chunk.text[:250],
+                    "source_title": src.title
+                })
+
+    # Prepare prompt
+    if has_sources:
+        prompt = (
+            f"You are a study assistant. Answer accurately based on the excerpts.\n\n"
+            f"{sources_context_block}\nStudent Question: {clean_message}"
+        )
+    else:
+        prompt = clean_message
+
+    def event_generator():
+        # First send metadata (conversation_id & citations)
+        init_payload = {
+            "conversation_id": conv.id,
+            "citations": citations_list
+        }
+        yield f"data: {json.dumps(init_payload)}\n\n"
+
+        full_content = []
+        try:
+            for token in ai_service.AIService._generate_content_stream(prompt):
+                full_content.append(token)
+                yield f"data: {json.dumps({'token': token})}\n\n"
+        except Exception as e:
+            yield f"data: {json.dumps({'error': str(e)})}\n\n"
+
+        # Signal completion
+        yield "data: [DONE]\n\n"
+
+        # Save to DB asynchronously
+        try:
+            complete_text = "".join(full_content)
+            db_user_msg = models.ChatHistory(role="user", content=clean_message, user_id=user_id, conversation_id=conv.id)
+            db.add(db_user_msg)
+            db_ai_msg = models.ChatHistory(
+                role="ai",
+                content=complete_text,
+                user_id=user_id,
+                conversation_id=conv.id,
+                citations_json=json.dumps(citations_list) if citations_list else None
+            )
+            db.add(db_ai_msg)
+            db.commit()
+        except Exception as persist_err:
+            print(f"Error persisting stream chat: {persist_err}")
+
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
 
 @app.get("/api/chat", response_model=List[ChatHistoryItem], tags=["AI Learning"])
 def get_chat_history(

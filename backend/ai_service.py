@@ -2,6 +2,8 @@ import os
 import json
 import time 
 import requests
+import warnings
+warnings.filterwarnings("ignore", category=FutureWarning)
 import google.generativeai as genai
 from dotenv import load_dotenv
 
@@ -396,6 +398,34 @@ class AIService:
         if "429" in error_msg:
             raise Exception(f"ALL AI SYSTEMS BUSY (Quota Exceeded). Errors: {error_msg}")
         raise Exception(f"All AI Providers Failed. Details: {error_msg}")
+
+    @staticmethod
+    def _generate_content_stream(prompt: str):
+        """
+        Yields tokens in real-time using Gemini streaming API with fallback to non-streaming generators.
+        """
+        if GEMINI_API_KEY and circuit_breaker.is_available("gemini"):
+            try:
+                valid_models = AIService._get_valid_models()
+                for model_name in valid_models:
+                    try:
+                        model = genai.GenerativeModel(model_name)
+                        response = model.generate_content(prompt, stream=True)
+                        circuit_breaker.record_success("gemini")
+                        for chunk in response:
+                            if chunk.text:
+                                yield chunk.text
+                        return
+                    except Exception as me:
+                        print(f"Gemini Stream model {model_name} failed: {me}")
+                        continue
+            except Exception as ge:
+                circuit_breaker.record_failure("gemini")
+                print(f"Gemini Streaming error: {ge}")
+
+        # Fallback to standard safe generation and yield as a single chunk
+        fallback_resp = AIService._generate_content_safe(prompt)
+        yield fallback_resp.text
 
     # =========================================================================
     # HYBRID MEMORY ARCHITECTURE IMPLEMENTATION
