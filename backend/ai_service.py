@@ -32,6 +32,7 @@ load_dotenv()
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 HUGGINGFACE_API_KEY = os.getenv("HUGGINGFACE_API_KEY")
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY") or os.getenv("OPEN_ROUTER_API_KEY")
+NVIDIA_API_KEY = os.getenv("NVIDIA_API_KEY")
 PORTKEY_API_KEY = os.getenv("PORTKEY_API_KEY")
 PORTKEY_VIRTUAL_KEY = os.getenv("PORTKEY_VIRTUAL_KEY")
 
@@ -41,6 +42,44 @@ if GEMINI_API_KEY:
 
 if OPENROUTER_API_KEY:
     os.environ["OPENROUTER_API_KEY"] = OPENROUTER_API_KEY
+
+if NVIDIA_API_KEY:
+    os.environ["NVIDIA_API_KEY"] = NVIDIA_API_KEY
+
+class CircuitBreaker:
+    """
+    Lightweight in-memory Circuit Breaker to prevent slow cascading timeouts
+    when an upstream AI provider experiences downtime or quota exhaustion.
+    """
+    def __init__(self, failure_threshold=3, recovery_time=60):
+        self.failure_threshold = failure_threshold
+        self.recovery_time = recovery_time
+        self.failure_counts = {}
+        self.circuit_open_until = {}
+
+    def is_available(self, provider: str) -> bool:
+        now = time.time()
+        if provider in self.circuit_open_until:
+            if now < self.circuit_open_until[provider]:
+                return False
+            # Circuit cooldown expired, enter half-open state
+            del self.circuit_open_until[provider]
+            self.failure_counts[provider] = 0
+        return True
+
+    def record_success(self, provider: str):
+        self.failure_counts[provider] = 0
+        if provider in self.circuit_open_until:
+            del self.circuit_open_until[provider]
+
+    def record_failure(self, provider: str):
+        count = self.failure_counts.get(provider, 0) + 1
+        self.failure_counts[provider] = count
+        if count >= self.failure_threshold:
+            self.circuit_open_until[provider] = time.time() + self.recovery_time
+            print(f"[CIRCUIT BREAKER OPENED] Provider '{provider}' tripped for {self.recovery_time}s.")
+
+circuit_breaker = CircuitBreaker()
 
 class AIService:
     _cached_models = None
@@ -139,6 +178,51 @@ class AIService:
         raise Exception("All OpenRouter free fallback models failed.")
 
     @staticmethod
+    def _generate_with_nvidia(prompt: str):
+        if not NVIDIA_API_KEY:
+            raise Exception("No NVIDIA NIM API Key available for fallback.")
+
+        models = [
+            "meta/llama-3.1-70b-instruct",
+            "mistralai/mistral-large-2-instruct"
+        ]
+
+        headers = {
+            "Authorization": f"Bearer {NVIDIA_API_KEY}",
+            "Content-Type": "application/json"
+        }
+
+        for model in models:
+            try:
+                payload = {
+                    "model": model,
+                    "messages": [{"role": "user", "content": prompt}],
+                    "temperature": 0.6,
+                    "max_tokens": 1500
+                }
+                response = requests.post(
+                    "https://integrate.api.nvidia.com/v1/chat/completions",
+                    headers=headers,
+                    json=payload,
+                    timeout=20
+                )
+                if response.status_code == 200:
+                    data = response.json()
+                    choices = data.get("choices", [])
+                    if choices:
+                        content = choices[0].get("message", {}).get("content", "")
+                        if content:
+                            class MockResponse:
+                                def __init__(self, text):
+                                    self.text = text
+                            return MockResponse(content)
+            except Exception as e:
+                print(f"Nvidia model {model} error: {e}")
+                continue
+
+        raise Exception("All NVIDIA NIM fallback models failed.")
+
+    @staticmethod
     def _generate_with_huggingface(prompt: str):
         if not HUGGINGFACE_API_KEY:
             raise Exception("No Hugging Face Key available for fallback.")
@@ -207,7 +291,7 @@ class AIService:
                 is_json = True
 
         # 1. Primary Route: LiteLLM AI Gateway (Multi-model failover)
-        if litellm:
+        if litellm and circuit_breaker.is_available("litellm"):
             try:
                 # Prioritize Gemini, automatically fall back to OpenRouter free models
                 primary_model = "gemini/gemini-2.0-flash" if GEMINI_API_KEY else "openrouter/deepseek/deepseek-chat:free"
@@ -229,14 +313,14 @@ class AIService:
                     model=primary_model,
                     messages=[{"role": "user", "content": prompt}],
                     fallbacks=fallbacks if fallbacks else None,
-                    timeout=30,
+                    timeout=25,
                     **kwargs
                 )
                 
                 output_text = response.choices[0].message.content or ""
-                # Apply Security Guardrail: PII and Secret Redaction
                 safe_text = sanitize_output(output_text)
 
+                circuit_breaker.record_success("litellm")
                 class GatewayResponse:
                     def __init__(self, text):
                         self.text = text
@@ -244,47 +328,63 @@ class AIService:
 
                 return GatewayResponse(safe_text)
             except Exception as e:
+                circuit_breaker.record_failure("litellm")
                 error_log.append(f"LiteLLM Gateway Note: {e}")
 
         # 2. Secondary Route: Direct Gemini API
-        if GEMINI_API_KEY:
+        if GEMINI_API_KEY and circuit_breaker.is_available("gemini"):
             try:
                 valid_models = AIService._get_valid_models()
                 for model_name in valid_models:
-                    for attempt in range(2):
-                        try:
-                            model = genai.GenerativeModel(model_name)
-                            response = model.generate_content(prompt, generation_config=generation_config)
-                            if hasattr(response, "text"):
-                                response.text = sanitize_output(response.text)
-                            return response
-                        except Exception as e:
-                            if "429" in str(e):
-                                time.sleep(1)
-                                continue
-                            else:
-                                raise e
+                    try:
+                        model = genai.GenerativeModel(model_name)
+                        response = model.generate_content(prompt, generation_config=generation_config)
+                        if hasattr(response, "text"):
+                            response.text = sanitize_output(response.text)
+                        circuit_breaker.record_success("gemini")
+                        return response
+                    except Exception as e:
+                        if "429" in str(e):
+                            continue
+                        raise e
             except Exception as e:
-                error_log.append(str(e))
+                circuit_breaker.record_failure("gemini")
+                error_log.append(f"Gemini Error: {e}")
         
         # 3. Tertiary Route: Direct OpenRouter API
-        if OPENROUTER_API_KEY:
+        if OPENROUTER_API_KEY and circuit_breaker.is_available("openrouter"):
             try:
                 res = AIService._generate_with_openrouter(prompt)
                 res.text = sanitize_output(res.text)
+                circuit_breaker.record_success("openrouter")
                 return res
             except Exception as or_e:
+                circuit_breaker.record_failure("openrouter")
                 error_log.append(f"OpenRouter Error: {or_e}")
 
-        # 4. Quaternary Route: Direct Hugging Face API
-        try:
-            res = AIService._generate_with_huggingface(prompt)
-            res.text = sanitize_output(res.text)
-            return res
-        except Exception as hf_e:
-            error_log.append(f"HF Error: {hf_e}")
+        # 4. Quaternary Route: Direct NVIDIA NIM API
+        if NVIDIA_API_KEY and circuit_breaker.is_available("nvidia"):
+            try:
+                res = AIService._generate_with_nvidia(prompt)
+                res.text = sanitize_output(res.text)
+                circuit_breaker.record_success("nvidia")
+                return res
+            except Exception as nv_e:
+                circuit_breaker.record_failure("nvidia")
+                error_log.append(f"NVIDIA NIM Error: {nv_e}")
 
-        # 5. Offline Emergency Route: Pollinations
+        # 5. Quinary Route: Direct Hugging Face API
+        if HUGGINGFACE_API_KEY and circuit_breaker.is_available("huggingface"):
+            try:
+                res = AIService._generate_with_huggingface(prompt)
+                res.text = sanitize_output(res.text)
+                circuit_breaker.record_success("huggingface")
+                return res
+            except Exception as hf_e:
+                circuit_breaker.record_failure("huggingface")
+                error_log.append(f"HF Error: {hf_e}")
+
+        # 6. Offline Emergency Route: Pollinations
         try:
             res = AIService._generate_with_pollinations(prompt)
             res.text = sanitize_output(res.text)
