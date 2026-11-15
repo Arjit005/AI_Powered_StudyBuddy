@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Zap, CheckCircle2, XCircle, Award, RotateCcw, ArrowRight, ShieldCheck, HelpCircle } from 'lucide-react';
+import { Zap, CheckCircle2, XCircle, Award, RotateCcw, ArrowRight, ShieldCheck, HelpCircle, Trophy } from 'lucide-react';
+import confetti from 'canvas-confetti';
 
 const Quiz = () => {
     const [topic, setTopic] = useState('');
@@ -65,6 +66,22 @@ const Quiz = () => {
             }
         });
         return score;
+    };
+
+    const handleSubmitQuiz = () => {
+        setSubmitted(true);
+        const score = calculateScore();
+        const total = quiz?.questions?.length || 1;
+        // Trigger celebration confetti if score >= 70%
+        if (score / total >= 0.7) {
+            try {
+                confetti({
+                    particleCount: 100,
+                    spread: 70,
+                    origin: { y: 0.6 }
+                });
+            } catch (_) {}
+        }
     };
 
     return (
@@ -214,7 +231,7 @@ const Quiz = () => {
                                         Answered: <span className="text-emerald-400 font-bold">{Object.keys(answers).length}</span> of {quiz.questions.length}
                                     </div>
                                     <button
-                                        onClick={() => setSubmitted(true)}
+                                        onClick={handleSubmitQuiz}
                                         disabled={Object.keys(answers).length === 0}
                                         className="w-full sm:w-auto px-8 py-3 rounded-xl font-semibold text-sm bg-gradient-to-r from-emerald-500 to-teal-500 text-slate-950 hover:brightness-110 active:scale-95 transition-all shadow-[0_0_20px_rgba(16,185,129,0.3)] disabled:opacity-40"
                                     >
