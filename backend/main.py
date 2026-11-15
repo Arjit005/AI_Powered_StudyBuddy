@@ -1484,3 +1484,33 @@ def toggle_library_favorite(
     item.is_favorite = 0 if item.is_favorite else 1
     db.commit()
     return {"status": "success", "is_favorite": bool(item.is_favorite)}
+
+# ============================================================================
+# PRODUCTION SPA STATIC ASSETS (RENDER COMBINED DEPLOYMENT)
+# ============================================================================
+_project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_dist_dir = os.path.join(_project_root, "dist")
+if not os.path.exists(_dist_dir):
+    _dist_dir = os.path.join(os.getcwd(), "dist")
+
+if os.path.exists(_dist_dir):
+    from fastapi.staticfiles import StaticFiles
+    from fastapi.responses import FileResponse
+
+    _assets_dir = os.path.join(_dist_dir, "assets")
+    if os.path.exists(_assets_dir):
+        app.mount("/assets", StaticFiles(directory=_assets_dir), name="assets")
+
+    @app.get("/{full_path:path}", include_in_schema=False)
+    async def serve_spa_frontend(full_path: str):
+        # Allow API, docs, and OpenAPI calls to pass through to FastAPI handlers
+        if full_path.startswith("api/") or full_path in ["docs", "redoc", "openapi.json"]:
+            raise HTTPException(status_code=404, detail="Not Found")
+        target_path = os.path.join(_dist_dir, full_path)
+        if os.path.exists(target_path) and os.path.isfile(target_path):
+            return FileResponse(target_path)
+        index_file = os.path.join(_dist_dir, "index.html")
+        if os.path.exists(index_file):
+            return FileResponse(index_file)
+        raise HTTPException(status_code=404, detail="SPA index.html not found.")
+
