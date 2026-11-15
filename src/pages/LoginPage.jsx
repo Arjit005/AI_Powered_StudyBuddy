@@ -34,9 +34,17 @@ const LoginPage = () => {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ id_token: idToken })
             });
-            const data = await res.json();
+            let data = {};
+            try {
+                data = await res.json();
+            } catch (_) {
+                data = { detail: res.statusText || 'Google sign-in server error' };
+            }
             if (!res.ok) {
                 throw new Error(data.detail || 'Google sign-in failed');
+            }
+            if (!data.access_token || !data.user) {
+                throw new Error('Authentication response is missing required credentials.');
             }
             localStorage.setItem('isAuthenticated', 'true');
             localStorage.setItem('auth_token', data.access_token);
@@ -211,18 +219,20 @@ const LoginPage = () => {
                         </button>
                     </form>
 
-                    {/* Developer Demo Quick-Fill */}
-                    <div className="mt-4 pt-4 border-t border-slate-800/80 flex items-center justify-between text-xs">
-                        <span className="text-slate-500 font-mono">Dev Quick-Fill:</span>
-                        <button
-                            type="button"
-                            onClick={() => handleQuickDemo('demo')}
-                            className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-950/60 border border-emerald-800/40 text-emerald-300 hover:bg-emerald-900/40 transition-colors font-mono text-[11px]"
-                        >
-                            <Zap className="w-3 h-3 text-emerald-400" />
-                            <span>Demo User</span>
-                        </button>
-                    </div>
+                    {/* Developer Demo Quick-Fill (Dev Mode Only) */}
+                    {isDev && (
+                        <div className="mt-4 pt-4 border-t border-slate-800/80 flex items-center justify-between text-xs">
+                            <span className="text-slate-500 font-mono">Dev Quick-Fill:</span>
+                            <button
+                                type="button"
+                                onClick={() => handleQuickDemo('demo')}
+                                className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-950/60 border border-emerald-800/40 text-emerald-300 hover:bg-emerald-900/40 transition-colors font-mono text-[11px]"
+                            >
+                                <Zap className="w-3 h-3 text-emerald-400" />
+                                <span>Demo User</span>
+                            </button>
+                        </div>
+                    )}
 
                     <div className="mt-6 pt-4 border-t border-slate-800/60 text-center">
                         <p className="text-xs text-slate-400">

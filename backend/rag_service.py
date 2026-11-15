@@ -110,23 +110,12 @@ class RAGService:
     @staticmethod
     def extract_text_from_url(url: str) -> str:
         """
-        Fetches and cleans webpage text using trafilatura or basic requests after strict SSRF check.
+        Fetches and cleans webpage text strictly enforcing SSRF safety with zero unvalidated redirects.
         """
         if not RAGService._is_safe_url(url):
             print(f"SSRF Alert: Blocked unsafe or internal URL: {url}")
             return ""
 
-        if trafilatura:
-            try:
-                downloaded = trafilatura.fetch_url(url)
-                if downloaded:
-                    extracted = trafilatura.extract(downloaded)
-                    if extracted:
-                        return extracted.strip()
-            except Exception as e:
-                print(f"Trafilatura extraction error: {e}")
-
-        # Fallback via requests with redirect validation
         import requests
         try:
             resp = requests.get(
@@ -135,7 +124,7 @@ class RAGService:
                 allow_redirects=False,
                 headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
             )
-            # If redirect, validate redirect destination
+            # If redirect, validate destination explicitly
             if resp.is_redirect or resp.status_code in [301, 302, 307, 308]:
                 redirect_url = resp.headers.get("location")
                 if redirect_url and RAGService._is_safe_url(redirect_url):
@@ -149,7 +138,16 @@ class RAGService:
                     return ""
 
             if resp.status_code == 200:
-                clean = re.sub(r'<[^>]+>', ' ', resp.text)
+                html_text = resp.text
+                if trafilatura:
+                    try:
+                        extracted = trafilatura.extract(html_text)
+                        if extracted:
+                            return extracted.strip()
+                    except Exception:
+                        pass
+                # Strip HTML fallback
+                clean = re.sub(r'<[^>]+>', ' ', html_text)
                 return re.sub(r'\s+', ' ', clean).strip()
         except Exception as e:
             print(f"URL fetch error: {e}")
@@ -530,6 +528,8 @@ class RAGService:
         chunk_query = db.query(SourceChunk).join(Source, SourceChunk.source_id == Source.id)
         if user_id:
             chunk_query = chunk_query.filter((Source.user_id == user_id) | (Source.user_id.is_(None)))
+        else:
+            chunk_query = chunk_query.filter(Source.user_id.is_(None))
         if source_ids:
             chunk_query = chunk_query.filter(SourceChunk.source_id.in_(source_ids))
 

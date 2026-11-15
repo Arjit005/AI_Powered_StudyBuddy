@@ -40,6 +40,19 @@ const Sources = () => {
 
     const handleUploadSubmit = async (e) => {
         e.preventDefault();
+
+        // Client-side validation per upload mode
+        if (uploadType === 'pdf' && !selectedFile) {
+            alert('Please select a PDF document to upload.');
+            return;
+        } else if (uploadType === 'url' && !urlInput.trim()) {
+            alert('Please enter a valid webpage or article URL.');
+            return;
+        } else if (uploadType === 'text' && !textInput.trim()) {
+            alert('Please paste some text notes to index.');
+            return;
+        }
+
         setUploading(true);
 
         const formData = new FormData();
@@ -113,9 +126,12 @@ const Sources = () => {
                     setSelectedSource(null);
                     setSourceGuide(null);
                 }
+            } else {
+                alert("Failed to delete source.");
             }
         } catch (e) {
             console.error("Delete error:", e);
+            alert("Network error deleting source.");
         }
     };
 
@@ -128,9 +144,12 @@ const Sources = () => {
             const res = await fetch(`/api/sources/${id}/reindex`, { method: 'POST', headers });
             if (res.ok) {
                 alert("Source successfully re-chunked and re-embedded!");
+            } else {
+                alert("Failed to reindex source.");
             }
         } catch (e) {
             console.error("Reindex error:", e);
+            alert("Network error reindexing source.");
         }
     };
 

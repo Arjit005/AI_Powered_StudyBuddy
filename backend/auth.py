@@ -25,12 +25,22 @@ ACCESS_TOKEN_EXPIRE_DAYS = 7
 security = HTTPBearer(auto_error=False)
 
 def hash_password(password: str) -> str:
+    # bcrypt has a hard maximum input limit of 72 bytes
+    pw_bytes = password.encode('utf-8')
+    if len(pw_bytes) > 72:
+        import hashlib
+        # Pre-hash long passwords using SHA-256 to remain strictly within 72 bytes
+        pw_bytes = hashlib.sha256(pw_bytes).hexdigest().encode('utf-8')
     salt = bcrypt.gensalt()
-    return bcrypt.hashpw(password.encode('utf-8'), salt).decode('utf-8')
+    return bcrypt.hashpw(pw_bytes, salt).decode('utf-8')
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     try:
-        return bcrypt.checkpw(plain_password.encode('utf-8'), hashed_password.encode('utf-8'))
+        pw_bytes = plain_password.encode('utf-8')
+        if len(pw_bytes) > 72:
+            import hashlib
+            pw_bytes = hashlib.sha256(pw_bytes).hexdigest().encode('utf-8')
+        return bcrypt.checkpw(pw_bytes, hashed_password.encode('utf-8'))
     except Exception:
         return False
 

@@ -57,16 +57,30 @@ const Maps = () => {
                 throw new Error('Failed to generate architecture diagram or concept map.');
             }
 
+            let hasDiagram = false;
+            let hasMap = false;
+
             if (diagramRes.ok) {
                 const data = await diagramRes.json();
-                setDiagramData(data);
+                if (data && typeof data === 'object') {
+                    setDiagramData(data);
+                    hasDiagram = true;
+                }
             }
 
             if (mapRes.ok) {
                 const mapJson = await mapRes.json();
                 if (mapJson.map_image) {
                     setMapImage(`data:image/png;base64,${mapJson.map_image}`);
+                    hasMap = true;
                 }
+            }
+
+            // Automatically switch to available view if one failed
+            if (!hasDiagram && hasMap) {
+                setViewMode('networkx');
+            } else if (hasDiagram) {
+                setViewMode('mermaid');
             }
         } catch (err) {
             console.error("Error generating diagram:", err);
@@ -196,7 +210,7 @@ const Maps = () => {
                             />
 
                             {/* Structured Component Breakdown */}
-                            {diagramData.key_components && diagramData.key_components.length > 0 && (
+                            {Array.isArray(diagramData.key_components) && diagramData.key_components.length > 0 && (
                                 <div className="mt-6 pt-6 border-t border-white/5 space-y-3">
                                     <h3 className="text-sm font-bold text-emerald-400 font-mono uppercase tracking-wider flex items-center gap-2">
                                         <Layers className="w-4 h-4" /> Subsystem Architectural Breakdown

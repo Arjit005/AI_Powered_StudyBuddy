@@ -54,8 +54,12 @@ const Summarize = () => {
             if (thisGen !== summarizeGenRef.current) return;
 
             if (!response.ok) {
-                const errData = await response.json();
-                throw new Error(errData.detail || 'Failed to synthesize summary');
+                let errDetail = 'Failed to synthesize summary';
+                try {
+                    const errData = await response.json();
+                    errDetail = errData.detail || errDetail;
+                } catch (_) {}
+                throw new Error(errDetail);
             }
 
             const data = await response.json();

@@ -48,14 +48,15 @@ class RateLimiter:
                 del self.history[key]
 
     def _get_client_ip(self, request: Request) -> str:
-        # Check standard reverse proxy headers if available
-        forwarded = request.headers.get("X-Forwarded-For")
-        if forwarded:
-            # Take the first untrusted client IP in the chain
-            return forwarded.split(",")[0].strip()
-        real_ip = request.headers.get("X-Real-IP")
-        if real_ip:
-            return real_ip.strip()
+        # Only trust forwarded headers if explicitly running behind a trusted reverse proxy
+        trust_proxy = os.getenv("TRUST_PROXY", "false").lower() == "true"
+        if trust_proxy:
+            forwarded = request.headers.get("X-Forwarded-For")
+            if forwarded:
+                return forwarded.split(",")[0].strip()
+            real_ip = request.headers.get("X-Real-IP")
+            if real_ip:
+                return real_ip.strip()
         return request.client.host if request.client else "unknown"
 
     def check_rate_limit(self, request: Request, category: str, max_requests: int, window_seconds: int):

@@ -60,10 +60,13 @@ class GuardrailResult:
 def validate_input(prompt: str) -> GuardrailResult:
     """
     Inspects incoming user prompts for prompt injection, jailbreaks, and harmful intent.
-    Returns GuardrailResult with passed=False if a violation is detected.
+    Returns GuardrailResult with passed=False if a violation is detected or input is invalid.
     """
-    if not prompt or not isinstance(prompt, str):
-        return GuardrailResult(passed=True, sanitized_text="")
+    if prompt is None or not isinstance(prompt, str):
+        return GuardrailResult(passed=False, reason="Invalid input: prompt must be a non-null string.")
+    
+    if not prompt.strip():
+        return GuardrailResult(passed=False, reason="Invalid input: prompt cannot be empty.")
 
     normalized = prompt.lower()
 
@@ -111,12 +114,12 @@ def verify_rag_grounding(answer: str, retrieved_chunks: List[str]) -> Tuple[bool
     Computes keyword overlap score as a heuristic faithfulness check.
     """
     if not retrieved_chunks:
-        # If no chunks provided, cannot verify grounded RAG
-        return True, 1.0
+        # If no chunks provided, cannot claim grounded RAG verification
+        return False, 0.0
 
     answer_words = set(re.findall(r'\w+', answer.lower()))
     if not answer_words:
-        return True, 1.0
+        return False, 0.0
 
     corpus_words = set()
     for chunk in retrieved_chunks:

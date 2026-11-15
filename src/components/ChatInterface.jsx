@@ -57,7 +57,7 @@ const ChatInterface = () => {
             if (res.ok) {
                 const data = await res.json();
                 setConversations(data);
-                if (data.length > 0 && !activeConvId) {
+                if (data.length > 0 && !activeConvIdRef.current) {
                     setActiveConvId(data[0].id);
                 }
             }
@@ -101,7 +101,7 @@ const ChatInterface = () => {
             }
         } catch (err) {
             console.error("Error loading messages:", err);
-            if (thisGen === historyRequestGenRef.current) {
+            if (thisGen === historyRequestGenRef.current && convId === activeConvIdRef.current) {
                 setMessages([DEFAULT_GREETING]);
             }
         } finally {
@@ -213,7 +213,8 @@ const ChatInterface = () => {
             if (token) headers['Authorization'] = `Bearer ${token}`;
 
             const url = activeConvId ? `/api/chat?conversation_id=${activeConvId}` : '/api/chat';
-            await fetch(url, { method: 'DELETE', headers });
+            const res = await fetch(url, { method: 'DELETE', headers });
+            if (!res.ok) throw new Error('Unable to clear this session. Please try again.');
             setMessages([
                 {
                     role: 'ai',
@@ -224,6 +225,7 @@ const ChatInterface = () => {
             fetchConversations();
         } catch (err) {
             console.error(err);
+            alert("Error clearing session memory.");
         }
     };
 

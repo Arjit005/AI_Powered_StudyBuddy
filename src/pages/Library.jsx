@@ -55,6 +55,7 @@ export default function Library() {
 
       if (res.ok) {
         const data = await res.json();
+        if (thisGen !== requestGenRef.current) return;
         setItems(data);
       } else {
         setError("Failed to load study materials. Please try again.");
@@ -194,6 +195,16 @@ export default function Library() {
         <div className="py-20 text-center">
           <div className="w-8 h-8 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
           <div className="text-sm text-slate-400">Loading your knowledge base...</div>
+        </div>
+      ) : error ? (
+        <div className="py-16 text-center glass-panel rounded-3xl border border-rose-500/30 p-8 max-w-lg mx-auto">
+          <div className="text-rose-400 text-sm mb-4 font-mono">{error}</div>
+          <button
+            onClick={fetchLibrary}
+            className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold"
+          >
+            Retry Loading
+          </button>
         </div>
       ) : items.length === 0 ? (
         <div className="py-20 text-center glass-panel rounded-3xl border border-white/10 p-8 max-w-lg mx-auto">

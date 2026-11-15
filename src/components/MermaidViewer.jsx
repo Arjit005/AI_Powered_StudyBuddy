@@ -77,10 +77,14 @@ const MermaidViewer = ({ chart, title = "Architecture Diagram" }) => {
         };
     }, [chart]);
 
-    const handleCopy = () => {
-        navigator.clipboard.writeText(chart);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
+    const handleCopy = async () => {
+        try {
+            await navigator.clipboard.writeText(chart);
+            setCopied(true);
+            setTimeout(() => setCopied(false), 2000);
+        } catch (err) {
+            console.error("Clipboard copy failed:", err);
+        }
     };
 
     const handleDownloadSvg = () => {
@@ -90,8 +94,10 @@ const MermaidViewer = ({ chart, title = "Architecture Diagram" }) => {
         const a = document.createElement('a');
         a.href = url;
         a.download = `${title.toLowerCase().replace(/\s+/g, '_')}.svg`;
+        document.body.appendChild(a);
         a.click();
-        URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
     };
 
     return (
@@ -201,11 +207,19 @@ const MermaidViewer = ({ chart, title = "Architecture Diagram" }) => {
                         className="flex-1 flex items-center justify-center overflow-auto p-4"
                         onClick={(e) => e.stopPropagation()}
                     >
-                        <div
-                            style={{ transform: `scale(${zoom * 1.3})`, transformOrigin: 'center center' }}
-                            className="transition-transform duration-200 max-w-full"
-                            dangerouslySetInnerHTML={{ __html: svgContent }}
-                        />
+                        {error ? (
+                            <div className="p-4 rounded-xl bg-rose-950/60 border border-rose-500/40 text-rose-300 text-xs font-mono max-w-lg">
+                                {error}
+                            </div>
+                        ) : svgContent ? (
+                            <div
+                                style={{ transform: `scale(${zoom * 1.3})`, transformOrigin: 'center center' }}
+                                className="transition-transform duration-200 max-w-full"
+                                dangerouslySetInnerHTML={{ __html: svgContent }}
+                            />
+                        ) : (
+                            <div className="text-slate-400 font-mono text-sm animate-pulse">Compiling vector diagram...</div>
+                        )}
                     </div>
                 </div>
             )}

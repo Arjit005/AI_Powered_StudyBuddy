@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   FlipHorizontal, 
   ChevronLeft, 
@@ -60,9 +60,19 @@ const Flashcards = () => {
             if (res.ok) {
                 const data = await res.json();
                 if (data.flashcards && Array.isArray(data.flashcards) && data.flashcards.length > 0) {
-                    setCards(data.flashcards);
-                    setCurrentCard(0);
-                    setMastery({});
+                    const validCards = data.flashcards
+                        .filter(c => c && typeof c === 'object')
+                        .map((c, i) => ({
+                            id: c.id || `gen_${Date.now()}_${i}`,
+                            front: String(c.front || 'Question'),
+                            back: String(c.back || 'Answer')
+                        }));
+                    if (validCards.length > 0) {
+                        if (advanceTimeoutRef.current) clearTimeout(advanceTimeoutRef.current);
+                        setCards(validCards);
+                        setCurrentCard(0);
+                        setMastery({});
+                    }
                 }
             } else {
                 alert("Failed to generate flashcards. Please try another topic.");
@@ -129,6 +139,10 @@ const Flashcards = () => {
 
     // Save Deck to Library
     const handleSaveDeck = async () => {
+        if (!cards || cards.length === 0) {
+            alert("Cannot save an empty flashcard deck.");
+            return;
+        }
         try {
             const token = localStorage.getItem('auth_token');
             const headers = { 'Content-Type': 'application/json' };
@@ -295,8 +309,8 @@ const Flashcards = () => {
 
                         {/* Card Footer */}
                         <div className="flex justify-between items-center text-xs font-mono text-slate-500 pt-4 border-t border-white/5">
-                            <span>Card {currentCard + 1} of {cards.length}</span>
-                            <span>{Math.round(((currentCard + 1) / cards.length) * 100)}% Progress</span>
+                            <span>Card {cards.length > 0 ? currentCard + 1 : 0} of {cards.length}</span>
+                            <span>{cards.length > 0 ? Math.round(((currentCard + 1) / cards.length) * 100) : 0}% Progress</span>
                         </div>
                     </div>
 

@@ -215,6 +215,7 @@ export default function CommandPalette({ isOpen, onClose }) {
                   tabIndex={0}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') {
+                      e.stopPropagation();
                       cmd.action();
                       onClose();
                     }

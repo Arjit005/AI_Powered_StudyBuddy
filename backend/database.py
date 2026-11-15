@@ -40,8 +40,8 @@ else:
             cursor = dbapi_connection.cursor()
             cursor.execute("PRAGMA foreign_keys=ON")
             cursor.close()
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"CRITICAL SQLITE WARNING: Failed to enable foreign keys pragma: {e}")
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 

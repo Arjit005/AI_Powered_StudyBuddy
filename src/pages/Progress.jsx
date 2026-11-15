@@ -55,6 +55,9 @@ const Progress = () => {
 
     useEffect(() => {
         fetchAnalytics();
+        return () => {
+            progressRequestGenRef.current++;
+        };
     }, []);
 
     const resetStats = async () => {
@@ -65,6 +68,7 @@ const Progress = () => {
         try {
             const res = await fetch('/api/progress', { method: 'DELETE', headers });
             if (res.ok) {
+                progressRequestGenRef.current++;
                 setStats({ study_hours: 0, quizzes_taken: 0, streak_days: 0 });
                 setChartImage(null);
                 setSessions([]);

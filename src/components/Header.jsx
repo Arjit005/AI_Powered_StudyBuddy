@@ -20,25 +20,43 @@ const Header = () => {
             console.error(e);
         }
 
-        // Fetch security telemetry from backend
+        // Fetch security telemetry from backend with unmount & single-flight protection
+        let isMounted = true;
+        let isPolling = false;
+
         const fetchTelemetry = async () => {
+            if (isPolling) return;
+            isPolling = true;
             const start = performance.now();
             try {
                 const res = await fetch('/api/security/status');
                 const duration = Math.round(performance.now() - start);
-                setApiLatency(`${duration}ms`);
+                if (!isMounted) return;
+
                 if (res.ok) {
                     const data = await res.json();
                     setSecurityData(data);
+                    setApiLatency(`${duration}ms`);
+                } else {
+                    setSecurityData(null);
+                    setApiLatency('Unavailable');
                 }
             } catch (err) {
-                setApiLatency('Offline');
+                if (isMounted) {
+                    setSecurityData(null);
+                    setApiLatency('Offline');
+                }
+            } finally {
+                isPolling = false;
             }
         };
 
         fetchTelemetry();
         const interval = setInterval(fetchTelemetry, 30000);
-        return () => clearInterval(interval);
+        return () => {
+            isMounted = false;
+            clearInterval(interval);
+        };
     }, []);
 
     const handleLogout = () => {

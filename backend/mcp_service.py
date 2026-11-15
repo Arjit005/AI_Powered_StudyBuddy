@@ -570,16 +570,21 @@ class MCPService:
         }
 
     @classmethod
-    def _query_study_memory(cls, conversation_id: Optional[int] = None, limit: int = 5) -> Dict[str, Any]:
+    def _query_study_memory(cls, conversation_id: Optional[int] = None, limit: int = 5, user_id: Optional[int] = None) -> Dict[str, Any]:
         """
-        Exposes SQLite hybrid memory via MCP protocol to any connected canvas or agent.
+        Exposes SQLite hybrid memory via MCP protocol scoped to authenticated or global tenant.
         """
         db = SessionLocal()
         try:
             if conversation_id:
-                conv = db.query(Conversation).filter(Conversation.id == conversation_id).first()
+                conv_q = db.query(Conversation).filter(Conversation.id == conversation_id)
+                if user_id:
+                    conv_q = conv_q.filter(Conversation.user_id == user_id)
+                else:
+                    conv_q = conv_q.filter(Conversation.user_id.is_(None))
+                conv = conv_q.first()
                 if not conv:
-                    return {"status": "not_found", "message": f"Conversation {conversation_id} not found"}
+                    return {"status": "not_found", "message": f"Conversation {conversation_id} not found or unauthorized"}
                 chats = db.query(ChatHistory).filter(ChatHistory.conversation_id == conversation_id).order_by(ChatHistory.id.desc()).limit(limit).all()
                 return {
                     "conversation_id": conv.id,
@@ -591,7 +596,12 @@ class MCPService:
                     ]
                 }
             else:
-                convs = db.query(Conversation).order_by(Conversation.updated_at.desc()).limit(limit).all()
+                convs_q = db.query(Conversation)
+                if user_id:
+                    convs_q = convs_q.filter(Conversation.user_id == user_id)
+                else:
+                    convs_q = convs_q.filter(Conversation.user_id.is_(None))
+                convs = convs_q.order_by(Conversation.updated_at.desc()).limit(limit).all()
                 return {
                     "active_conversations": [
                         {

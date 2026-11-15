@@ -44,13 +44,15 @@ def get_node_depths(G, root):
     """Calculate depth of each node from root using BFS."""
     depths = {root: 0}
     try:
-        for edge in nx.bfs_edges(G, root):
-            depths[edge[1]] = depths[edge[0]] + 1
-    except:
-        pass
+        if root in G:
+            for edge in nx.bfs_edges(G, root):
+                depths[edge[1]] = depths[edge[0]] + 1
+    except (nx.NetworkXError, KeyError, IndexError) as e:
+        print(f"BFS depth warning: {e}")
     return depths
 
 def generate_network_graph(edge_data):
+    fig = None
     try:
         # 1. Create a Directed Graph
         G = nx.DiGraph()

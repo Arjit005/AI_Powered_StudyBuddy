@@ -39,12 +39,10 @@ dist/
 build/
 *.log
 
-# Test files
-test_*.py
-debug_*.py
-verify_*.py
-*_test_*.txt
-backend_debug.log
+# Temporary debug scripts (scoped to root)
+/debug_*.py
+/verify_*.py
+/backend_debug.log
 
 # Temporary files
 *.tmp
