@@ -20,10 +20,11 @@ import Pricing from './pages/Pricing';
 import LoginPage from './pages/LoginPage';
 import SignupPage from './pages/SignupPage';
 
-// Protected Route Component
+// Protected Route Component checking both token presence and authenticated flag
 const ProtectedRoute = ({ children }) => {
-  const isAuthenticated = localStorage.getItem('isAuthenticated') === 'true';
-  return isAuthenticated ? children : <Navigate to="/login" />;
+  const token = localStorage.getItem('auth_token');
+  const isAuthenticated = localStorage.getItem('isAuthenticated') === 'true' && Boolean(token);
+  return isAuthenticated ? children : <Navigate to="/login" replace />;
 };
 
 function App() {

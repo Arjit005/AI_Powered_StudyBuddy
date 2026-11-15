@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { Share2, Sparkles, X, ZoomIn, Download, Network, ArrowRight, Layers, Cpu, CheckCircle2 } from 'lucide-react';
 import MermaidViewer from '../components/MermaidViewer';
 
@@ -20,37 +20,47 @@ const Maps = () => {
     const [mapImage, setMapImage] = useState(null);
     const [isZoomed, setIsZoomed] = useState(false);
     const [error, setError] = useState(null);
+    const mapRequestGenRef = useRef(0);
 
     const generateDiagram = async (targetTopic) => {
         const topicToUse = targetTopic || topic;
-        if (!topicToUse.trim()) return;
+        if (!topicToUse.trim() || loading) return;
         setLoading(true);
         setError(null);
         setIsZoomed(false);
+        setDiagramData(null);
+        setMapImage(null);
 
+        const thisGen = ++mapRequestGenRef.current;
         const token = localStorage.getItem('auth_token');
         const headers = { 'Content-Type': 'application/json' };
         if (token) headers['Authorization'] = `Bearer ${token}`;
 
         try {
-            // 1. Fetch detailed Mermaid diagram
-            const diagramRes = await fetch('/api/generate-diagram', {
-                method: 'POST',
-                headers,
-                body: JSON.stringify({ topic: topicToUse.trim() })
-            });
+            // Fetch detailed Mermaid diagram and NetworkX topology graph concurrently
+            const [diagramRes, mapRes] = await Promise.all([
+                fetch('/api/generate-diagram', {
+                    method: 'POST',
+                    headers,
+                    body: JSON.stringify({ topic: topicToUse.trim() })
+                }),
+                fetch('/api/generate-map', {
+                    method: 'POST',
+                    headers,
+                    body: JSON.stringify({ topic: topicToUse.trim() })
+                })
+            ]);
+
+            if (thisGen !== mapRequestGenRef.current) return;
+
+            if (!diagramRes.ok && !mapRes.ok) {
+                throw new Error('Failed to generate architecture diagram or concept map.');
+            }
 
             if (diagramRes.ok) {
                 const data = await diagramRes.json();
                 setDiagramData(data);
             }
-
-            // 2. Fetch NetworkX fallback topology graph
-            const mapRes = await fetch('/api/generate-map', {
-                method: 'POST',
-                headers,
-                body: JSON.stringify({ topic: topicToUse.trim() })
-            });
 
             if (mapRes.ok) {
                 const mapJson = await mapRes.json();
@@ -60,9 +70,13 @@ const Maps = () => {
             }
         } catch (err) {
             console.error("Error generating diagram:", err);
-            setError(err.message || "Failed to synthesize system diagram.");
+            if (thisGen === mapRequestGenRef.current) {
+                setError(err.message || "Failed to synthesize system diagram.");
+            }
         } finally {
-            setLoading(false);
+            if (thisGen === mapRequestGenRef.current) {
+                setLoading(false);
+            }
         }
     };
 

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { BarChart3, Calendar, TrendingUp, RotateCcw, Award, Flame, Shield, Activity, Clock, CheckCircle2, Bot, Zap } from 'lucide-react';
 
 const Progress = () => {
@@ -7,41 +7,50 @@ const Progress = () => {
     const [chartImage, setChartImage] = useState(null);
     const [sessions, setSessions] = useState([]);
     const [loading, setLoading] = useState(true);
+    const progressRequestGenRef = useRef(0);
 
-    const fetchAnalytics = () => {
+    const fetchAnalytics = async () => {
         setLoading(true);
         const token = localStorage.getItem('auth_token');
         const headers = {};
         if (token) headers['Authorization'] = `Bearer ${token}`;
 
-        fetch('/api/progress', { headers })
-            .then(res => res.json())
-            .then(data => setStats(data))
-            .catch(err => console.error("Error fetching progress:", err));
+        const thisGen = ++progressRequestGenRef.current;
+        try {
+            const [progRes, heatRes, dashRes, sessRes] = await Promise.all([
+                fetch('/api/progress', { headers }),
+                fetch('/api/analytics/activity-heatmap', { headers }),
+                fetch('/api/analytics/dashboard', { headers }),
+                fetch('/api/sessions/history', { headers })
+            ]);
 
-        fetch('/api/analytics/activity-heatmap', { headers })
-            .then(res => res.json())
-            .then(data => {
+            if (thisGen !== progressRequestGenRef.current) return;
+
+            if (progRes.ok) {
+                const data = await progRes.json();
+                setStats(data);
+            }
+            if (heatRes.ok) {
+                const data = await heatRes.json();
                 if (data && Array.isArray(data.days)) {
                     setHeatmapData(data.days);
                 }
-            })
-            .catch(err => console.error("Error fetching heatmap:", err));
-
-        fetch('/api/analytics/dashboard', { headers })
-            .then(res => res.json())
-            .then(data => {
+            }
+            if (dashRes.ok) {
+                const data = await dashRes.json();
                 if (data.chart) setChartImage(`data:image/png;base64,${data.chart}`);
-            })
-            .catch(err => console.error("Error fetching chart:", err));
-
-        fetch('/api/sessions/history', { headers })
-            .then(res => res.json())
-            .then(data => {
+            }
+            if (sessRes.ok) {
+                const data = await sessRes.json();
                 if (Array.isArray(data)) setSessions(data);
-            })
-            .catch(err => console.error("Error fetching session history:", err))
-            .finally(() => setLoading(false));
+            }
+        } catch (err) {
+            console.error("Error fetching progress batch:", err);
+        } finally {
+            if (thisGen === progressRequestGenRef.current) {
+                setLoading(false);
+            }
+        }
     };
 
     useEffect(() => {
@@ -53,10 +62,20 @@ const Progress = () => {
         const token = localStorage.getItem('auth_token');
         const headers = {};
         if (token) headers['Authorization'] = `Bearer ${token}`;
-        await fetch('/api/progress', { method: 'DELETE', headers });
-        setStats({ study_hours: 0, quizzes_taken: 0, streak_days: 0 });
-        setChartImage(null);
-        setSessions([]);
+        try {
+            const res = await fetch('/api/progress', { method: 'DELETE', headers });
+            if (res.ok) {
+                setStats({ study_hours: 0, quizzes_taken: 0, streak_days: 0 });
+                setChartImage(null);
+                setSessions([]);
+                fetchAnalytics();
+            } else {
+                alert("Failed to reset progress on server.");
+            }
+        } catch (err) {
+            console.error("Reset error:", err);
+            alert("Network error resetting progress.");
+        }
     };
 
     const getActivityIcon = (type) => {
@@ -186,7 +205,8 @@ const Progress = () => {
                             return (
                                 <div key={weekIdx} className="flex flex-col gap-1.5">
                                     {(weekDays.length > 0 ? weekDays : Array.from({ length: 7 })).map((day, dayIdx) => {
-                                        const intensity = day ? day.intensity : 0;
+                                        const rawIntensity = day ? day.intensity : 0;
+                                        const intensity = Math.max(0, Math.min(4, Math.floor(rawIntensity || 0)));
                                         const dateLabel = day ? day.date : `Day ${dayIdx}`;
                                         const countLabel = day ? day.count : 0;
                                         const durationLabel = day ? day.duration_minutes : 0;

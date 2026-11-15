@@ -210,7 +210,8 @@ def health_check(db: Session = Depends(get_db)):
         from sqlalchemy import text
         db.execute(text("SELECT 1"))
     except Exception as e:
-        db_status = f"unhealthy: {str(e)[:50]}"
+        print(f"Health check database failure: {e}")
+        db_status = "unhealthy"
 
     return {
         "status": "healthy" if db_status == "connected" else "degraded",
@@ -340,9 +341,10 @@ def google_login(req: GoogleLoginRequest, request: Request, db: Session = Depend
     try:
         decoded = fb_auth.verify_id_token(req.id_token)
     except Exception as e:
+        print(f"Google ID token verification failed: {e}")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=f"Google authentication failed: {str(e)}"
+            detail="Google authentication token verification failed. Please try again."
         )
 
     email = decoded.get("email", "").lower().strip()
@@ -463,10 +465,20 @@ def list_sources(
     ]
 
 @app.get("/api/sources/{source_id}", tags=["Sources"])
-def get_source_detail(source_id: int, db: Session = Depends(get_db)):
-    source = db.query(models.Source).filter(models.Source.id == source_id).first()
+def get_source_detail(
+    source_id: int, 
+    db: Session = Depends(get_db),
+    current_user: Optional[models.User] = Depends(auth.get_current_user_optional)
+):
+    query = db.query(models.Source).filter(models.Source.id == source_id)
+    if current_user:
+        query = query.filter((models.Source.user_id == current_user.id) | (models.Source.user_id.is_(None)))
+    else:
+        query = query.filter(models.Source.user_id.is_(None))
+
+    source = query.first()
     if not source:
-        raise HTTPException(status_code=404, detail="Source not found.")
+        raise HTTPException(status_code=404, detail="Source not found or unauthorized.")
     return {
         "id": source.id,
         "title": source.title,
@@ -482,10 +494,20 @@ def get_source_detail(source_id: int, db: Session = Depends(get_db)):
     }
 
 @app.delete("/api/sources/{source_id}", tags=["Sources"])
-def delete_source(source_id: int, db: Session = Depends(get_db)):
-    source = db.query(models.Source).filter(models.Source.id == source_id).first()
+def delete_source(
+    source_id: int, 
+    db: Session = Depends(get_db),
+    current_user: Optional[models.User] = Depends(auth.get_current_user_optional)
+):
+    query = db.query(models.Source).filter(models.Source.id == source_id)
+    if current_user:
+        query = query.filter(models.Source.user_id == current_user.id)
+    else:
+        query = query.filter(models.Source.user_id.is_(None))
+
+    source = query.first()
     if not source:
-        raise HTTPException(status_code=404, detail="Source not found.")
+        raise HTTPException(status_code=404, detail="Source not found or unauthorized.")
     
     user_id = source.user_id
     # Clean up Pinecone vectors for this source
@@ -499,18 +521,38 @@ def delete_source(source_id: int, db: Session = Depends(get_db)):
     return {"status": "success", "message": f"Source {source_id} deleted with cascade."}
 
 @app.post("/api/sources/{source_id}/reindex", tags=["Sources"])
-def reindex_source(source_id: int, db: Session = Depends(get_db)):
-    source = db.query(models.Source).filter(models.Source.id == source_id).first()
+def reindex_source(
+    source_id: int, 
+    db: Session = Depends(get_db),
+    current_user: Optional[models.User] = Depends(auth.get_current_user_optional)
+):
+    query = db.query(models.Source).filter(models.Source.id == source_id)
+    if current_user:
+        query = query.filter(models.Source.user_id == current_user.id)
+    else:
+        query = query.filter(models.Source.user_id.is_(None))
+
+    source = query.first()
     if not source:
-        raise HTTPException(status_code=404, detail="Source not found.")
+        raise HTTPException(status_code=404, detail="Source not found or unauthorized.")
     rag_service.RAGService.chunk_and_embed_source(db, source)
     return {"status": "success", "message": f"Source {source_id} re-chunked and re-embedded."}
 
 @app.get("/api/sources/{source_id}/guide", tags=["Sources"])
-def get_source_guide_endpoint(source_id: int, db: Session = Depends(get_db)):
-    source = db.query(models.Source).filter(models.Source.id == source_id).first()
+def get_source_guide_endpoint(
+    source_id: int, 
+    db: Session = Depends(get_db),
+    current_user: Optional[models.User] = Depends(auth.get_current_user_optional)
+):
+    query = db.query(models.Source).filter(models.Source.id == source_id)
+    if current_user:
+        query = query.filter((models.Source.user_id == current_user.id) | (models.Source.user_id.is_(None)))
+    else:
+        query = query.filter(models.Source.user_id.is_(None))
+
+    source = query.first()
     if not source:
-        raise HTTPException(status_code=404, detail="Source not found.")
+        raise HTTPException(status_code=404, detail="Source not found or unauthorized.")
     return rag_service.RAGService.generate_source_guide(source)
 
 
@@ -654,6 +696,8 @@ def chat_endpoint(
         conv_query = db.query(models.Conversation).filter(models.Conversation.id == req.conversation_id)
         if user_id:
             conv_query = conv_query.filter(models.Conversation.user_id == user_id)
+        else:
+            conv_query = conv_query.filter(models.Conversation.user_id.is_(None))
         conv = conv_query.first()
 
     if not conv:
@@ -791,7 +835,12 @@ async def chat_with_ai_stream(
     # Resolve conversation
     conv = None
     if req.conversation_id:
-        conv = db.query(models.Conversation).filter(models.Conversation.id == req.conversation_id).first()
+        conv_query = db.query(models.Conversation).filter(models.Conversation.id == req.conversation_id)
+        if user_id:
+            conv_query = conv_query.filter(models.Conversation.user_id == user_id)
+        else:
+            conv_query = conv_query.filter(models.Conversation.user_id.is_(None))
+        conv = conv_query.first()
     if not conv:
         auto_title = clean_message[:35] + ("..." if len(clean_message) > 35 else "")
         conv = models.Conversation(user_id=user_id, title=auto_title or "Study Session")
@@ -878,6 +927,8 @@ def get_chat_history(
     query = db.query(models.ChatHistory)
     if current_user:
         query = query.filter(models.ChatHistory.user_id == current_user.id)
+    else:
+        query = query.filter(models.ChatHistory.user_id.is_(None))
 
     if conversation_id:
         query = query.filter(models.ChatHistory.conversation_id == conversation_id)
@@ -885,6 +936,8 @@ def get_chat_history(
         latest_conv = db.query(models.Conversation)
         if current_user:
             latest_conv = latest_conv.filter(models.Conversation.user_id == current_user.id)
+        else:
+            latest_conv = latest_conv.filter(models.Conversation.user_id.is_(None))
         latest = latest_conv.order_by(models.Conversation.updated_at.desc()).first()
         if latest:
             query = query.filter(models.ChatHistory.conversation_id == latest.id)
@@ -916,9 +969,17 @@ def clear_chat_history(
     query = db.query(models.ChatHistory)
     if current_user:
         query = query.filter(models.ChatHistory.user_id == current_user.id)
+    else:
+        query = query.filter(models.ChatHistory.user_id.is_(None))
+
     if conversation_id:
         query = query.filter(models.ChatHistory.conversation_id == conversation_id)
-        conv = db.query(models.Conversation).filter(models.Conversation.id == conversation_id).first()
+        conv_q = db.query(models.Conversation).filter(models.Conversation.id == conversation_id)
+        if current_user:
+            conv_q = conv_q.filter(models.Conversation.user_id == current_user.id)
+        else:
+            conv_q = conv_q.filter(models.Conversation.user_id.is_(None))
+        conv = conv_q.first()
         if conv:
             conv.long_term_summary = None
 
@@ -1056,6 +1117,8 @@ def get_progress(
         query = db.query(models.StudySession)
         if user_id:
             query = query.filter(models.StudySession.user_id == user_id)
+        else:
+            query = query.filter(models.StudySession.user_id.is_(None))
 
         timer_query = query.filter(models.StudySession.activity_type == "timer_focus")
         total_seconds = timer_query.with_entities(func.sum(models.StudySession.duration_seconds)).scalar() or 0
@@ -1085,6 +1148,8 @@ def reset_progress(
     query = db.query(models.StudySession)
     if current_user:
         query = query.filter(models.StudySession.user_id == current_user.id)
+    else:
+        query = query.filter(models.StudySession.user_id.is_(None))
     query.delete(synchronize_session=False)
     db.commit()
     return {"status": "reset"}
@@ -1108,6 +1173,8 @@ def get_activity_heatmap(
     query = db.query(models.StudySession).filter(models.StudySession.created_at >= start_date)
     if user_id:
         query = query.filter(models.StudySession.user_id == user_id)
+    else:
+        query = query.filter(models.StudySession.user_id.is_(None))
 
     sessions = query.all()
 
@@ -1344,9 +1411,16 @@ def save_material_to_library(
 @app.get("/api/library/{item_id}", tags=["Study Library"])
 def get_library_material(
     item_id: int,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: Optional[models.User] = Depends(auth.get_current_user_optional)
 ):
-    item = db.query(models.SavedStudyMaterial).filter(models.SavedStudyMaterial.id == item_id).first()
+    query = db.query(models.SavedStudyMaterial).filter(models.SavedStudyMaterial.id == item_id)
+    if current_user:
+        query = query.filter((models.SavedStudyMaterial.user_id == current_user.id) | (models.SavedStudyMaterial.user_id.is_(None)))
+    else:
+        query = query.filter(models.SavedStudyMaterial.user_id.is_(None))
+
+    item = query.first()
     if not item:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Material not found in library.")
 
@@ -1364,9 +1438,16 @@ def get_library_material(
 @app.delete("/api/library/{item_id}", tags=["Study Library"])
 def delete_library_material(
     item_id: int,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: Optional[models.User] = Depends(auth.get_current_user_optional)
 ):
-    item = db.query(models.SavedStudyMaterial).filter(models.SavedStudyMaterial.id == item_id).first()
+    query = db.query(models.SavedStudyMaterial).filter(models.SavedStudyMaterial.id == item_id)
+    if current_user:
+        query = query.filter(models.SavedStudyMaterial.user_id == current_user.id)
+    else:
+        query = query.filter(models.SavedStudyMaterial.user_id.is_(None))
+
+    item = query.first()
     if not item:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Material not found.")
     db.delete(item)
@@ -1376,9 +1457,16 @@ def delete_library_material(
 @app.put("/api/library/{item_id}/favorite", tags=["Study Library"])
 def toggle_library_favorite(
     item_id: int,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: Optional[models.User] = Depends(auth.get_current_user_optional)
 ):
-    item = db.query(models.SavedStudyMaterial).filter(models.SavedStudyMaterial.id == item_id).first()
+    query = db.query(models.SavedStudyMaterial).filter(models.SavedStudyMaterial.id == item_id)
+    if current_user:
+        query = query.filter(models.SavedStudyMaterial.user_id == current_user.id)
+    else:
+        query = query.filter(models.SavedStudyMaterial.user_id.is_(None))
+
+    item = query.first()
     if not item:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Material not found.")
     item.is_favorite = 0 if item.is_favorite else 1

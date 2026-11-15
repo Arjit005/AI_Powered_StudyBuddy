@@ -41,10 +41,25 @@ class RateLimiter:
     def _clean_old_requests(self, key: str, window_seconds: int, current_time: float):
         if key in self.history:
             cutoff = current_time - window_seconds
-            self.history[key] = [t for t in self.history[key] if t > cutoff]
+            valid_timestamps = [t for t in self.history[key] if t > cutoff]
+            if valid_timestamps:
+                self.history[key] = valid_timestamps
+            else:
+                del self.history[key]
+
+    def _get_client_ip(self, request: Request) -> str:
+        # Check standard reverse proxy headers if available
+        forwarded = request.headers.get("X-Forwarded-For")
+        if forwarded:
+            # Take the first untrusted client IP in the chain
+            return forwarded.split(",")[0].strip()
+        real_ip = request.headers.get("X-Real-IP")
+        if real_ip:
+            return real_ip.strip()
+        return request.client.host if request.client else "unknown"
 
     def check_rate_limit(self, request: Request, category: str, max_requests: int, window_seconds: int):
-        client_ip = request.client.host if request.client else "unknown"
+        client_ip = self._get_client_ip(request)
         current_time = time.time()
 
         # Check if IP is currently under lockout (e.g. from repeated login failures)

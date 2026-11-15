@@ -4,7 +4,6 @@ Re-embeds all existing Source chunks with genuine neural embeddings
 and upserts them into Pinecone with tenant namespace isolation.
 """
 import os
-import sys
 import json
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -34,6 +33,8 @@ def migrate_embeddings():
         if not chunks:
             print(f"Source ID {src.id} has no chunks. Re-chunking...")
             RAGService.chunk_and_embed_source(db, src)
+            created_count = db.query(SourceChunk).filter(SourceChunk.source_id == src.id).count()
+            total_chunks_reembedded += created_count
             continue
 
         texts = [c.text for c in chunks]

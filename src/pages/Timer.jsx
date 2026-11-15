@@ -31,7 +31,10 @@ const StudyTimer = () => {
         return () => clearInterval(interval);
     }, [isActive, timeLeft, mode]);
 
-    const toggleTimer = () => setIsActive(!isActive);
+    const toggleTimer = () => {
+        if (timeLeft === 0) return;
+        setIsActive(!isActive);
+    };
 
     const resetTimer = () => {
         setIsActive(false);

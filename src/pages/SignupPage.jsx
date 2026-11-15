@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Brain, Lock, User, Mail, ArrowRight, ShieldCheck, CheckCircle2, XCircle, Eye, EyeOff } from 'lucide-react';
 import { signInWithGoogle } from '../firebase';
@@ -16,6 +16,7 @@ const SignupPage = () => {
     const navigate = useNavigate();
 
     const handleGoogleSignIn = async () => {
+        if (isLoading) return;
         setError('');
         setIsGoogleLoading(true);
         try {
@@ -70,8 +71,16 @@ const SignupPage = () => {
         return { text: 'Strong (Recommended)', color: 'bg-emerald-400', textClass: 'text-emerald-400' };
     }, [password, strengthScore]);
 
+    const redirectTimerRef = useRef(null);
+    useEffect(() => {
+        return () => {
+            if (redirectTimerRef.current) clearTimeout(redirectTimerRef.current);
+        };
+    }, []);
+
     const handleSignup = async (e) => {
         e.preventDefault();
+        if (isGoogleLoading) return;
         setError('');
 
         if (password !== confirmPassword) {
@@ -79,8 +88,8 @@ const SignupPage = () => {
             return;
         }
 
-        if (strengthScore < 4) {
-            setError("Please fulfill all security criteria for a strong password.");
+        if (strengthScore < 5) {
+            setError("Please fulfill all 5 security criteria for a strong password.");
             return;
         }
 
@@ -109,7 +118,7 @@ const SignupPage = () => {
             localStorage.setItem('user', JSON.stringify(data.user));
 
             setIsSuccess(true);
-            setTimeout(() => {
+            redirectTimerRef.current = setTimeout(() => {
                 navigate('/');
             }, 1200);
         } catch (err) {

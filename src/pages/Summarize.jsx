@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   FileText, 
   ArrowRight, 
@@ -24,20 +24,22 @@ const Summarize = () => {
     const [isSpeaking, setIsSpeaking] = useState(false);
 
     // Audio Speech Synthesis cleanup on unmount
+    const summarizeGenRef = useRef(0);
     useEffect(() => {
         return () => {
-            if ('speechSynthesis' in window) {
+            if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
                 window.speechSynthesis.cancel();
             }
         };
     }, []);
 
     const handleSummarize = async () => {
-        if (!topic.trim()) return;
+        if (!topic.trim() || isLoading) return;
         setIsLoading(true);
         setError('');
-        if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+        if (typeof window !== 'undefined' && 'speechSynthesis' in window) window.speechSynthesis.cancel();
         setIsSpeaking(false);
+        const thisGen = ++summarizeGenRef.current;
         try {
             const token = localStorage.getItem('auth_token');
             const headers = { 'Content-Type': 'application/json' };
@@ -49,6 +51,8 @@ const Summarize = () => {
                 body: JSON.stringify({ topic: topic.trim() })
             });
 
+            if (thisGen !== summarizeGenRef.current) return;
+
             if (!response.ok) {
                 const errData = await response.json();
                 throw new Error(errData.detail || 'Failed to synthesize summary');
@@ -57,9 +61,13 @@ const Summarize = () => {
             const data = await response.json();
             setSummary(data.summary);
         } catch (err) {
-            setError(err.message || 'Error occurred while generating summary.');
+            if (thisGen === summarizeGenRef.current) {
+                setError(err.message || 'Error occurred while generating summary.');
+            }
         } finally {
-            setIsLoading(false);
+            if (thisGen === summarizeGenRef.current) {
+                setIsLoading(false);
+            }
         }
     };
 
@@ -91,9 +99,13 @@ const Summarize = () => {
     const handleSaveToLibrary = async () => {
         if (!summary) return;
         try {
+            const token = localStorage.getItem('auth_token');
+            const headers = { 'Content-Type': 'application/json' };
+            if (token) headers['Authorization'] = `Bearer ${token}`;
+
             const res = await fetch('/api/library', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers,
                 body: JSON.stringify({
                     material_type: 'summary',
                     title: `Summary: ${topic.slice(0, 45)}...`,
@@ -105,9 +117,12 @@ const Summarize = () => {
             if (res.ok) {
                 setSaved(true);
                 setTimeout(() => setSaved(false), 3000);
+            } else {
+                alert("Failed to save summary to library.");
             }
         } catch (err) {
             console.error("Save error:", err);
+            alert("Network error saving summary.");
         }
     };
 

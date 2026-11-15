@@ -102,8 +102,10 @@ export default function CommandPalette({ isOpen, onClose }) {
       icon: Plus,
       category: 'Quick Action',
       action: () => {
-        navigate('/chat');
-        window.dispatchEvent(new CustomEvent('study-buddy:new-chat'));
+        navigate('/chat', { state: { triggerNewChat: true } });
+        setTimeout(() => {
+          window.dispatchEvent(new CustomEvent('study-buddy:new-chat'));
+        }, 150);
       }
     },
     {
@@ -164,7 +166,12 @@ export default function CommandPalette({ isOpen, onClose }) {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center pt-20 px-4 bg-black/80 backdrop-blur-md animate-fade-in">
+    <div 
+      className="fixed inset-0 z-50 flex items-start justify-center pt-20 px-4 bg-black/80 backdrop-blur-md animate-fade-in"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Command Palette"
+    >
       <div 
         className="glass-panel w-full max-w-2xl rounded-2xl border border-emerald-500/30 shadow-2xl shadow-emerald-950/60 overflow-hidden"
         onClick={(e) => e.stopPropagation()}
@@ -178,10 +185,12 @@ export default function CommandPalette({ isOpen, onClose }) {
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Type a command, tool name, or search (e.g. Canvas, Quiz, MCP)..."
             className="w-full bg-transparent text-white placeholder-slate-400 text-base focus:outline-none"
+            aria-label="Command search query"
             autoFocus
           />
           <button 
             onClick={onClose}
+            aria-label="Close command palette"
             className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
           >
             <X className="w-4 h-4" />
@@ -189,7 +198,7 @@ export default function CommandPalette({ isOpen, onClose }) {
         </div>
 
         {/* Results List */}
-        <div className="max-h-96 overflow-y-auto p-2 space-y-1">
+        <div className="max-h-96 overflow-y-auto p-2 space-y-1" role="listbox" aria-label="Commands">
           {filtered.length === 0 ? (
             <div className="py-10 text-center text-slate-400 text-sm">
               No matching commands or tools found for "{query}".
@@ -201,6 +210,15 @@ export default function CommandPalette({ isOpen, onClose }) {
               return (
                 <div
                   key={cmd.id}
+                  role="option"
+                  aria-selected={isSelected}
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      cmd.action();
+                      onClose();
+                    }
+                  }}
                   onClick={() => {
                     cmd.action();
                     onClose();

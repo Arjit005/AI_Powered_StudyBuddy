@@ -1,7 +1,4 @@
-import os
 import json
-import uuid
-import math
 from typing import Dict, Any, List, Optional
 from backend.ai_service import AIService
 from backend.database import SessionLocal
@@ -144,6 +141,9 @@ class MCPService:
         elif name == "query_study_memory":
             cid = arguments.get("conversation_id")
             limit = arguments.get("limit", 5)
+            if not isinstance(limit, int) or isinstance(limit, bool) or limit < 1:
+                limit = 5
+            limit = min(limit, 100)
             return cls._query_study_memory(cid, limit)
 
         elif name == "create_study_flashcards":
@@ -692,6 +692,46 @@ class MCPService:
                     ]
                 }
             }
+
+        elif method == "resources/read":
+            uri = params.get("uri")
+            if uri == "study://hybrid-memory":
+                return {
+                    "jsonrpc": "2.0",
+                    "id": rpc_id,
+                    "result": {
+                        "contents": [
+                            {
+                                "uri": uri,
+                                "mimeType": "application/json",
+                                "text": json.dumps({"status": "active", "architecture": "Tier-1 Buffer + Tier-2 Episodic Summary"})
+                            }
+                        ]
+                    }
+                }
+            elif uri == "study://canvas-templates":
+                return {
+                    "jsonrpc": "2.0",
+                    "id": rpc_id,
+                    "result": {
+                        "contents": [
+                            {
+                                "uri": uri,
+                                "mimeType": "application/json",
+                                "text": json.dumps(cls.get_canvas_templates())
+                            }
+                        ]
+                    }
+                }
+            else:
+                return {
+                    "jsonrpc": "2.0",
+                    "id": rpc_id,
+                    "error": {
+                        "code": -32602,
+                        "message": f"Resource not found: {uri}"
+                    }
+                }
 
         elif method == "prompts/list":
             return {

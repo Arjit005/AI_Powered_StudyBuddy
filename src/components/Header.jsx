@@ -86,12 +86,16 @@ const Header = () => {
                         <div className="relative hidden md:block">
                             <button
                                 onClick={() => setSecurityOpen(!securityOpen)}
-                                className="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-mono font-medium bg-emerald-950/50 text-emerald-300 border border-emerald-800/50 hover:bg-emerald-900/40 hover:border-emerald-600/60 transition-all cursor-pointer shadow-sm"
+                                className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-mono font-medium transition-all cursor-pointer shadow-sm ${
+                                    securityData?.shield_active 
+                                        ? 'bg-emerald-950/50 text-emerald-300 border border-emerald-800/50 hover:bg-emerald-900/40' 
+                                        : 'bg-amber-950/50 text-amber-300 border border-amber-800/50 hover:bg-amber-900/40'
+                                }`}
                                 title="Click to view AI Safety Shield status"
                             >
-                                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-                                <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-                                <span>Shield: Active</span>
+                                <span className={`w-2 h-2 rounded-full ${securityData?.shield_active ? 'bg-emerald-400 animate-ping' : 'bg-amber-400'}`} />
+                                <ShieldCheck className={`w-3.5 h-3.5 ${securityData?.shield_active ? 'text-emerald-400' : 'text-amber-400'}`} />
+                                <span>Shield: {securityData?.shield_active ? 'Active' : 'Degraded'}</span>
                                 <span className="text-emerald-500/60">|</span>
                                 <span className="text-slate-400">{apiLatency}</span>
                                 <ChevronDown className={`w-3 h-3 text-emerald-400 transition-transform ${securityOpen ? 'rotate-180' : ''}`} />
@@ -182,7 +186,7 @@ const Header = () => {
                         {user && (
                             <div className="hidden sm:flex items-center gap-2 pl-3 py-1 pr-1 bg-slate-900/80 border border-slate-800 rounded-xl">
                                 <div className="w-6 h-6 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold text-xs uppercase">
-                                    {user.username ? user.username.slice(0, 2) : 'SB'}
+                                    {typeof user.username === 'string' && user.username ? user.username.slice(0, 2) : 'SB'}
                                 </div>
                                 <span className="text-xs font-mono text-slate-300 max-w-[100px] truncate">{user.username}</span>
                                 <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-mono font-bold border border-emerald-500/20">PRO</span>

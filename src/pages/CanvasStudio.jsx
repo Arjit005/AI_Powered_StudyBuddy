@@ -181,6 +181,15 @@ export default function CanvasStudio() {
     setIsPanning(false);
   };
 
+  useEffect(() => {
+    const handleGlobalMouseUp = () => {
+      setDraggingNodeId(null);
+      setIsPanning(false);
+    };
+    window.addEventListener('mouseup', handleGlobalMouseUp);
+    return () => window.removeEventListener('mouseup', handleGlobalMouseUp);
+  }, []);
+
   // Zoom controls
   const handleZoom = (delta) => {
     setZoom(prev => Math.min(Math.max(0.4, prev + delta), 2.2));
@@ -225,13 +234,16 @@ export default function CanvasStudio() {
       if (res.ok) {
         setSavedSuccess(true);
         setTimeout(() => setSavedSuccess(false), 3000);
+      } else {
+        alert("Failed to save canvas diagram to library.");
       }
     } catch (err) {
       console.error("Save to library error:", err);
+      alert("Network error saving canvas diagram.");
     }
   };
 
-  // Download SVG
+  // Download SVG with proper Blob URL cleanup
   const handleDownloadSvg = () => {
     if (!canvasRef.current) return;
     const svgEl = canvasRef.current.querySelector('svg');
@@ -245,6 +257,7 @@ export default function CanvasStudio() {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
 
   // Helper for node category styles

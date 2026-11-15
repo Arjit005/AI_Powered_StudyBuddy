@@ -1,17 +1,28 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Brain, Lock, User, ArrowRight, ShieldCheck, AlertTriangle, Eye, EyeOff, Zap } from 'lucide-react';
 import { signInWithGoogle } from '../firebase';
 
 const LoginPage = () => {
-    const [username, setUsername] = useState('testuser1@example.com');
-    const [password, setPassword] = useState('secretpassword123');
+    // Empty default credentials in production builds
+    const isDev = import.meta.env.DEV;
+    const [username, setUsername] = useState(isDev ? 'testuser1@example.com' : '');
+    const [password, setPassword] = useState(isDev ? 'secretpassword123' : '');
     const [showPassword, setShowPassword] = useState(false);
     const [error, setError] = useState('');
     const [lockoutSecs, setLockoutSecs] = useState(0);
     const [isLoading, setIsLoading] = useState(false);
     const [isGoogleLoading, setIsGoogleLoading] = useState(false);
     const navigate = useNavigate();
+
+    // Lockout countdown timer
+    useEffect(() => {
+        if (lockoutSecs <= 0) return;
+        const timer = setInterval(() => {
+            setLockoutSecs(prev => Math.max(0, prev - 1));
+        }, 1000);
+        return () => clearInterval(timer);
+    }, [lockoutSecs]);
 
     const handleGoogleSignIn = async () => {
         setError('');
@@ -58,7 +69,12 @@ const LoginPage = () => {
                 }),
             });
 
-            const data = await res.json();
+            let data = {};
+            try {
+                data = await res.json();
+            } catch (_) {
+                data = { detail: res.statusText || 'Unexpected server response' };
+            }
             if (!res.ok) {
                 if (res.status === 429) {
                     setLockoutSecs(60);

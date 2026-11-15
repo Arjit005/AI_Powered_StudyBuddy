@@ -9,7 +9,7 @@ const initMermaid = () => {
         mermaid.initialize({
             startOnLoad: false,
             theme: 'dark',
-            securityLevel: 'loose',
+            securityLevel: 'strict',
             themeVariables: {
                 darkMode: true,
                 background: '#0b0f17',
@@ -36,11 +36,18 @@ const MermaidViewer = ({ chart, title = "Architecture Diagram" }) => {
     const [isFullscreen, setIsFullscreen] = useState(false);
 
     useEffect(() => {
-        if (!chart || !chart.trim()) return;
+        if (!chart || !chart.trim()) {
+            setSvgContent('');
+            setError(null);
+            return;
+        }
         initMermaid();
 
+        let isCancelled = false;
+        setSvgContent(''); // Clear previous SVG while compiling
+        setError(null);
+
         const renderChart = async () => {
-            setError(null);
             const id = 'mermaid-' + Math.random().toString(36).substring(2, 9);
             try {
                 // Clean markdown code blocks if passed with backticks
@@ -52,14 +59,22 @@ const MermaidViewer = ({ chart, title = "Architecture Diagram" }) => {
                 }
 
                 const { svg } = await mermaid.render(id, cleanChart);
-                setSvgContent(svg);
+                if (!isCancelled) {
+                    setSvgContent(svg);
+                }
             } catch (err) {
                 console.error("Mermaid Render Error:", err);
-                setError(err.message || "Failed to render diagram syntax.");
+                if (!isCancelled) {
+                    setError(err.message || "Failed to render diagram syntax.");
+                }
             }
         };
 
         renderChart();
+
+        return () => {
+            isCancelled = true;
+        };
     }, [chart]);
 
     const handleCopy = () => {

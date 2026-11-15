@@ -34,10 +34,12 @@ const Flashcards = () => {
         { id: 5, front: "What is Connection Pooling?", back: "A caching technique where a pool of open database connections is kept alive and reused across requests to avoid the latency of TCP 3-way handshake and SSL negotiation on every query." }
     ]);
 
-    // Audio Speech Synthesis cleanup
+    // Audio Speech Synthesis & timeout cleanup
+    const advanceTimeoutRef = useRef(null);
     useEffect(() => {
         return () => {
             if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+            if (advanceTimeoutRef.current) clearTimeout(advanceTimeoutRef.current);
         };
     }, []);
 
@@ -55,20 +57,26 @@ const Flashcards = () => {
                 headers,
                 body: JSON.stringify({ topic: topic.trim() })
             });
-            const data = await res.json();
-            if (data.flashcards && data.flashcards.length > 0) {
-                setCards(data.flashcards);
-                setCurrentCard(0);
-                setMastery({});
+            if (res.ok) {
+                const data = await res.json();
+                if (data.flashcards && Array.isArray(data.flashcards) && data.flashcards.length > 0) {
+                    setCards(data.flashcards);
+                    setCurrentCard(0);
+                    setMastery({});
+                }
+            } else {
+                alert("Failed to generate flashcards. Please try another topic.");
             }
         } catch (err) {
             console.error(err);
+            alert("Network error generating flashcards.");
         } finally {
             setLoading(false);
         }
     };
 
     const nextCard = () => {
+        if (cards.length === 0) return;
         setIsFlipped(false);
         if ('speechSynthesis' in window) window.speechSynthesis.cancel();
         setIsSpeaking(false);
@@ -76,6 +84,7 @@ const Flashcards = () => {
     };
 
     const prevCard = () => {
+        if (cards.length === 0) return;
         setIsFlipped(false);
         if ('speechSynthesis' in window) window.speechSynthesis.cancel();
         setIsSpeaking(false);
@@ -91,7 +100,8 @@ const Flashcards = () => {
             [activeCard.id || currentCard]: rating
         }));
         // Auto-advance on rating
-        setTimeout(() => {
+        if (advanceTimeoutRef.current) clearTimeout(advanceTimeoutRef.current);
+        advanceTimeoutRef.current = setTimeout(() => {
             nextCard();
         }, 300);
     };
@@ -120,9 +130,13 @@ const Flashcards = () => {
     // Save Deck to Library
     const handleSaveDeck = async () => {
         try {
+            const token = localStorage.getItem('auth_token');
+            const headers = { 'Content-Type': 'application/json' };
+            if (token) headers['Authorization'] = `Bearer ${token}`;
+
             const res = await fetch('/api/library', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers,
                 body: JSON.stringify({
                     material_type: 'flashcards',
                     title: `Flashcards: ${topic || 'Computer Science Core'} (${cards.length} cards)`,
@@ -134,9 +148,12 @@ const Flashcards = () => {
             if (res.ok) {
                 setSaved(true);
                 setTimeout(() => setSaved(false), 3000);
+            } else {
+                alert("Failed to save flashcards to library.");
             }
         } catch (err) {
             console.error("Save deck error:", err);
+            alert("Network error saving flashcards.");
         }
     };
 
@@ -162,7 +179,7 @@ const Flashcards = () => {
 
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [cards.length, currentCard]);
+    }, [cards, currentCard]);
 
     const activeCardData = cards[currentCard] || { front: '', back: '' };
     const currentRating = mastery[activeCardData.id || currentCard];
@@ -220,7 +237,7 @@ const Flashcards = () => {
                 <div className="max-w-xl mx-auto mb-4 flex items-center justify-between px-3 text-xs font-mono text-slate-400">
                     <div className="flex items-center gap-2">
                         <Flame className="w-4 h-4 text-emerald-400" />
-                        <span>Mastered: <b className="text-emerald-400">{masteredCount}</b> / {cards.length}</span>
+                        <span>Mastered: <b className="text-emerald-400">{masteredCount}</b> / {cards.length} ({cards.length > 0 ? Math.round((masteredCount / cards.length) * 100) : 0}% Progress)</span>
                     </div>
                     <div className="flex items-center gap-3">
                         <span className="text-rose-400">🔴 Hard (1)</span>

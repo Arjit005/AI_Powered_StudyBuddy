@@ -78,9 +78,12 @@ const Pricing = () => {
                             <h3 className="text-xl font-bold text-white mb-1">Study Cohort</h3>
                             <p className="text-slate-400 text-xs mb-6">Designed for university labs & teams.</p>
                             <div className="text-4xl font-extrabold text-white mb-6">$29<span className="text-sm font-normal text-slate-400">/mo</span></div>
-                            <button className="w-full py-3 px-4 bg-slate-800 text-slate-300 font-semibold rounded-xl text-xs hover:bg-slate-700 transition-colors mb-6 border border-white/5">
+                            <a 
+                                href="mailto:support@studybuddy.ai?subject=Inquiry%20about%20Study%20Cohort%20Plan" 
+                                className="w-full block text-center py-3 px-4 bg-slate-800 text-slate-300 font-semibold rounded-xl text-xs hover:bg-slate-700 hover:text-white transition-colors mb-6 border border-white/5"
+                            >
                                 Contact Team
-                            </button>
+                            </a>
                             <ul className="space-y-3.5 text-xs text-slate-300">
                                 {[
                                     'Up to 10 Team Members',

@@ -67,10 +67,55 @@ class RAGService:
         return text.strip()
 
     @staticmethod
+    def _is_safe_url(url: str) -> bool:
+        """
+        SSRF Defense: Validates URL schemes and ensures IP does not resolve to private,
+        loopback, link-local, or cloud metadata ranges.
+        """
+        import socket
+        import ipaddress
+        from urllib.parse import urlparse
+
+        try:
+            parsed = urlparse(url)
+            if parsed.scheme.lower() not in ["http", "https"]:
+                return False
+            hostname = parsed.hostname
+            if not hostname:
+                return False
+            
+            # Block localhost strings explicitly
+            if hostname.lower() in ["localhost", "127.0.0.1", "::1", "0.0.0.0"]:
+                return False
+
+            # Resolve DNS
+            addr_info = socket.getaddrinfo(hostname, None)
+            for item in addr_info:
+                ip_str = item[4][0]
+                ip_obj = ipaddress.ip_address(ip_str)
+                if (
+                    ip_obj.is_private
+                    or ip_obj.is_loopback
+                    or ip_obj.is_link_local
+                    or ip_obj.is_reserved
+                    or ip_obj.is_multicast
+                    or ip_str.startswith("169.254.") # AWS / GCP / Azure metadata endpoint
+                ):
+                    return False
+            return True
+        except Exception as e:
+            print(f"SSRF validation exception for {url}: {e}")
+            return False
+
+    @staticmethod
     def extract_text_from_url(url: str) -> str:
         """
-        Fetches and cleans webpage text using trafilatura or basic requests.
+        Fetches and cleans webpage text using trafilatura or basic requests after strict SSRF check.
         """
+        if not RAGService._is_safe_url(url):
+            print(f"SSRF Alert: Blocked unsafe or internal URL: {url}")
+            return ""
+
         if trafilatura:
             try:
                 downloaded = trafilatura.fetch_url(url)
@@ -81,12 +126,29 @@ class RAGService:
             except Exception as e:
                 print(f"Trafilatura extraction error: {e}")
 
-        # Fallback via requests
+        # Fallback via requests with redirect validation
         import requests
         try:
-            resp = requests.get(url, timeout=15, headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"})
+            resp = requests.get(
+                url, 
+                timeout=10, 
+                allow_redirects=False,
+                headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
+            )
+            # If redirect, validate redirect destination
+            if resp.is_redirect or resp.status_code in [301, 302, 307, 308]:
+                redirect_url = resp.headers.get("location")
+                if redirect_url and RAGService._is_safe_url(redirect_url):
+                    resp = requests.get(
+                        redirect_url,
+                        timeout=10,
+                        allow_redirects=False,
+                        headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
+                    )
+                else:
+                    return ""
+
             if resp.status_code == 200:
-                # Basic strip HTML tags
                 clean = re.sub(r'<[^>]+>', ' ', resp.text)
                 return re.sub(r'\s+', ' ', clean).strip()
         except Exception as e:
@@ -186,6 +248,12 @@ class RAGService:
 
     @staticmethod
     def chunk_and_embed_source(db: Session, source: Source):
+        # 1. Fetch all existing chunk indices so we can clean up old Pinecone vectors
+        existing_chunks = db.query(SourceChunk).filter(SourceChunk.source_id == source.id).all()
+        if existing_chunks:
+            old_chunk_indices = [c.chunk_index for c in existing_chunks]
+            RAGService.delete_source_vectors(source.id, source.user_id, chunk_ids=old_chunk_indices)
+
         # Delete existing chunks for this source if reindexing
         db.query(SourceChunk).filter(SourceChunk.source_id == source.id).delete()
         db.commit()

@@ -109,19 +109,32 @@ class EmbeddingService:
 
         cleaned_texts = [t.strip() if t and t.strip() else "[Empty Chunk]" for t in texts]
 
+        # Use batch processing or robust per-item fallback with correct validation
         last_error = None
         for attempt in range(cls.MAX_RETRIES):
             try:
-                kwargs = {
-                    "model": cls.MODEL_NAME,
-                    "content": cleaned_texts,
-                    "output_dimensionality": cls.TARGET_DIMENSION,
-                }
-                if task_type in ["retrieval_query", "retrieval_document"]:
-                    kwargs["task_type"] = task_type
-
-                result = genai.embed_content(**kwargs)
-                raw_embeddings = result.get("embedding", [])
+                # The Google Generative AI SDK supports list of contents directly in newer versions,
+                # but to guarantee rock-solid compatibility across all versions, we embed items reliably:
+                raw_embeddings = []
+                try:
+                    kwargs = {
+                        "model": cls.MODEL_NAME,
+                        "content": cleaned_texts,
+                        "output_dimensionality": cls.TARGET_DIMENSION,
+                    }
+                    if task_type in ["retrieval_query", "retrieval_document"]:
+                        kwargs["task_type"] = task_type
+                    res = genai.embed_content(**kwargs)
+                    batch_res = res.get("embedding", [])
+                    if isinstance(batch_res, list) and len(batch_res) == len(cleaned_texts) and isinstance(batch_res[0], list):
+                        raw_embeddings = batch_res
+                except Exception as sdk_batch_err:
+                    # Fallback to per-item scalar embed_content
+                    raw_embeddings = []
+                    for t in cleaned_texts:
+                        item_vec = cls.embed_text(t, task_type=task_type)
+                        raw_embeddings.append(item_vec)
+                    return raw_embeddings
 
                 if len(raw_embeddings) != len(cleaned_texts):
                     raise EmbeddingProviderError(

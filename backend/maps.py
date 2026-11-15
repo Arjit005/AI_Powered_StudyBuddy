@@ -96,7 +96,7 @@ def generate_network_graph(edge_data):
         max_depth = max(depths.values()) if depths else 0
         
         # COMPACT FORMAT (User Requested - "No Scrolling")
-        plt.figure(figsize=(13, 9), facecolor='#f8fafc')
+        fig = plt.figure(figsize=(13, 9), facecolor='#f8fafc')
         
         # 4. Determine Layout
         layout_type = edge_data.get("layout", "tree")
@@ -126,7 +126,7 @@ def generate_network_graph(edge_data):
             # Place missing nodes in a separate cluster using spring layout
             # We offset them slightly to avoid overlap with the main tree
             subgraph = G.subgraph(missing_nodes)
-            fallback_pos = nx.spring_layout(subgraph, center=(width/2, -1)) 
+            fallback_pos = nx.spring_layout(subgraph, center=(0.0, -1.0)) 
             pos.update(fallback_pos)
 
         # 5. Styling & Drawing (Professional Org-Chart Theme)
@@ -204,19 +204,29 @@ def generate_network_graph(edge_data):
         # Save with light gray background to make emerald pop
         plt.savefig(buffer, format='png', bbox_inches='tight', transparent=False, facecolor='#f8fafc', dpi=130)
         buffer.seek(0)
-        plt.close()
+        if fig:
+            plt.close(fig)
+        else:
+            plt.close('all')
 
         return base64.b64encode(buffer.getvalue()).decode('utf-8')
 
     except Exception as e:
         print(f"CRITICAL MAP GENERATION ERROR: {e}")
+        if fig:
+            try:
+                plt.close(fig)
+            except Exception:
+                pass
         # Fallback Image Generation
-        plt.figure(figsize=(16, 12)) # Reduced size based on feedback
-        plt.text(0.5, 0.5, f"Map Generation Failed:\n{str(e)[:100]}", 
-                 ha='center', va='center', fontsize=14, color='red')
-        plt.axis('off')
-        buffer = io.BytesIO()
-        plt.savefig(buffer, format='png')
-        buffer.seek(0)
-        plt.close()
-        return base64.b64encode(buffer.getvalue()).decode('utf-8')
+        fail_fig = plt.figure(figsize=(16, 12)) # Reduced size based on feedback
+        try:
+            plt.text(0.5, 0.5, f"Map Generation Failed:\n{str(e)[:100]}", 
+                     ha='center', va='center', fontsize=14, color='red')
+            plt.axis('off')
+            buffer = io.BytesIO()
+            plt.savefig(buffer, format='png')
+            buffer.seek(0)
+            return base64.b64encode(buffer.getvalue()).decode('utf-8')
+        finally:
+            plt.close(fail_fig)

@@ -35,6 +35,13 @@ const ChatInterface = () => {
     const [copiedIndex, setCopiedIndex] = useState(null);
     const messagesEndRef = useRef(null);
 
+    // Concurrency / Race Condition tracking refs
+    const activeConvIdRef = useRef(activeConvId);
+    useEffect(() => {
+        activeConvIdRef.current = activeConvId;
+    }, [activeConvId]);
+    const historyRequestGenRef = useRef(0);
+
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     };
@@ -59,9 +66,10 @@ const ChatInterface = () => {
         }
     };
 
-    // 2. Fetch Chat History for Active Conversation
+    // 2. Fetch Chat History for Active Conversation with generation guard
     const fetchChatHistory = async (convId) => {
         setLoadingHistory(true);
+        const thisGen = ++historyRequestGenRef.current;
         try {
             const token = localStorage.getItem('auth_token');
             const headers = {};
@@ -69,6 +77,12 @@ const ChatInterface = () => {
 
             const url = convId ? `/api/chat?conversation_id=${convId}` : '/api/chat';
             const res = await fetch(url, { headers });
+            
+            // Check if this response is still for the current request generation and conversation
+            if (thisGen !== historyRequestGenRef.current || convId !== activeConvIdRef.current) {
+                return;
+            }
+
             if (res.ok) {
                 const data = await res.json();
                 if (data && data.length > 0) {
@@ -87,9 +101,13 @@ const ChatInterface = () => {
             }
         } catch (err) {
             console.error("Error loading messages:", err);
-            setMessages([DEFAULT_GREETING]);
+            if (thisGen === historyRequestGenRef.current) {
+                setMessages([DEFAULT_GREETING]);
+            }
         } finally {
-            setLoadingHistory(false);
+            if (thisGen === historyRequestGenRef.current) {
+                setLoadingHistory(false);
+            }
         }
     };
 
@@ -213,6 +231,7 @@ const ChatInterface = () => {
         const textToSend = messageText || input;
         if (!textToSend.trim() || isLoading) return;
 
+        const originatingConvId = activeConvId;
         const currentTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
         const userMessage = { role: 'user', content: textToSend, timestamp: currentTime };
         setMessages(prev => [...prev, userMessage]);
@@ -229,7 +248,7 @@ const ChatInterface = () => {
                 headers,
                 body: JSON.stringify({ 
                     message: textToSend,
-                    conversation_id: activeConvId
+                    conversation_id: originatingConvId
                 }),
             });
 
@@ -240,6 +259,11 @@ const ChatInterface = () => {
 
             const data = await response.json();
             
+            // If user switched conversation during in-flight generation, do not append to new room
+            if (originatingConvId !== activeConvIdRef.current && activeConvIdRef.current !== null) {
+                return;
+            }
+
             // If new session was automatically allocated
             if (data.conversation_id && data.conversation_id !== activeConvId) {
                 setActiveConvId(data.conversation_id);
@@ -261,16 +285,20 @@ const ChatInterface = () => {
             setMessages(prev => [...prev, aiMessage]);
         } catch (error) {
             console.error('Error:', error);
-            setMessages(prev => [
-                ...prev,
-                {
-                    role: 'ai',
-                    content: `⚠️ **Session Error**: ${error.message || 'Unable to connect to AI engine. Please check your network or try again in a moment.'}`,
-                    isError: true
-                }
-            ]);
+            if (originatingConvId === activeConvIdRef.current) {
+                setMessages(prev => [
+                    ...prev,
+                    {
+                        role: 'ai',
+                        content: `⚠️ **Session Error**: ${error.message || 'Unable to connect to AI engine. Please check your network or try again in a moment.'}`,
+                        isError: true
+                    }
+                ]);
+            }
         } finally {
-            setIsLoading(false);
+            if (originatingConvId === activeConvIdRef.current) {
+                setIsLoading(false);
+            }
         }
     };
 

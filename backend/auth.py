@@ -8,7 +8,17 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 from . import models, database
 
-SECRET_KEY = os.getenv('JWT_SECRET_KEY', 'study-buddy-super-secret-key-2025-secure')
+# Require JWT_SECRET_KEY in production / runtime; do not silently use insecure fallback
+SECRET_KEY = os.getenv('JWT_SECRET_KEY')
+if not SECRET_KEY:
+    if os.getenv('ENVIRONMENT', 'development').lower() == 'production':
+        raise RuntimeError(
+            "CRITICAL SECURITY CONFIGURATION ERROR: JWT_SECRET_KEY environment variable is missing in production. "
+            "Server startup halted to prevent token forgery."
+        )
+    else:
+        # Development warning only
+        SECRET_KEY = 'dev-insecure-study-buddy-secret-key-change-in-production'
 ALGORITHM = 'HS256'
 ACCESS_TOKEN_EXPIRE_DAYS = 7
 

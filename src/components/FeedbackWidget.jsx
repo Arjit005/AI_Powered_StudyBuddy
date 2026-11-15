@@ -9,10 +9,12 @@ const FeedbackWidget = () => {
     const [comment, setComment] = useState('');
     const [submitting, setSubmitting] = useState(false);
     const [submitted, setSubmitted] = useState(false);
+    const [submitError, setSubmitError] = useState(null);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
         setSubmitting(true);
+        setSubmitError(null);
         try {
             const res = await fetch('/api/feedback', {
                 method: 'POST',
@@ -23,16 +25,19 @@ const FeedbackWidget = () => {
                     comment
                 })
             });
-            if (res.ok) {
-                setSubmitted(true);
-                setTimeout(() => {
-                    setSubmitted(false);
-                    setIsOpen(false);
-                    setComment('');
-                }, 2500);
+            if (!res.ok) {
+                const errData = await res.json().catch(() => ({}));
+                throw new Error(errData.detail || 'Feedback submission failed');
             }
+            setSubmitted(true);
+            setTimeout(() => {
+                setSubmitted(false);
+                setIsOpen(false);
+                setComment('');
+            }, 2500);
         } catch (err) {
             console.error("Feedback error:", err);
+            setSubmitError(err.message || 'Submission failed. Please try again.');
         } finally {
             setSubmitting(false);
         }

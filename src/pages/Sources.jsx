@@ -78,12 +78,37 @@ const Sources = () => {
         }
     };
 
+    const openSourceGuide = async (source) => {
+        setSelectedSource(source);
+        setSourceGuide(null);
+        setLoadingGuide(true);
+        try {
+            const token = localStorage.getItem('auth_token');
+            const headers = {};
+            if (token) headers['Authorization'] = `Bearer ${token}`;
+
+            const res = await fetch(`/api/sources/${source.id}/guide`, { headers });
+            if (res.ok) {
+                const data = await res.json();
+                setSourceGuide(data);
+            }
+        } catch (e) {
+            console.error("Guide fetch error:", e);
+        } finally {
+            setLoadingGuide(false);
+        }
+    };
+
     const handleDelete = async (id) => {
         if (!confirm("Are you sure you want to delete this source and its embedded chunks?")) return;
         try {
-            const res = await fetch(`/api/sources/${id}`, { method: 'DELETE' });
+            const token = localStorage.getItem('auth_token');
+            const headers = {};
+            if (token) headers['Authorization'] = `Bearer ${token}`;
+
+            const res = await fetch(`/api/sources/${id}`, { method: 'DELETE', headers });
             if (res.ok) {
-                setSources(sources.filter(s => s.id !== id));
+                setSources(current => current.filter(s => s.id !== id));
                 if (selectedSource?.id === id) {
                     setSelectedSource(null);
                     setSourceGuide(null);
@@ -96,28 +121,16 @@ const Sources = () => {
 
     const handleReindex = async (id) => {
         try {
-            const res = await fetch(`/api/sources/${id}/reindex`, { method: 'POST' });
+            const token = localStorage.getItem('auth_token');
+            const headers = {};
+            if (token) headers['Authorization'] = `Bearer ${token}`;
+
+            const res = await fetch(`/api/sources/${id}/reindex`, { method: 'POST', headers });
             if (res.ok) {
                 alert("Source successfully re-chunked and re-embedded!");
             }
         } catch (e) {
             console.error("Reindex error:", e);
-        }
-    };
-
-    const openSourceGuide = async (source) => {
-        setSelectedSource(source);
-        setLoadingGuide(true);
-        try {
-            const res = await fetch(`/api/sources/${source.id}/guide`);
-            if (res.ok) {
-                const data = await res.json();
-                setSourceGuide(data);
-            }
-        } catch (e) {
-            console.error("Guide fetch error:", e);
-        } finally {
-            setLoadingGuide(false);
         }
     };
 

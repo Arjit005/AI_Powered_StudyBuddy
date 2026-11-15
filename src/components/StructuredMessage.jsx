@@ -1,14 +1,18 @@
 import React, { useState } from 'react';
 import MermaidViewer from './MermaidViewer';
-import { Copy, Check, Code, Sparkles, Terminal } from 'lucide-react';
+import { Copy, Check, Terminal } from 'lucide-react';
 
 const StructuredMessage = ({ content }) => {
     const [copiedCodeIdx, setCopiedCodeIdx] = useState(null);
 
-    const handleCopyCode = (codeText, idx) => {
-        navigator.clipboard.writeText(codeText);
-        setCopiedCodeIdx(idx);
-        setTimeout(() => setCopiedCodeIdx(null), 2000);
+    const handleCopyCode = async (codeText, idx) => {
+        try {
+            await navigator.clipboard.writeText(codeText);
+            setCopiedCodeIdx(idx);
+            setTimeout(() => setCopiedCodeIdx(null), 2000);
+        } catch (err) {
+            console.error("Clipboard write error:", err);
+        }
     };
 
     if (!content) return null;

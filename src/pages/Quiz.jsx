@@ -38,7 +38,7 @@ const Quiz = () => {
 
             // Track activity in background
             try {
-                fetch('/api/track-activity', {
+                await fetch('/api/track-activity', {
                     method: 'POST',
                     headers,
                     body: JSON.stringify({ activity_type: 'quiz', duration_seconds: 120 })
@@ -71,9 +71,9 @@ const Quiz = () => {
     const handleSubmitQuiz = () => {
         setSubmitted(true);
         const score = calculateScore();
-        const total = quiz?.questions?.length || 1;
+        const total = quiz?.questions?.length || 0;
         // Trigger celebration confetti if score >= 70%
-        if (score / total >= 0.7) {
+        if (total > 0 && score / total >= 0.7) {
             try {
                 confetti({
                     particleCount: 100,
@@ -116,9 +116,10 @@ const Quiz = () => {
                             type="text"
                             value={topic}
                             onChange={(e) => setTopic(e.target.value)}
-                            onKeyDown={(e) => e.key === 'Enter' && generateQuiz()}
+                            onKeyDown={(e) => e.key === 'Enter' && !loading && generateQuiz()}
+                            disabled={loading}
                             placeholder="e.g. Operating Systems Concurrency, Docker, Calculus"
-                            className="w-full px-4 py-3.5 rounded-xl glass-input text-sm font-mono placeholder:text-slate-500 mb-4"
+                            className="w-full px-4 py-3.5 rounded-xl glass-input text-sm font-mono placeholder:text-slate-500 mb-4 disabled:opacity-50"
                         />
                         <button
                             onClick={generateQuiz}

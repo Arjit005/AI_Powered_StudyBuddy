@@ -25,10 +25,12 @@ def generate_study_chart(db: Session):
     summary = df.groupby('Activity')['Minutes'].sum().reset_index()
 
     # 4. detailed Matplotlib Visualization
-    plt.figure(figsize=(10, 6))
+    fig = plt.figure(figsize=(10, 6))
     
-    # Custom styling
-    bars = plt.bar(summary['Activity'], summary['Minutes'], color=['#3b82f6', '#10b981', '#f59e0b'])
+    # Custom styling - scalable cyclic colormap prevents ValueError if > 3 activities
+    base_palette = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ef4444', '#06b6d4', '#ec4899']
+    bar_colors = [base_palette[i % len(base_palette)] for i in range(len(summary))]
+    bars = plt.bar(summary['Activity'], summary['Minutes'], color=bar_colors)
     
     # Add labels and title
     plt.title('Study Time Distribution', fontsize=16, fontweight='bold', pad=20)

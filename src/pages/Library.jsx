@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   BookOpen, 
   Search, 
@@ -21,10 +21,12 @@ import { useNavigate } from 'react-router-dom';
 export default function Library() {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState('all');
   const [search, setSearch] = useState('');
   const [selectedItem, setSelectedItem] = useState(null);
   const navigate = useNavigate();
+  const requestGenRef = useRef(0);
 
   useEffect(() => {
     fetchLibrary();
@@ -39,6 +41,8 @@ export default function Library() {
 
   const fetchLibrary = async () => {
     setLoading(true);
+    setError(null);
+    const thisGen = ++requestGenRef.current;
     try {
       let url = '/api/library';
       const params = new URLSearchParams();
@@ -47,14 +51,23 @@ export default function Library() {
       if (params.toString()) url += `?${params.toString()}`;
 
       const res = await fetch(url, { headers: getAuthHeaders() });
+      if (thisGen !== requestGenRef.current) return;
+
       if (res.ok) {
         const data = await res.json();
         setItems(data);
+      } else {
+        setError("Failed to load study materials. Please try again.");
       }
     } catch (err) {
       console.error("Library fetch error:", err);
+      if (thisGen === requestGenRef.current) {
+        setError("Network error while loading library.");
+      }
     } finally {
-      setLoading(false);
+      if (thisGen === requestGenRef.current) {
+        setLoading(false);
+      }
     }
   };
 
@@ -64,9 +77,12 @@ export default function Library() {
       const res = await fetch(`/api/library/${id}/favorite`, { method: 'PUT', headers: getAuthHeaders() });
       if (res.ok) {
         setItems(prev => prev.map(item => item.id === id ? { ...item, is_favorite: !item.is_favorite } : item));
+      } else {
+        alert("Could not update favorite status.");
       }
     } catch (err) {
       console.error("Favorite toggle error:", err);
+      alert("Network error updating favorite.");
     }
   };
 
@@ -78,9 +94,12 @@ export default function Library() {
       if (res.ok) {
         setItems(prev => prev.filter(item => item.id !== id));
         if (selectedItem?.id === id) setSelectedItem(null);
+      } else {
+        alert("Failed to delete item from library.");
       }
     } catch (err) {
       console.error("Delete error:", err);
+      alert("Network error deleting item.");
     }
   };
 
