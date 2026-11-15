@@ -24,7 +24,7 @@ const Maps = () => {
 
     const generateDiagram = async (targetTopic) => {
         const topicToUse = targetTopic || topic;
-        if (!topicToUse.trim() || loading) return;
+        if (!topicToUse.trim()) return;
         setLoading(true);
         setError(null);
         setIsZoomed(false);
@@ -62,7 +62,7 @@ const Maps = () => {
 
             if (diagramRes.ok) {
                 const data = await diagramRes.json();
-                if (data && typeof data === 'object') {
+                if (data && typeof data === 'object' && typeof data.mermaid_code === 'string' && data.mermaid_code.trim()) {
                     setDiagramData(data);
                     hasDiagram = true;
                 }

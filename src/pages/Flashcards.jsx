@@ -22,6 +22,7 @@ const Flashcards = () => {
     const [topic, setTopic] = useState('');
     const [loading, setLoading] = useState(false);
     const [saved, setSaved] = useState(false);
+    const [saving, setSaving] = useState(false);
     const [isSpeaking, setIsSpeaking] = useState(false);
     
     // Spaced repetition mastery state: { [cardId]: 'hard' | 'good' | 'mastered' }
@@ -37,17 +38,21 @@ const Flashcards = () => {
 
     // Audio Speech Synthesis & timeout cleanup
     const advanceTimeoutRef = useRef(null);
+    const saveTimeoutRef = useRef(null);
     useEffect(() => {
         return () => {
             if ('speechSynthesis' in window) window.speechSynthesis.cancel();
             if (advanceTimeoutRef.current) clearTimeout(advanceTimeoutRef.current);
+            if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
         };
     }, []);
 
     const generateFlashcards = async () => {
-        if (!topic.trim()) return;
+        if (!topic.trim() || loading) return;
         setLoading(true);
         setIsFlipped(false);
+        if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+        setIsSpeaking(false);
         try {
             const token = localStorage.getItem('auth_token');
             const headers = { 'Content-Type': 'application/json' };
@@ -88,6 +93,10 @@ const Flashcards = () => {
 
     const nextCard = () => {
         if (cards.length === 0) return;
+        if (advanceTimeoutRef.current) {
+            clearTimeout(advanceTimeoutRef.current);
+            advanceTimeoutRef.current = null;
+        }
         setIsFlipped(false);
         if ('speechSynthesis' in window) window.speechSynthesis.cancel();
         setIsSpeaking(false);
@@ -96,6 +105,10 @@ const Flashcards = () => {
 
     const prevCard = () => {
         if (cards.length === 0) return;
+        if (advanceTimeoutRef.current) {
+            clearTimeout(advanceTimeoutRef.current);
+            advanceTimeoutRef.current = null;
+        }
         setIsFlipped(false);
         if ('speechSynthesis' in window) window.speechSynthesis.cancel();
         setIsSpeaking(false);
@@ -140,10 +153,11 @@ const Flashcards = () => {
 
     // Save Deck to Library
     const handleSaveDeck = async () => {
-        if (!cards || cards.length === 0) {
-            alert("Cannot save an empty flashcard deck.");
+        if (!cards || cards.length === 0 || saving) {
+            if (!cards || cards.length === 0) alert("Cannot save an empty flashcard deck.");
             return;
         }
+        setSaving(true);
         try {
             const token = localStorage.getItem('auth_token');
             const headers = { 'Content-Type': 'application/json' };
@@ -162,13 +176,19 @@ const Flashcards = () => {
             });
             if (res.ok) {
                 setSaved(true);
-                setTimeout(() => setSaved(false), 3000);
+                if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+                saveTimeoutRef.current = setTimeout(() => {
+                    setSaved(false);
+                    saveTimeoutRef.current = null;
+                }, 3000);
             } else {
                 alert("Failed to save flashcards to library.");
             }
         } catch (err) {
             console.error("Save deck error:", err);
             alert("Network error saving flashcards.");
+        } finally {
+            setSaving(false);
         }
     };
 
@@ -222,7 +242,7 @@ const Flashcards = () => {
                         type="text"
                         value={topic}
                         onChange={(e) => setTopic(e.target.value)}
-                        onKeyDown={(e) => e.key === 'Enter' && generateFlashcards()}
+                        onKeyDown={(e) => e.key === 'Enter' && !loading && topic.trim() && generateFlashcards()}
                         placeholder="Enter deck topic (e.g. Distributed Systems, Kubernetes, Organic Chem)..."
                         className="flex-1 px-4 py-3 rounded-xl glass-input text-sm font-mono placeholder:text-slate-500"
                     />
@@ -240,11 +260,12 @@ const Flashcards = () => {
                     </button>
                     <button
                         onClick={handleSaveDeck}
-                        className="px-3.5 py-3 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 hover:text-emerald-400 text-xs font-mono transition-colors flex items-center gap-1.5"
+                        disabled={saving || !cards || cards.length === 0}
+                        className="px-3.5 py-3 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 hover:text-emerald-400 text-xs font-mono transition-colors flex items-center gap-1.5 disabled:opacity-50"
                         title="Save Deck to Personal Library"
                     >
                         {saved ? <Check className="w-4 h-4 text-emerald-400" /> : <Save className="w-4 h-4" />}
-                        <span className="hidden sm:inline">{saved ? 'Saved' : 'Save'}</span>
+                        <span className="hidden sm:inline">{saved ? 'Saved' : saving ? 'Saving...' : 'Save'}</span>
                     </button>
                 </div>
 

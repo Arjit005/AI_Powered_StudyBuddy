@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Search, 
@@ -21,6 +21,9 @@ export default function CommandPalette({ isOpen, onClose }) {
   const [query, setQuery] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
   const navigate = useNavigate();
+  const previousFocusRef = useRef(null);
+  const modalRef = useRef(null);
+  const inputRef = useRef(null);
 
   const commands = [
     {
@@ -103,9 +106,6 @@ export default function CommandPalette({ isOpen, onClose }) {
       category: 'Quick Action',
       action: () => {
         navigate('/chat', { state: { triggerNewChat: true } });
-        setTimeout(() => {
-          window.dispatchEvent(new CustomEvent('study-buddy:new-chat'));
-        }, 150);
       }
     },
     {
@@ -129,21 +129,48 @@ export default function CommandPalette({ isOpen, onClose }) {
   }, [query]);
 
   useEffect(() => {
+    if (isOpen) {
+      previousFocusRef.current = document.activeElement;
+      inputRef.current?.focus();
+    } else {
+      if (previousFocusRef.current && typeof previousFocusRef.current.focus === 'function') {
+        previousFocusRef.current.focus();
+      }
+    }
+  }, [isOpen]);
+
+  useEffect(() => {
     const handleKeyDown = (e) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
         e.preventDefault();
         if (isOpen) {
           onClose();
         } else {
-          // Open handled by parent, or toggle
           window.dispatchEvent(new CustomEvent('study-buddy:open-palette'));
         }
+        return;
       }
 
       if (!isOpen) return;
 
       if (e.key === 'Escape') {
+        e.preventDefault();
         onClose();
+      } else if (e.key === 'Tab' && modalRef.current) {
+        const focusableElements = modalRef.current.querySelectorAll(
+          'input, button, [tabindex]:not([tabindex="-1"])'
+        );
+        if (focusableElements.length > 0) {
+          const firstElement = focusableElements[0];
+          const lastElement = focusableElements[focusableElements.length - 1];
+          if (e.shiftKey && document.activeElement === firstElement) {
+            e.preventDefault();
+            lastElement.focus();
+          } else if (!e.shiftKey && document.activeElement === lastElement) {
+            e.preventDefault();
+            firstElement.focus();
+          }
+        }
       } else if (e.key === 'ArrowDown') {
         e.preventDefault();
         setSelectedIndex(prev => (prev + 1) % (filtered.length || 1));
@@ -171,8 +198,10 @@ export default function CommandPalette({ isOpen, onClose }) {
       role="dialog"
       aria-modal="true"
       aria-label="Command Palette"
+      onClick={onClose}
     >
       <div 
+        ref={modalRef}
         className="glass-panel w-full max-w-2xl rounded-2xl border border-emerald-500/30 shadow-2xl shadow-emerald-950/60 overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
@@ -180,13 +209,13 @@ export default function CommandPalette({ isOpen, onClose }) {
         <div className="flex items-center gap-3 px-4 py-3.5 border-b border-white/10 bg-slate-900/60">
           <Search className="w-5 h-5 text-emerald-400 shrink-0" />
           <input
+            ref={inputRef}
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Type a command, tool name, or search (e.g. Canvas, Quiz, MCP)..."
             className="w-full bg-transparent text-white placeholder-slate-400 text-base focus:outline-none"
             aria-label="Command search query"
-            autoFocus
           />
           <button 
             onClick={onClose}

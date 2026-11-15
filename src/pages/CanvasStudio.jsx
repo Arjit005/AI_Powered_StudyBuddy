@@ -45,13 +45,20 @@ export default function CanvasStudio() {
   const [showMermaidModal, setShowMermaidModal] = useState(false);
   const [mcpConfig, setMcpConfig] = useState(null);
   const [telemetry, setTelemetry] = useState(null);
+  const [error, setError] = useState(null);
 
   const canvasRef = useRef(null);
+  const copyTimeoutRef = useRef(null);
+  const saveTimeoutRef = useRef(null);
 
   // Initial load
   useEffect(() => {
     fetchInitialCanvas();
     fetchMcpConfig();
+    return () => {
+      if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
+      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+    };
   }, []);
 
   const getAuthHeaders = () => {
@@ -105,6 +112,7 @@ export default function CanvasStudio() {
     if (e) e.preventDefault();
     if (!topic.trim()) return;
     setLoading(true);
+    setError(null);
     setSelectedNode(null);
     try {
       const res = await fetch('/api/canvas/generate', {
@@ -126,9 +134,13 @@ export default function CanvasStudio() {
         });
         setPan({ x: 0, y: 0 });
         setZoom(1);
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        setError(errData.detail || 'Diagram generation failed. Please try another prompt.');
       }
     } catch (err) {
       console.error("Generate canvas error:", err);
+      setError("Network error communicating with canvas generation engine.");
     } finally {
       setLoading(false);
     }
@@ -201,7 +213,7 @@ export default function CanvasStudio() {
   };
 
   // Copy Excalidraw JSON
-  const handleCopyExcalidraw = () => {
+  const handleCopyExcalidraw = async () => {
     if (!canvasData?.excalidraw_elements) return;
     const payload = JSON.stringify({
       type: "excalidraw",
@@ -211,9 +223,18 @@ export default function CanvasStudio() {
       appState: { viewBackgroundColor: "#0b1329", currentItemFontFamily: 1 }
     }, null, 2);
 
-    navigator.clipboard.writeText(payload);
-    setCopiedExcalidraw(true);
-    setTimeout(() => setCopiedExcalidraw(false), 2500);
+    try {
+      await navigator.clipboard.writeText(payload);
+      setCopiedExcalidraw(true);
+      if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
+      copyTimeoutRef.current = setTimeout(() => {
+        setCopiedExcalidraw(false);
+        copyTimeoutRef.current = null;
+      }, 2500);
+    } catch (err) {
+      console.error("Failed to copy Excalidraw payload:", err);
+      alert("Clipboard copy failed. Please grant permission or copy manually.");
+    }
   };
 
   // Save to Study Library
@@ -233,7 +254,11 @@ export default function CanvasStudio() {
       });
       if (res.ok) {
         setSavedSuccess(true);
-        setTimeout(() => setSavedSuccess(false), 3000);
+        if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+        saveTimeoutRef.current = setTimeout(() => {
+          setSavedSuccess(false);
+          saveTimeoutRef.current = null;
+        }, 3000);
       } else {
         alert("Failed to save canvas diagram to library.");
       }
@@ -436,6 +461,13 @@ export default function CanvasStudio() {
           </button>
         </div>
       </div>
+
+      {error && (
+        <div className="mx-6 my-2 p-3 rounded-xl bg-rose-950/60 border border-rose-800/80 text-rose-300 text-xs font-mono flex items-center justify-between">
+          <span>⚠️ {error}</span>
+          <button onClick={() => setError(null)} className="text-slate-400 hover:text-white px-2 py-0.5">✕</button>
+        </div>
+      )}
 
       {/* Main Studio Viewport */}
       <div className="flex-1 relative overflow-hidden flex bg-[#030712]">
@@ -650,10 +682,12 @@ export default function CanvasStudio() {
               <div className="p-3 rounded-xl bg-slate-900/80 border border-white/10">
                 <div className="flex items-center justify-between text-slate-300 font-medium mb-1">
                   <span>Server Status</span>
-                  <span className="text-emerald-400 font-mono">● ONLINE (JSON-RPC 2.0)</span>
+                  <span className={`${mcpConfig?.server_status === 'offline' ? 'text-amber-400' : 'text-emerald-400'} font-mono`}>
+                    ● {mcpConfig?.server_status || 'ONLINE (JSON-RPC 2.0)'}
+                  </span>
                 </div>
                 <div className="text-slate-400 text-[11px]">
-                  HTTP Endpoint: <code className="text-emerald-300">http://127.0.0.1:8000/api/mcp</code>
+                  HTTP Endpoint: <code className="text-emerald-300">{mcpConfig?.endpoint || (typeof window !== 'undefined' ? `${window.location.origin}/api/mcp` : 'http://127.0.0.1:8000/api/mcp')}</code>
                 </div>
               </div>
 

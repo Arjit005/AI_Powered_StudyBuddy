@@ -1,5 +1,5 @@
 import React from 'react';
-import { Check, Sparkles, Shield, Zap, Terminal } from 'lucide-react';
+import { Check, Sparkles } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 const Pricing = () => {

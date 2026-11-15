@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { 
     Send, Bot, User, Trash2, Shield, Copy, Check, Download, Sparkles, 
     Terminal, Database, Clock, RefreshCw, Plus, MessageSquare, 
@@ -41,6 +42,14 @@ const ChatInterface = () => {
         activeConvIdRef.current = activeConvId;
     }, [activeConvId]);
     const historyRequestGenRef = useRef(0);
+    const location = useLocation();
+
+    useEffect(() => {
+        if (location.state?.triggerNewChat) {
+            handleNewChat();
+            window.history.replaceState({}, document.title);
+        }
+    }, [location.state]);
 
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -264,18 +273,20 @@ const ChatInterface = () => {
                     let streamConvId = originatingConvId;
                     const streamMsgId = Date.now();
 
-                    // Insert initial streaming message
-                    setMessages(prev => [
-                        ...prev,
-                        {
-                            id: streamMsgId,
-                            role: 'ai',
-                            content: '',
-                            isStreaming: true,
-                            shield: 'Active',
-                            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-                        }
-                    ]);
+                    // Insert initial streaming message only if user is still on the originating conversation
+                    if (originatingConvId === activeConvIdRef.current) {
+                        setMessages(prev => [
+                            ...prev,
+                            {
+                                id: streamMsgId,
+                                role: 'ai',
+                                content: '',
+                                isStreaming: true,
+                                shield: 'Active',
+                                timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                            }
+                        ]);
+                    }
 
                     let doneReading = false;
                     let buffer = '';
@@ -297,26 +308,34 @@ const ChatInterface = () => {
                                 break;
                             }
 
+                            let parsed = null;
                             try {
-                                const parsed = JSON.parse(dataStr);
-                                if (parsed.conversation_id && parsed.conversation_id !== activeConvIdRef.current) {
-                                    streamConvId = parsed.conversation_id;
-                                    setActiveConvId(parsed.conversation_id);
-                                    fetchConversations();
+                                parsed = JSON.parse(dataStr);
+                            } catch {
+                                continue;
+                            }
+
+                            if (parsed.error) {
+                                throw new Error(parsed.error);
+                            }
+
+                            if (parsed.conversation_id && parsed.conversation_id !== activeConvIdRef.current) {
+                                streamConvId = parsed.conversation_id;
+                                setActiveConvId(parsed.conversation_id);
+                                fetchConversations();
+                            }
+                            if (parsed.token) {
+                                accumulatedText += parsed.token;
+                                if (originatingConvId === activeConvIdRef.current || activeConvIdRef.current === streamConvId) {
+                                    setMessages(prev => prev.map(m => m.id === streamMsgId ? { ...m, content: accumulatedText } : m));
                                 }
-                                if (parsed.token) {
-                                    accumulatedText += parsed.token;
-                                    if (originatingConvId === activeConvIdRef.current || activeConvIdRef.current === streamConvId) {
-                                        setMessages(prev => prev.map(m => m.id === streamMsgId ? { ...m, content: accumulatedText } : m));
-                                    }
-                                }
-                                if (parsed.error) {
-                                    throw new Error(parsed.error);
-                                }
-                            } catch (parseErr) {
-                                if (parseErr.message && parseErr.message.includes('token')) console.error(parseErr);
                             }
                         }
+                    }
+
+                    if (!doneReading && accumulatedText.length === 0) {
+                        setMessages(prev => prev.filter(m => m.id !== streamMsgId));
+                        throw new Error('Streaming connection closed unexpectedly before response was received.');
                     }
 
                     // Mark streaming complete
@@ -327,6 +346,7 @@ const ChatInterface = () => {
                 }
             } catch (streamErr) {
                 console.warn('SSE Streaming connection failed, falling back to standard endpoint:', streamErr);
+                setMessages(prev => prev.filter(m => m.isStreaming && (!m.content || m.content === '')));
             }
 
             if (!streamSuccess) {
@@ -341,7 +361,7 @@ const ChatInterface = () => {
                 });
 
                 if (!response.ok) {
-                    const errData = await response.json();
+                    const errData = await response.json().catch(() => ({}));
                     throw new Error(errData.detail || 'Network response failed');
                 }
 
@@ -384,9 +404,7 @@ const ChatInterface = () => {
                 ]);
             }
         } finally {
-            if (originatingConvId === activeConvIdRef.current) {
-                setIsLoading(false);
-            }
+            setIsLoading(false);
         }
     };
 

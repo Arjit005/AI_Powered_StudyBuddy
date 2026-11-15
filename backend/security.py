@@ -1,3 +1,4 @@
+import os
 import re
 import time
 import html
@@ -37,6 +38,7 @@ class RateLimiter:
         self.history: Dict[str, List[float]] = {}
         # Maps "client_ip" -> lockout until epoch
         self.lockouts: Dict[str, float] = {}
+        self._last_global_cleanup: float = time.time()
 
     def _clean_old_requests(self, key: str, window_seconds: int, current_time: float):
         if key in self.history:
@@ -46,6 +48,19 @@ class RateLimiter:
                 self.history[key] = valid_timestamps
             else:
                 del self.history[key]
+
+        # Bounded periodic global sweep to prevent memory leak from dormant client IPs
+        if current_time - self._last_global_cleanup > 300:
+            self._last_global_cleanup = current_time
+            keys_to_delete = [
+                k for k, v in self.history.items()
+                if not v or v[-1] < (current_time - 3600)
+            ]
+            for k in keys_to_delete:
+                del self.history[k]
+            # Safety ceiling if under DDoS with unique spoofed IPs
+            if len(self.history) > 10000:
+                self.history.clear()
 
     def _get_client_ip(self, request: Request) -> str:
         # Only trust forwarded headers if explicitly running behind a trusted reverse proxy

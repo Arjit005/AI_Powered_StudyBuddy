@@ -7,10 +7,12 @@ const Progress = () => {
     const [chartImage, setChartImage] = useState(null);
     const [sessions, setSessions] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [fetchError, setFetchError] = useState(null);
     const progressRequestGenRef = useRef(0);
 
     const fetchAnalytics = async () => {
         setLoading(true);
+        setFetchError(null);
         const token = localStorage.getItem('auth_token');
         const headers = {};
         if (token) headers['Authorization'] = `Bearer ${token}`;
@@ -26,26 +28,49 @@ const Progress = () => {
 
             if (thisGen !== progressRequestGenRef.current) return;
 
+            let hasErrors = false;
             if (progRes.ok) {
                 const data = await progRes.json();
+                if (thisGen !== progressRequestGenRef.current) return;
                 setStats(data);
+            } else {
+                hasErrors = true;
             }
+
             if (heatRes.ok) {
                 const data = await heatRes.json();
+                if (thisGen !== progressRequestGenRef.current) return;
                 if (data && Array.isArray(data.days)) {
                     setHeatmapData(data.days);
                 }
+            } else {
+                hasErrors = true;
             }
+
             if (dashRes.ok) {
                 const data = await dashRes.json();
+                if (thisGen !== progressRequestGenRef.current) return;
                 if (data.chart) setChartImage(`data:image/png;base64,${data.chart}`);
+            } else {
+                hasErrors = true;
             }
+
             if (sessRes.ok) {
                 const data = await sessRes.json();
+                if (thisGen !== progressRequestGenRef.current) return;
                 if (Array.isArray(data)) setSessions(data);
+            } else {
+                hasErrors = true;
+            }
+
+            if (hasErrors) {
+                setFetchError("Some analytics modules were temporarily unavailable.");
             }
         } catch (err) {
             console.error("Error fetching progress batch:", err);
+            if (thisGen === progressRequestGenRef.current) {
+                setFetchError("Network error while loading analytics.");
+            }
         } finally {
             if (thisGen === progressRequestGenRef.current) {
                 setLoading(false);
@@ -62,13 +87,13 @@ const Progress = () => {
 
     const resetStats = async () => {
         if (!confirm("Are you sure you want to reset all recorded study progress?")) return;
+        progressRequestGenRef.current++;
         const token = localStorage.getItem('auth_token');
         const headers = {};
         if (token) headers['Authorization'] = `Bearer ${token}`;
         try {
             const res = await fetch('/api/progress', { method: 'DELETE', headers });
             if (res.ok) {
-                progressRequestGenRef.current++;
                 setStats({ study_hours: 0, quizzes_taken: 0, streak_days: 0 });
                 setChartImage(null);
                 setSessions([]);
@@ -142,6 +167,13 @@ const Progress = () => {
                     </div>
                 </div>
 
+                {fetchError && (
+                    <div className="mb-6 p-3 rounded-xl bg-amber-950/50 border border-amber-800/50 text-amber-300 text-xs font-mono flex items-center justify-between">
+                        <span>⚠️ {fetchError}</span>
+                        <button onClick={() => setFetchError(null)} className="text-slate-400 hover:text-white px-2">✕</button>
+                    </div>
+                )}
+
                 {/* Metrics Grid */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
                     <div className="glass-panel p-6 rounded-3xl relative overflow-hidden border border-white/5">
@@ -151,9 +183,9 @@ const Progress = () => {
                             </div>
                             <span className="text-xs font-mono text-amber-400 font-bold px-2 py-0.5 rounded-full bg-amber-500/10">Active Streak</span>
                         </div>
-                        <p className="text-xs font-mono text-slate-400 mb-1">Study Sessions Recorded</p>
+                        <p className="text-xs font-mono text-slate-400 mb-1">Consecutive Day Streak</p>
                         <div className="text-4xl font-extrabold text-white font-mono">
-                            {stats.streak_days} <span className="text-sm font-sans font-normal text-slate-500">sessions</span>
+                            {stats.streak_days} <span className="text-sm font-sans font-normal text-slate-500">days</span>
                         </div>
                     </div>
 

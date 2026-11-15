@@ -128,13 +128,22 @@ class EmbeddingService:
                     batch_res = res.get("embedding", [])
                     if isinstance(batch_res, list) and len(batch_res) == len(cleaned_texts) and isinstance(batch_res[0], list):
                         raw_embeddings = batch_res
-                except Exception as sdk_batch_err:
-                    # Fallback to per-item scalar embed_content
+                except (TypeError, ValueError) as sdk_batch_err:
+                    # SDK doesn't support batch list input or invalid argument shape
                     raw_embeddings = []
                     for t in cleaned_texts:
                         item_vec = cls.embed_text(t, task_type=task_type)
                         raw_embeddings.append(item_vec)
                     return raw_embeddings
+                except Exception as sdk_batch_err:
+                    err_msg = str(sdk_batch_err).lower()
+                    if any(phrase in err_msg for phrase in ["not supported", "unsupported", "expected string", "must be a string", "invalid argument"]):
+                        raw_embeddings = []
+                        for t in cleaned_texts:
+                            item_vec = cls.embed_text(t, task_type=task_type)
+                            raw_embeddings.append(item_vec)
+                        return raw_embeddings
+                    raise  # Re-raise transient/network/auth errors so outer retry logic handles them
 
                 if len(raw_embeddings) != len(cleaned_texts):
                     raise EmbeddingProviderError(

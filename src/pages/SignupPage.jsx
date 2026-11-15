@@ -16,7 +16,7 @@ const SignupPage = () => {
     const navigate = useNavigate();
 
     const handleGoogleSignIn = async () => {
-        if (isLoading) return;
+        if (isLoading || isGoogleLoading) return;
         setError('');
         setIsGoogleLoading(true);
         try {
@@ -26,9 +26,17 @@ const SignupPage = () => {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ id_token: idToken })
             });
-            const data = await res.json();
+            let data = {};
+            try {
+                data = await res.json();
+            } catch (_) {
+                data = { detail: res.statusText || 'Google sign-up server error' };
+            }
             if (!res.ok) {
                 throw new Error(data.detail || 'Google sign-up failed');
+            }
+            if (!data.access_token || !data.user) {
+                throw new Error('Authentication response is missing required credentials.');
             }
             localStorage.setItem('isAuthenticated', 'true');
             localStorage.setItem('auth_token', data.access_token);
@@ -80,7 +88,7 @@ const SignupPage = () => {
 
     const handleSignup = async (e) => {
         e.preventDefault();
-        if (isGoogleLoading) return;
+        if (isLoading || isGoogleLoading) return;
         setError('');
 
         if (password !== confirmPassword) {
@@ -108,9 +116,18 @@ const SignupPage = () => {
                 }),
             });
 
-            const data = await res.json();
+            let data = {};
+            try {
+                data = await res.json();
+            } catch (_) {
+                data = { detail: res.statusText || 'Registration server response error' };
+            }
             if (!res.ok) {
                 throw new Error(data.detail || 'Failed to create account.');
+            }
+
+            if (!data.access_token || !data.user) {
+                throw new Error('Authentication response is missing required credentials.');
             }
 
             localStorage.setItem('isAuthenticated', 'true');
@@ -168,7 +185,7 @@ const SignupPage = () => {
                     <button
                         type="button"
                         onClick={handleGoogleSignIn}
-                        disabled={isGoogleLoading}
+                        disabled={isLoading || isGoogleLoading}
                         className="w-full mb-5 py-3 px-4 rounded-xl font-medium text-sm bg-slate-900/90 hover:bg-slate-800 border border-slate-700/80 text-white transition-all flex items-center justify-center gap-3 shadow-lg hover:border-emerald-500/50 cursor-pointer disabled:opacity-50"
                     >
                         {isGoogleLoading ? (
@@ -301,7 +318,7 @@ const SignupPage = () => {
                         {/* Submit Button */}
                         <button
                             type="submit"
-                            disabled={isLoading}
+                            disabled={isLoading || isGoogleLoading}
                             className="w-full mt-6 py-3.5 px-4 rounded-xl font-semibold text-sm bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 text-slate-950 hover:brightness-110 active:scale-[0.98] transition-all flex items-center justify-center gap-2 shadow-[0_0_25px_rgba(16,185,129,0.35)] disabled:opacity-50"
                         >
                             {isLoading ? (

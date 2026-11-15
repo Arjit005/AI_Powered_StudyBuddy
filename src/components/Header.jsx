@@ -63,6 +63,7 @@ const Header = () => {
         localStorage.removeItem('isAuthenticated');
         localStorage.removeItem('auth_token');
         localStorage.removeItem('user');
+        setUser(null);
         navigate('/login');
     };
 

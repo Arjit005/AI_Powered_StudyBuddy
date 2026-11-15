@@ -1,5 +1,3 @@
-import os
-import math
 import time
 from dotenv import load_dotenv
 
@@ -55,9 +53,9 @@ def run_evaluation():
 
     # 1. Old Deterministic SHA-256 Hash Projection Baseline
     print("--- 1. Evaluating Hash-Projection Baseline (Commit 7b14b78) ---")
+    t0 = time.time()
     doc_embs_hash = {k: RAGService._compute_semantic_embedding(v, dim=1536) for k, v in corpus.items()}
     hash_ranks = []
-    t0 = time.time()
     for q_item in queries:
         q_emb = RAGService._compute_semantic_embedding(q_item["q"], dim=1536)
         scores = [(k, cos_sim(q_emb, doc_embs_hash[k])) for k in corpus]

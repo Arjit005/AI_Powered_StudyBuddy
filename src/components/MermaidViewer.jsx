@@ -29,11 +29,20 @@ const initMermaid = () => {
 
 const MermaidViewer = ({ chart, title = "Architecture Diagram" }) => {
     const containerRef = useRef(null);
+    const copyTimeoutRef = useRef(null);
     const [svgContent, setSvgContent] = useState('');
     const [error, setError] = useState(null);
     const [copied, setCopied] = useState(false);
     const [zoom, setZoom] = useState(1);
     const [isFullscreen, setIsFullscreen] = useState(false);
+
+    useEffect(() => {
+        return () => {
+            if (copyTimeoutRef.current) {
+                clearTimeout(copyTimeoutRef.current);
+            }
+        };
+    }, []);
 
     useEffect(() => {
         if (!chart || !chart.trim()) {
@@ -79,9 +88,13 @@ const MermaidViewer = ({ chart, title = "Architecture Diagram" }) => {
 
     const handleCopy = async () => {
         try {
-            await navigator.clipboard.writeText(chart);
+            await navigator.clipboard.writeText(chart || '');
             setCopied(true);
-            setTimeout(() => setCopied(false), 2000);
+            if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
+            copyTimeoutRef.current = setTimeout(() => {
+                setCopied(false);
+                copyTimeoutRef.current = null;
+            }, 2000);
         } catch (err) {
             console.error("Clipboard copy failed:", err);
         }
@@ -178,6 +191,10 @@ const MermaidViewer = ({ chart, title = "Architecture Diagram" }) => {
                         className="transition-transform duration-200 flex items-center justify-center w-full"
                         dangerouslySetInnerHTML={{ __html: svgContent }}
                     />
+                ) : (!chart || !chart.trim()) ? (
+                    <div className="flex items-center gap-2 text-xs font-mono text-slate-500">
+                        <span>No diagram code provided.</span>
+                    </div>
                 ) : (
                     <div className="flex items-center gap-2 text-xs font-mono text-slate-500">
                         <div className="w-4 h-4 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin" />
@@ -217,6 +234,8 @@ const MermaidViewer = ({ chart, title = "Architecture Diagram" }) => {
                                 className="transition-transform duration-200 max-w-full"
                                 dangerouslySetInnerHTML={{ __html: svgContent }}
                             />
+                        ) : (!chart || !chart.trim()) ? (
+                            <div className="text-slate-400 font-mono text-sm">No diagram code provided.</div>
                         ) : (
                             <div className="text-slate-400 font-mono text-sm animate-pulse">Compiling vector diagram...</div>
                         )}

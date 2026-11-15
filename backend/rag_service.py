@@ -538,7 +538,11 @@ class RAGService:
                     return scored_results
 
         # 3. Fallback: Database-level cosine similarity + keyword overlap
-        query_emb_fallback = query_emb_1536[:64] if query_emb_1536 else RAGService._compute_fallback_embedding(query)
+        query_emb_fallback = (
+            query_emb_1536[:64] 
+            if query_emb_1536 
+            else RAGService._compute_semantic_embedding(query, dim=1536)[:64]
+        )
 
         chunk_query = db.query(SourceChunk).join(Source, SourceChunk.source_id == Source.id)
         if user_id:

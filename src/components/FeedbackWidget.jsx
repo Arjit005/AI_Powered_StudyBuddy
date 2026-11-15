@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { MessageSquarePlus, Star, Send, X, CheckCircle2 } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
 
@@ -10,6 +10,15 @@ const FeedbackWidget = () => {
     const [submitting, setSubmitting] = useState(false);
     const [submitted, setSubmitted] = useState(false);
     const [submitError, setSubmitError] = useState(null);
+    const closeTimerRef = useRef(null);
+
+    useEffect(() => {
+        return () => {
+            if (closeTimerRef.current) {
+                clearTimeout(closeTimerRef.current);
+            }
+        };
+    }, []);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -30,10 +39,12 @@ const FeedbackWidget = () => {
                 throw new Error(errData.detail || 'Feedback submission failed');
             }
             setSubmitted(true);
-            setTimeout(() => {
+            if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
+            closeTimerRef.current = setTimeout(() => {
                 setSubmitted(false);
                 setIsOpen(false);
                 setComment('');
+                closeTimerRef.current = null;
             }, 2500);
         } catch (err) {
             console.error("Feedback error:", err);
@@ -57,7 +68,10 @@ const FeedbackWidget = () => {
             ) : (
                 <div className="glass-panel w-80 p-5 rounded-3xl border border-emerald-500/40 shadow-2xl relative animate-in fade-in slide-in-from-bottom-4 duration-200">
                     <button
-                        onClick={() => setIsOpen(false)}
+                        onClick={() => {
+                            if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
+                            setIsOpen(false);
+                        }}
                         className="absolute top-4 right-4 p-1.5 rounded-full bg-slate-900 text-slate-400 hover:text-white border border-slate-800"
                     >
                         <X className="w-3.5 h-3.5" />

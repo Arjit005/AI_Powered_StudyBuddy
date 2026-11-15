@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Play, Pause, RotateCcw, Coffee, Flame, CheckCircle2 } from 'lucide-react';
+import { Play, Pause, RotateCcw, Flame } from 'lucide-react';
 
 const StudyTimer = () => {
     const [timeLeft, setTimeLeft] = useState(25 * 60);
     const [isActive, setIsActive] = useState(false);
     const [mode, setMode] = useState('focus'); // 'focus' or 'break'
+    const [trackingStatus, setTrackingStatus] = useState(null);
     const totalTime = mode === 'focus' ? 25 * 60 : 5 * 60;
 
     useEffect(() => {
@@ -25,7 +26,16 @@ const StudyTimer = () => {
                     method: 'POST',
                     headers,
                     body: JSON.stringify({ activity_type: 'timer_focus', duration_seconds: duration })
-                }).catch(err => console.error("Failed to track time", err));
+                }).then(res => {
+                    if (res.ok) {
+                        setTrackingStatus('Completed session recorded in analytics.');
+                    } else {
+                        setTrackingStatus('Could not record session in analytics.');
+                    }
+                }).catch(err => {
+                    console.error("Failed to track time", err);
+                    setTrackingStatus('Network error while recording session.');
+                });
             }
         }
         return () => clearInterval(interval);
@@ -130,8 +140,13 @@ const StudyTimer = () => {
                     </div>
                 </div>
 
+                {trackingStatus && (
+                    <div className="mt-3 text-center text-xs font-mono text-emerald-400">
+                        {trackingStatus}
+                    </div>
+                )}
                 <div className="mt-6 text-center text-slate-500 text-xs font-mono">
-                    Sessions are persisted to SQLite database and reflected in your analytics.
+                    Completed 25-minute focus intervals are persisted to SQLite database and reflected in your analytics.
                 </div>
             </div>
         </div>

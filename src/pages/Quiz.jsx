@@ -9,6 +9,8 @@ const Quiz = () => {
     const [answers, setAnswers] = useState({});
     const [submitted, setSubmitted] = useState(false);
     const [savedSuccess, setSavedSuccess] = useState(false);
+    const [saving, setSaving] = useState(false);
+    const [activityLogged, setActivityLogged] = useState(false);
     const [error, setError] = useState('');
 
     const generateQuiz = async () => {
@@ -17,6 +19,7 @@ const Quiz = () => {
         setQuiz(null);
         setAnswers({});
         setSubmitted(false);
+        setActivityLogged(false);
         setError('');
 
         try {
@@ -31,19 +34,31 @@ const Quiz = () => {
             });
 
             if (!response.ok) {
-                const errData = await response.json();
+                const errData = await response.json().catch(() => ({}));
                 throw new Error(errData.detail || 'Failed to generate quiz');
             }
             const data = await response.json();
-            setQuiz(data);
+            if (!data || !Array.isArray(data.questions) || data.questions.length === 0) {
+                throw new Error('AI engine returned no questions. Please try another topic.');
+            }
+            const validQuestions = data.questions.filter(
+                q => q && typeof q.question === 'string' && Array.isArray(q.options) && q.options.length >= 2
+            );
+            if (validQuestions.length === 0) {
+                throw new Error('Received malformed quiz questions. Please regenerate.');
+            }
+            setQuiz({ ...data, questions: validQuestions });
 
             // Track activity in background
             try {
-                await fetch('/api/track-activity', {
+                const actRes = await fetch('/api/track-activity', {
                     method: 'POST',
                     headers,
                     body: JSON.stringify({ activity_type: 'quiz', duration_seconds: 120 })
                 });
+                if (actRes.ok) {
+                    setActivityLogged(true);
+                }
             } catch (_) {}
         } catch (err) {
             setError(err.message || 'Error creating quiz.');
@@ -86,7 +101,8 @@ const Quiz = () => {
     };
 
     const handleSaveQuiz = async () => {
-        if (!quiz || !quiz.questions) return;
+        if (!quiz || !quiz.questions || quiz.questions.length === 0 || saving) return;
+        setSaving(true);
         try {
             const token = localStorage.getItem('auth_token');
             const headers = { 'Content-Type': 'application/json' };
@@ -119,6 +135,8 @@ const Quiz = () => {
             }
         } catch (err) {
             alert('Failed to save quiz: ' + err.message);
+        } finally {
+            setSaving(false);
         }
     };
 
@@ -283,19 +301,22 @@ const Quiz = () => {
                                         <Award className="w-6 h-6 text-amber-400" />
                                         <div>
                                             <div className="text-sm font-bold text-white">
-                                                Final Score: {calculateScore()} / {quiz.questions.length} ({Math.round((calculateScore() / quiz.questions.length) * 100)}%)
+                                                Final Score: {calculateScore()} / {quiz.questions.length} ({quiz.questions.length > 0 ? Math.round((calculateScore() / quiz.questions.length) * 100) : 0}%)
                                             </div>
-                                            <div className="text-xs font-mono text-slate-400">Activity logged to your study dashboard.</div>
+                                            <div className="text-xs font-mono text-slate-400">
+                                                {activityLogged ? 'Activity logged to your study dashboard.' : 'Assessment complete.'}
+                                            </div>
                                         </div>
                                     </div>
                                     <div className="flex items-center gap-2 w-full sm:w-auto">
                                         <button
                                             onClick={handleSaveQuiz}
-                                            className="px-5 py-2.5 rounded-xl font-mono text-xs bg-slate-900 border border-slate-700 hover:border-emerald-500 text-emerald-400 flex items-center justify-center gap-1.5 transition-all"
+                                            disabled={saving}
+                                            className="px-5 py-2.5 rounded-xl font-mono text-xs bg-slate-900 border border-slate-700 hover:border-emerald-500 text-emerald-400 flex items-center justify-center gap-1.5 transition-all disabled:opacity-50"
                                             title="Save Quiz & answers to Library"
                                         >
                                             {savedSuccess ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Save className="w-3.5 h-3.5" />}
-                                            <span>{savedSuccess ? 'Saved' : 'Save Quiz'}</span>
+                                            <span>{savedSuccess ? 'Saved' : saving ? 'Saving...' : 'Save Quiz'}</span>
                                         </button>
                                         <button
                                             onClick={() => {

@@ -365,9 +365,8 @@ class AIService:
                         circuit_breaker.record_success("gemini")
                         return response
                     except Exception as e:
-                        if "429" in str(e):
-                            continue
-                        raise e
+                        error_log.append(f"Gemini {model_name} failed: {e}")
+                        continue
             except Exception as e:
                 circuit_breaker.record_failure("gemini")
                 error_log.append(f"Gemini Error: {e}")
@@ -433,7 +432,7 @@ class AIService:
                         circuit_breaker.record_success("gemini")
                         for chunk in response:
                             if chunk.text:
-                                yield chunk.text
+                                yield sanitize_output(chunk.text)
                         return
                     except Exception as me:
                         print(f"Gemini Stream model {model_name} failed: {me}")
@@ -442,9 +441,9 @@ class AIService:
                 circuit_breaker.record_failure("gemini")
                 print(f"Gemini Streaming error: {ge}")
 
-        # Fallback to standard safe generation and yield as a single chunk
+        # Fallback to standard safe generation and yield as a single sanitized chunk
         fallback_resp = AIService._generate_content_safe(prompt)
-        yield fallback_resp.text
+        yield sanitize_output(fallback_resp.text)
 
     # =========================================================================
     # HYBRID MEMORY ARCHITECTURE IMPLEMENTATION
@@ -624,7 +623,12 @@ flowchart TD
                 {"id": 2, "question": f"Which field is {topic} most prominently utilized in?", "options": ["Computer Science & Engineering", "Classical Literature", "Olympic Sports", "Meteorology"], "answer": "Computer Science & Engineering", "explanation": f"{topic} is a key concept within technological frameworks."},
                 {"id": 3, "question": f"Why is understanding {topic} essential for developers?", "options": ["Enables robust architecture design", "Only needed for certification exams", "Has no practical modern utility", "Slows down debugging execution"], "answer": "Enables robust architecture design", "explanation": "Mastery provides conceptual foundation for system scalability."},
                 {"id": 4, "question": f"What is a common best practice when implementing {topic}?", "options": ["Modularity and separation of concerns", "Hardcoding variables globally", "Disabling error logging", "Ignoring data integrity"], "answer": "Modularity and separation of concerns", "explanation": "Clean architecture dictates loose coupling and high cohesion."},
-                {"id": 5, "question": f"How do you test implementations related to {topic}?", "options": ["Automated unit and integration test suites", "Guessing without test cases", "Only checking during production outages", "None of the above"], "answer": "Automated unit and integration test suites", "explanation": "Comprehensive testing prevents regressions and validates edge cases."}
+                {"id": 5, "question": f"How do you test implementations related to {topic}?", "options": ["Automated unit and integration test suites", "Guessing without test cases", "Only checking during production outages", "None of the above"], "answer": "Automated unit and integration test suites", "explanation": "Comprehensive testing prevents regressions and validates edge cases."},
+                {"id": 6, "question": f"What is a typical scalability bottleneck in {topic}?", "options": ["Unbounded resource consumption", "Using version control systems", "Writing automated documentation", "Following syntax standards"], "answer": "Unbounded resource consumption", "explanation": "System resources must be throttled and pooled to avoid memory or CPU exhaustion."},
+                {"id": 7, "question": f"How does error handling safeguard {topic} workflows?", "options": ["Prevents cascading application crashes", "Slows down development intentionally", "Encrypts local databases", "Increases network latency"], "answer": "Prevents cascading application crashes", "explanation": "Defensive programming and graceful degradation preserve system stability."},
+                {"id": 8, "question": f"Which protocol or pattern is commonly associated with {topic}?", "options": ["Client-server request/response or event-driven streaming", "Manual paper index tracking", "Analog radio signals", "Single-threaded blocking execution only"], "answer": "Client-server request/response or event-driven streaming", "explanation": "Modern systems communicate over structured network protocols and event buses."},
+                {"id": 9, "question": f"What security principle must always be enforced in {topic}?", "options": ["Principle of least privilege and strict input validation", "Trusting all client input implicitly", "Exposing raw stack traces to users", "Disabling authentication in production"], "answer": "Principle of least privilege and strict input validation", "explanation": "Sanitizing input and enforcing minimal permissions stops injection attacks."},
+                {"id": 10, "question": f"What is the ultimate goal of mastering {topic}?", "options": ["Building resilient, maintainable, and efficient solutions", "Memorizing definitions without application", "Deprecating all legacy software overnight", "Avoiding teamwork and collaboration"], "answer": "Building resilient, maintainable, and efficient solutions", "explanation": "Engineering mastery focuses on sustainable and reliable real-world systems."}
             ]
         }
 
@@ -707,14 +711,14 @@ flowchart TD
         }
 
     @staticmethod
-    def generate_detailed_mermaid_diagram(topic: str) -> dict:
+    def generate_detailed_mermaid_diagram(topic: str, diagram_type: str = "flowchart") -> dict:
         """
         Generates production-grade detailed Mermaid.js architecture diagrams and flowcharts.
         """
         try:
             prompt = f"""
             You are a Principal Software & Systems Architect.
-            Task: Design a comprehensive, detailed architectural flowchart or sequence diagram for: "{topic}".
+            Task: Design a comprehensive, detailed architectural {diagram_type} for: "{topic}".
             
             RULES FOR MERMAID CODE:
             1. Use 'flowchart TD' or 'sequenceDiagram'.

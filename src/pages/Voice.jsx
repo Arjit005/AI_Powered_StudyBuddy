@@ -24,11 +24,11 @@ const Voice = () => {
         recognition.lang = 'en-US';
 
         recognition.onresult = (event) => {
-            let currentTranscript = '';
-            for (let i = event.resultIndex; i < event.results.length; i++) {
-                currentTranscript += event.results[i][0].transcript;
+            let fullTranscript = '';
+            for (let i = 0; i < event.results.length; i++) {
+                fullTranscript += event.results[i][0].transcript;
             }
-            setTranscript(currentTranscript);
+            setTranscript(fullTranscript);
         };
 
         recognition.onerror = (event) => {
@@ -98,7 +98,7 @@ const Voice = () => {
             setAiResponse(reply);
 
             // Auto-read response if speech synthesis available
-            if ('speechSynthesis' in window) {
+            if ('speechSynthesis' in window && typeof window.SpeechSynthesisUtterance !== 'undefined') {
                 window.speechSynthesis.cancel();
                 const cleanText = reply.replace(/[#*`_\[\]()]/g, '');
                 const utterance = new SpeechSynthesisUtterance(cleanText);
@@ -116,7 +116,7 @@ const Voice = () => {
     };
 
     const toggleSpeechPlayback = () => {
-        if (!('speechSynthesis' in window) || !aiResponse) return;
+        if (!('speechSynthesis' in window) || typeof window.SpeechSynthesisUtterance === 'undefined' || !aiResponse) return;
 
         if (isSpeaking) {
             window.speechSynthesis.cancel();

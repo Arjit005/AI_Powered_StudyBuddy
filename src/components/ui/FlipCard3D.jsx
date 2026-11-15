@@ -79,7 +79,10 @@ const FlipCard3D = ({
                                 </span>
                             )}
                             <button
-                                onClick={onReadCard}
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    onReadCard?.();
+                                }}
                                 className="p-2 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors"
                                 title="Listen to prompt"
                             >
@@ -131,7 +134,10 @@ const FlipCard3D = ({
                         </span>
 
                         <button
-                            onClick={onReadCard}
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                onReadCard?.();
+                            }}
                             className="p-2 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors"
                             title="Listen to solution"
                         >

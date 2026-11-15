@@ -20,11 +20,33 @@ import Pricing from './pages/Pricing';
 import LoginPage from './pages/LoginPage';
 import SignupPage from './pages/SignupPage';
 
-// Protected Route Component checking both token presence and authenticated flag
+// Helper to check JWT format and expiration
+const isTokenValid = (token) => {
+  if (!token || typeof token !== 'string') return false;
+  try {
+    const parts = token.split('.');
+    if (parts.length !== 3) return false;
+    const payloadJson = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
+    if (payloadJson.exp && payloadJson.exp * 1000 < Date.now()) {
+      return false;
+    }
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+// Protected Route Component checking both token presence, structure, and validity
 const ProtectedRoute = ({ children }) => {
   const token = localStorage.getItem('auth_token');
-  const isAuthenticated = localStorage.getItem('isAuthenticated') === 'true' && Boolean(token);
-  return isAuthenticated ? children : <Navigate to="/login" replace />;
+  const isAuthenticated = localStorage.getItem('isAuthenticated') === 'true' && isTokenValid(token);
+  if (!isAuthenticated) {
+    localStorage.removeItem('auth_token');
+    localStorage.removeItem('isAuthenticated');
+    localStorage.removeItem('user');
+    return <Navigate to="/login" replace />;
+  }
+  return children;
 };
 
 function App() {

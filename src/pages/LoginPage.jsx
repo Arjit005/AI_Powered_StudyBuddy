@@ -60,6 +60,10 @@ const LoginPage = () => {
 
     const handleLogin = async (e) => {
         e.preventDefault();
+        if (lockoutSecs > 0) {
+            setError(`Account is locked out. Please wait ${lockoutSecs}s.`);
+            return;
+        }
         setError('');
         setIsLoading(true);
 
@@ -88,6 +92,10 @@ const LoginPage = () => {
                     setLockoutSecs(60);
                 }
                 throw new Error(data.detail || 'Invalid username/email or password');
+            }
+
+            if (!data.access_token || !data.user) {
+                throw new Error('Authentication response is missing required credentials.');
             }
 
             localStorage.setItem('isAuthenticated', 'true');
@@ -133,7 +141,7 @@ const LoginPage = () => {
                     {lockoutSecs > 0 && (
                         <div className="mb-6 p-3 rounded-xl bg-amber-950/50 border border-amber-800/50 text-amber-300 text-xs flex items-center gap-2">
                             <ShieldCheck className="w-4 h-4 text-amber-400" />
-                            <span>Rate Limit Lockout active. Protected against brute-force attacks.</span>
+                            <span>Rate Limit Lockout active ({lockoutSecs}s remaining). Protected against brute-force attacks.</span>
                         </div>
                     )}
 
@@ -205,7 +213,7 @@ const LoginPage = () => {
 
                         <button
                             type="submit"
-                            disabled={isLoading}
+                            disabled={isLoading || isGoogleLoading || lockoutSecs > 0}
                             className="w-full mt-6 py-3.5 px-4 rounded-xl font-semibold text-sm bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 text-slate-950 hover:brightness-110 active:scale-[0.98] transition-all flex items-center justify-center gap-2 shadow-[0_0_25px_rgba(16,185,129,0.35)] disabled:opacity-50"
                         >
                             {isLoading ? (

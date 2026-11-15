@@ -72,9 +72,8 @@ def generate_network_graph(edge_data):
             target = edge.get("target", "")
             relation = edge.get("relationship", "")
             
-            # ACTIVE TRASH FILTER: Skip edges leading to conceptual nodes
-            if any(kw in source.lower() for kw in TRASH_KEYWORDS) or \
-               any(kw in target.lower() for kw in TRASH_KEYWORDS):
+            # Skip generic single-word stopword nodes
+            if source.strip().lower() in TRASH_KEYWORDS or target.strip().lower() in TRASH_KEYWORDS:
                 continue
                 
             # Add nodes if they don't exist
@@ -172,7 +171,7 @@ def generate_network_graph(edge_data):
         # Draw Node Labels (The actual "Boxes")
         for i, node in enumerate(G.nodes):
             x, y = pos[node]
-            d = depths.get(node, 0)
+            d = depths.get(node, 1 if node != root else 0)
             
             # Cycle through colors based on depth
             color = depth_colors[d % len(depth_colors)]

@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { FileText, Globe, Upload, Trash2, RefreshCw, BookOpen, Sparkles, CheckCircle2, AlertCircle, Plus, Search, ExternalLink, Star } from 'lucide-react';
 
 const Sources = () => {
     const [sources, setSources] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [fetchError, setFetchError] = useState(null);
     const [uploading, setUploading] = useState(false);
     const [activeTab, setActiveTab] = useState('library'); // 'library' | 'upload' | 'discover'
 
@@ -17,7 +18,9 @@ const Sources = () => {
     // Selected source guide modal state
     const [selectedSource, setSelectedSource] = useState(null);
     const [sourceGuide, setSourceGuide] = useState(null);
+    const [guideError, setGuideError] = useState(null);
     const [loadingGuide, setLoadingGuide] = useState(false);
+    const guideRequestGenRef = useRef(0);
 
     useEffect(() => {
         fetchSources();
@@ -25,14 +28,19 @@ const Sources = () => {
 
     const fetchSources = async () => {
         setLoading(true);
+        setFetchError(null);
         try {
             const res = await fetch('/api/sources');
             if (res.ok) {
                 const data = await res.json();
-                setSources(data);
+                setSources(Array.isArray(data) ? data : []);
+            } else {
+                const errData = await res.json().catch(() => ({}));
+                setFetchError(errData.detail || 'Failed to load study sources.');
             }
         } catch (e) {
             console.error("Error fetching sources:", e);
+            setFetchError('Network error while retrieving sources.');
         } finally {
             setLoading(false);
         }
@@ -78,9 +86,9 @@ const Sources = () => {
                 setUrlInput('');
                 setSelectedFile(null);
                 setActiveTab('library');
-                fetchSources();
+                await fetchSources();
             } else {
-                const err = await res.json();
+                const err = await res.json().catch(() => ({}));
                 alert(err.detail || 'Failed to ingest source.');
             }
         } catch (err) {
@@ -92,8 +100,10 @@ const Sources = () => {
     };
 
     const openSourceGuide = async (source) => {
+        const thisGen = ++guideRequestGenRef.current;
         setSelectedSource(source);
         setSourceGuide(null);
+        setGuideError(null);
         setLoadingGuide(true);
         try {
             const token = localStorage.getItem('auth_token');
@@ -101,14 +111,24 @@ const Sources = () => {
             if (token) headers['Authorization'] = `Bearer ${token}`;
 
             const res = await fetch(`/api/sources/${source.id}/guide`, { headers });
+            if (thisGen !== guideRequestGenRef.current) return;
             if (res.ok) {
                 const data = await res.json();
+                if (thisGen !== guideRequestGenRef.current) return;
                 setSourceGuide(data);
+            } else {
+                const errData = await res.json().catch(() => ({}));
+                setGuideError(errData.detail || 'Could not generate study guide for this source.');
             }
         } catch (e) {
             console.error("Guide fetch error:", e);
+            if (thisGen === guideRequestGenRef.current) {
+                setGuideError('Network error retrieving study guide.');
+            }
         } finally {
-            setLoadingGuide(false);
+            if (thisGen === guideRequestGenRef.current) {
+                setLoadingGuide(false);
+            }
         }
     };
 
@@ -190,6 +210,13 @@ const Sources = () => {
                     </button>
                 </div>
             </div>
+
+            {fetchError && (
+                <div className="mb-6 p-3 rounded-xl bg-amber-950/50 border border-amber-800/50 text-amber-300 text-xs font-mono flex items-center justify-between">
+                    <span>⚠️ {fetchError}</span>
+                    <button onClick={() => setFetchError(null)} className="text-slate-400 hover:text-white px-2">✕</button>
+                </div>
+            )}
 
             {/* Main Content Area */}
             {activeTab === 'library' ? (
@@ -469,6 +496,10 @@ const Sources = () => {
                                         ))}
                                     </ul>
                                 </div>
+                            </div>
+                        ) : guideError ? (
+                            <div className="p-4 rounded-2xl bg-rose-950/60 border border-rose-800 text-rose-300 text-xs font-mono">
+                                ⚠️ {guideError}
                             </div>
                         ) : (
                             <div className="text-slate-400 text-sm">Failed to load source guide.</div>

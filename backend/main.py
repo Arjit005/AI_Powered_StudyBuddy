@@ -348,7 +348,7 @@ def google_login(req: GoogleLoginRequest, request: Request, db: Session = Depend
         )
 
     email = decoded.get("email", "").lower().strip()
-    if not email:
+    if not email or decoded.get("email_verified") is not True:
         raise HTTPException(status_code=400, detail="Google account has no verified email address.")
 
     raw_name = decoded.get("name") or email.split("@")[0]
@@ -1506,10 +1506,16 @@ if os.path.exists(_dist_dir):
         # Allow API, docs, and OpenAPI calls to pass through to FastAPI handlers
         if full_path.startswith("api/") or full_path in ["docs", "redoc", "openapi.json"]:
             raise HTTPException(status_code=404, detail="Not Found")
-        target_path = os.path.join(_dist_dir, full_path)
+        
+        resolved_dist = os.path.abspath(_dist_dir)
+        target_path = os.path.abspath(os.path.join(resolved_dist, full_path))
+        # Directory Traversal Guard: Ensure target_path stays strictly within resolved_dist
+        if not (target_path == resolved_dist or target_path.startswith(resolved_dist + os.sep)):
+            raise HTTPException(status_code=403, detail="Access forbidden.")
+
         if os.path.exists(target_path) and os.path.isfile(target_path):
             return FileResponse(target_path)
-        index_file = os.path.join(_dist_dir, "index.html")
+        index_file = os.path.join(resolved_dist, "index.html")
         if os.path.exists(index_file):
             return FileResponse(index_file)
         raise HTTPException(status_code=404, detail="SPA index.html not found.")

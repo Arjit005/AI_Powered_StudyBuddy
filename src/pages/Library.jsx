@@ -25,8 +25,12 @@ export default function Library() {
   const [activeTab, setActiveTab] = useState('all');
   const [search, setSearch] = useState('');
   const [selectedItem, setSelectedItem] = useState(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [detailError, setDetailError] = useState(null);
   const navigate = useNavigate();
   const requestGenRef = useRef(0);
+  const detailRequestGenRef = useRef(0);
+  const pendingFavoritesRef = useRef(new Set());
 
   useEffect(() => {
     fetchLibrary();
@@ -56,7 +60,7 @@ export default function Library() {
       if (res.ok) {
         const data = await res.json();
         if (thisGen !== requestGenRef.current) return;
-        setItems(data);
+        setItems(Array.isArray(data) ? data : []);
       } else {
         setError("Failed to load study materials. Please try again.");
       }
@@ -74,6 +78,8 @@ export default function Library() {
 
   const handleToggleFavorite = async (e, id) => {
     e.stopPropagation();
+    if (pendingFavoritesRef.current.has(id)) return;
+    pendingFavoritesRef.current.add(id);
     try {
       const res = await fetch(`/api/library/${id}/favorite`, { method: 'PUT', headers: getAuthHeaders() });
       if (res.ok) {
@@ -84,6 +90,8 @@ export default function Library() {
     } catch (err) {
       console.error("Favorite toggle error:", err);
       alert("Network error updating favorite.");
+    } finally {
+      pendingFavoritesRef.current.delete(id);
     }
   };
 
@@ -105,14 +113,29 @@ export default function Library() {
   };
 
   const handleOpenItem = async (item) => {
+    const thisGen = ++detailRequestGenRef.current;
+    setSelectedItem(item);
+    setDetailLoading(true);
+    setDetailError(null);
     try {
       const res = await fetch(`/api/library/${item.id}`, { headers: getAuthHeaders() });
+      if (thisGen !== detailRequestGenRef.current) return;
       if (res.ok) {
         const full = await res.json();
+        if (thisGen !== detailRequestGenRef.current) return;
         setSelectedItem(full);
+      } else {
+        setDetailError("Failed to fetch full study material details.");
       }
     } catch (err) {
       console.error("Fetch full item error:", err);
+      if (thisGen === detailRequestGenRef.current) {
+        setDetailError("Network error while loading item details.");
+      }
+    } finally {
+      if (thisGen === detailRequestGenRef.current) {
+        setDetailLoading(false);
+      }
     }
   };
 
@@ -296,9 +319,19 @@ export default function Library() {
               </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-4 rounded-2xl bg-slate-900/60 border border-white/5 text-sm text-slate-300 leading-relaxed font-mono whitespace-pre-wrap">
-              {selectedItem.content_json}
-            </div>
+            {detailError ? (
+              <div className="p-4 rounded-2xl bg-rose-950/60 border border-rose-800 text-sm text-rose-300 font-mono">
+                ⚠️ {detailError}
+              </div>
+            ) : detailLoading ? (
+              <div className="flex-1 flex items-center justify-center p-8 text-slate-400 font-mono text-xs">
+                Loading study material details...
+              </div>
+            ) : (
+              <div className="flex-1 overflow-y-auto p-4 rounded-2xl bg-slate-900/60 border border-white/5 text-sm text-slate-300 leading-relaxed font-mono whitespace-pre-wrap">
+                {selectedItem.content_json}
+              </div>
+            )}
 
             <div className="flex items-center justify-between pt-2">
               <span className="text-xs text-slate-400">

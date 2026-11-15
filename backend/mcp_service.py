@@ -131,7 +131,8 @@ class MCPService:
 
         elif name == "generate_mermaid_spec":
             topic = arguments.get("topic", "System Architecture")
-            return AIService.generate_detailed_mermaid_diagram(topic)
+            diagram_type = arguments.get("diagram_type", "flowchart")
+            return AIService.generate_detailed_mermaid_diagram(topic, diagram_type=diagram_type)
 
         elif name == "export_to_canvas_json":
             content = arguments.get("content", "")
@@ -149,6 +150,9 @@ class MCPService:
         elif name == "create_study_flashcards":
             topic = arguments.get("topic", "General Topic")
             count = arguments.get("count", 5)
+            if not isinstance(count, int) or isinstance(count, bool):
+                count = 5
+            count = min(max(count, 3), 10)
             return AIService.generate_flashcards(topic, count=count)
 
         else:
@@ -622,9 +626,14 @@ class MCPService:
         Standard Model Context Protocol JSON-RPC 2.0 processor.
         Supports initialize, tools/list, tools/call, resources/list, prompts/list.
         """
+        if not isinstance(payload, dict):
+            return {"jsonrpc": "2.0", "id": None, "error": {"code": -32600, "message": "Invalid Request: payload must be a JSON object."}}
+
         rpc_id = payload.get("id")
         method = payload.get("method")
         params = payload.get("params", {})
+        if not isinstance(params, dict):
+            return {"jsonrpc": "2.0", "id": rpc_id, "error": {"code": -32602, "message": "Invalid params: params must be a JSON object."}}
 
         if method == "initialize":
             return {

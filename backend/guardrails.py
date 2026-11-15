@@ -69,10 +69,11 @@ def validate_input(prompt: str) -> GuardrailResult:
         return GuardrailResult(passed=False, reason="Invalid input: prompt cannot be empty.")
 
     normalized = prompt.lower()
+    clean_normalized = re.sub(r'[\s\-_,\.;:!?]+', ' ', normalized).strip()
 
-    # 1. Check prompt injection patterns
+    # 1. Check prompt injection patterns against raw and punctuation-normalized input
     for pattern in INJECTION_PATTERNS:
-        if re.search(pattern, normalized):
+        if re.search(pattern, normalized) or re.search(pattern, clean_normalized):
             logger.warning(f"Security Alert: Prompt injection detected matching pattern: '{pattern}'")
             return GuardrailResult(
                 passed=False,
@@ -81,7 +82,7 @@ def validate_input(prompt: str) -> GuardrailResult:
 
     # 2. Check harmful content patterns
     for pattern in HARMFUL_PATTERNS:
-        if re.search(pattern, normalized):
+        if re.search(pattern, normalized) or re.search(pattern, clean_normalized):
             logger.warning(f"Security Alert: Harmful content detected matching pattern: '{pattern}'")
             return GuardrailResult(
                 passed=False,
@@ -133,6 +134,6 @@ def verify_rag_grounding(answer: str, retrieved_chunks: List[str]) -> Tuple[bool
     overlap = meaningful_answer_words.intersection(corpus_words)
     faithfulness_score = len(overlap) / len(meaningful_answer_words)
 
-    # Threshold for faithfulness
-    is_faithful = faithfulness_score >= 0.15 or len(answer) < 60
+    # Threshold for faithfulness based on actual textual evidence overlap
+    is_faithful = faithfulness_score >= 0.15
     return is_faithful, faithfulness_score
