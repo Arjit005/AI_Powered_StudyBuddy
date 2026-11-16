@@ -49,8 +49,8 @@ const Quiz = () => {
                     const rawAnswer = String(q.correct_answer || q.answer || '').trim();
                     if (!rawAnswer) return null;
                     const normalizedOptions = q.options.map(opt => String(opt).trim());
-                    // Reject questions with duplicate options
-                    if (new Set(normalizedOptions).size !== normalizedOptions.length) return null;
+                    // Reject questions with duplicate options (case-insensitive check)
+                    if (new Set(normalizedOptions.map(opt => opt.toLowerCase())).size !== normalizedOptions.length) return null;
                     // Find option matching rawAnswer strictly (exact match case-insensitively)
                     const matchingOption = normalizedOptions.find(opt => opt.toLowerCase() === rawAnswer.toLowerCase());
                     if (!matchingOption) return null;
@@ -360,9 +360,11 @@ const Quiz = () => {
                                         </button>
                                         <button
                                             onClick={() => {
+                                                quizInstanceRef.current = null;
                                                 setQuiz(null);
                                                 setAnswers({});
                                                 setSubmitted(false);
+                                                setActivityLogged(false);
                                             }}
                                             disabled={saving}
                                             className="flex-1 sm:flex-initial px-6 py-2.5 rounded-xl font-mono text-xs bg-emerald-500/20 border border-emerald-500/40 hover:bg-emerald-500/30 text-emerald-300 transition-all text-center disabled:opacity-50"

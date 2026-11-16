@@ -73,9 +73,13 @@ const Maps = () => {
                 try {
                     const mapJson = await mapResult.value.json();
                     if (thisGen !== mapRequestGenRef.current) return;
-                    if (mapJson && mapJson.map_image) {
-                        setMapImage(`data:image/png;base64,${mapJson.map_image}`);
-                        hasMap = true;
+                    if (mapJson && typeof mapJson.map_image === 'string') {
+                        const rawB64 = mapJson.map_image.trim();
+                        // Enforce reasonable response-size limit (max 5MB base64 string) and valid base64 format
+                        if (rawB64.length <= 5 * 1024 * 1024 && /^[A-Za-z0-9+/=]+$/.test(rawB64)) {
+                            setMapImage(`data:image/png;base64,${rawB64}`);
+                            hasMap = true;
+                        }
                     }
                 } catch (pErr) {
                     console.warn("Map JSON parse error:", pErr);

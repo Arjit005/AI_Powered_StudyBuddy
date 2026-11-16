@@ -1,5 +1,6 @@
 import json
 import logging
+import math
 import re
 from typing import Dict, Any, List, Optional
 from backend.ai_service import AIService
@@ -160,6 +161,8 @@ class MCPService:
 
         elif name == "query_study_memory":
             cid = arguments.get("conversation_id")
+            if cid is not None and (not isinstance(cid, int) or isinstance(cid, bool) or cid < 1):
+                cid = None
             limit = arguments.get("limit", 5)
             if not isinstance(limit, int) or isinstance(limit, bool) or limit < 1:
                 limit = 5
@@ -238,10 +241,22 @@ class MCPService:
             cleaned = AIService._clean_json_response(response.text)
             parsed = json.loads(cleaned)
             if isinstance(parsed, dict) and "nodes" in parsed and isinstance(parsed["nodes"], list):
-                valid_nodes = [
-                    n for n in parsed["nodes"]
-                    if isinstance(n, dict) and isinstance(n.get("id"), str) and isinstance(n.get("label"), str)
-                ]
+                def _is_valid_num(val):
+                    return isinstance(val, (int, float)) and not isinstance(val, bool) and math.isfinite(val)
+
+                valid_nodes = []
+                for n in parsed["nodes"]:
+                    if isinstance(n, dict) and isinstance(n.get("id"), str) and isinstance(n.get("label"), str):
+                        # Ensure numeric geometry if coordinates are provided
+                        if "x" in n and not _is_valid_num(n["x"]):
+                            n["x"] = 0
+                        if "y" in n and not _is_valid_num(n["y"]):
+                            n["y"] = 0
+                        if "width" in n and not _is_valid_num(n["width"]):
+                            n["width"] = 160
+                        if "height" in n and not _is_valid_num(n["height"]):
+                            n["height"] = 60
+                        valid_nodes.append(n)
                 valid_edges = [
                     e for e in parsed.get("edges", [])
                     if isinstance(e, dict) and isinstance(e.get("source"), str) and isinstance(e.get("target"), str)
@@ -629,7 +644,7 @@ class MCPService:
         try:
             if conversation_id:
                 conv_q = db.query(Conversation).filter(Conversation.id == conversation_id)
-                if user_id:
+                if user_id is not None:
                     conv_q = conv_q.filter(Conversation.user_id == user_id)
                 else:
                     conv_q = conv_q.filter(Conversation.user_id.is_(None))
@@ -648,7 +663,7 @@ class MCPService:
                 }
             else:
                 convs_q = db.query(Conversation)
-                if user_id:
+                if user_id is not None:
                     convs_q = convs_q.filter(Conversation.user_id == user_id)
                 else:
                     convs_q = convs_q.filter(Conversation.user_id.is_(None))

@@ -113,9 +113,11 @@ export default function Library() {
       const res = await fetch(`/api/library/${id}`, { method: 'DELETE', headers: getAuthHeaders() });
       if (res.ok) {
         setItems(prev => prev.filter(item => item.id !== id));
-        detailRequestGenRef.current += 1;
         if (selectedItem?.id === id) {
+          detailRequestGenRef.current += 1;
           setSelectedItem(null);
+          setDetailLoading(false);
+          setDetailError(null);
         }
       } else {
         alert("Failed to delete item from library.");

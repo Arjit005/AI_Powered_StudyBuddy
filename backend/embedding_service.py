@@ -130,7 +130,7 @@ class EmbeddingService:
                         kwargs["task_type"] = task_type
                     res = genai.embed_content(**kwargs)
                     batch_res = res.get("embedding", [])
-                    if isinstance(batch_res, list) and len(batch_res) == len(cleaned_texts) and isinstance(batch_res[0], list):
+                    if isinstance(batch_res, list) and batch_res and len(batch_res) == len(cleaned_texts) and isinstance(batch_res[0], list):
                         raw_embeddings = batch_res
                 except (TypeError, ValueError) as sdk_batch_err:
                     # SDK doesn't support batch list input or invalid argument shape

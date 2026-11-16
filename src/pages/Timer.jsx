@@ -72,7 +72,7 @@ const StudyTimer = () => {
         } else {
             if (targetEndTimeRef.current) {
                 const now = Date.now();
-                const remaining = Math.max(0, Math.round((targetEndTimeRef.current - now) / 1000));
+                const remaining = Math.max(0, Math.ceil((targetEndTimeRef.current - now) / 1000));
                 setTimeLeft(remaining);
             }
             targetEndTimeRef.current = null;

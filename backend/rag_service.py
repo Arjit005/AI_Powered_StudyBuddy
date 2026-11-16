@@ -170,8 +170,10 @@ class RAGService:
                                 print(f"SSRF Alert: DNS rebinding blocked; peer IP {peer_ip} is disallowed.")
                                 resp.close()
                                 return ""
-                    except Exception:
-                        pass
+                    except Exception as sock_err:
+                        print(f"SSRF Verification Alert: Socket inspection failed ({sock_err}). Failing closed.")
+                        resp.close()
+                        return ""
 
                     if resp.is_redirect or resp.status_code in (301, 302, 303, 307, 308):
                         loc = resp.headers.get("location")
@@ -267,8 +269,17 @@ class RAGService:
         db.commit()
         db.refresh(source)
 
-        # Chunk and embed
-        RAGService.chunk_and_embed_source(db, source)
+        # Chunk and embed transactionally: clean up source if chunking fails
+        try:
+            RAGService.chunk_and_embed_source(db, source)
+        except Exception as chunk_err:
+            print(f"Error during chunk_and_embed_source: {chunk_err}")
+            try:
+                db.delete(source)
+                db.commit()
+            except Exception:
+                db.rollback()
+            raise
         return source
 
     @staticmethod
@@ -339,12 +350,14 @@ class RAGService:
         vectors_to_upsert = []
 
         # Generate genuine neural embeddings via EmbeddingService in batch
+        is_neural = True
         try:
             batch_embeddings = EmbeddingService.embed_batch(chunks_data, task_type="retrieval_document")
             if not isinstance(batch_embeddings, list) or len(batch_embeddings) != len(chunks_data):
                 raise ValueError("Mismatch in returned batch embedding count.")
         except Exception as e:
             print(f"EmbeddingService Warning (falling back to deterministic projection): {e}")
+            is_neural = False
             batch_embeddings = [RAGService._compute_semantic_embedding(t, dim=1536) for t in chunks_data]
 
         for idx, text in enumerate(chunks_data):
@@ -374,7 +387,8 @@ class RAGService:
                     "chunk_index": idx,
                     "title": source.title[:100],
                     "text": text[:1000],
-                    "user_id": str(source.user_id) if source.user_id else "global"
+                    "user_id": str(source.user_id) if source.user_id else "global",
+                    "embedding_kind": "gemini" if is_neural else "semantic_hash"
                 }
             })
 

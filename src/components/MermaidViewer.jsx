@@ -10,19 +10,27 @@ const sanitizeSvg = (svgStr) => {
     try {
         const parser = new DOMParser();
         const doc = parser.parseFromString(svgStr, 'image/svg+xml');
-        // Strip active executable elements including script, foreignObject, iframe, embed, object
-        doc.querySelectorAll('script, foreignObject, iframe, embed, object').forEach(s => s.remove());
-        // Remove disallowed tags
-        const disallowedTags = ['script', 'iframe', 'object', 'embed', 'foreignObject', 'image', 'base'];
-        disallowedTags.forEach(tag => {
-            doc.querySelectorAll(tag).forEach(el => el.remove());
-        });
+        // Fail closed on XML parser errors
+        if (doc.querySelector('parsererror')) {
+            return '';
+        }
 
-        // Strip event handler attributes, javascript/vbscript/data URLs, and active CSS url()
+        // Remove disallowed tags by localName to handle namespaces properly
+        const disallowedLocalNames = new Set([
+            'script', 'foreignobject', 'iframe', 'embed', 'object', 'image', 'base', 'audio', 'video'
+        ]);
+
         doc.querySelectorAll('*').forEach(el => {
+            const local = (el.localName || el.tagName || '').toLowerCase().replace(/.*:/, '');
+            if (disallowedLocalNames.has(local)) {
+                el.remove();
+                return;
+            }
+
+            // Strip event handler attributes, javascript/vbscript/data URLs, and active CSS url()
             for (let i = el.attributes.length - 1; i >= 0; i--) {
                 const attr = el.attributes[i];
-                const name = attr.name.toLowerCase();
+                const name = (attr.localName || attr.name).toLowerCase();
                 const val = attr.value.trim().toLowerCase();
                 if (
                     name.startsWith('on') || 
@@ -106,7 +114,7 @@ const MermaidViewer = ({ chart, title = "Architecture Diagram" }) => {
     }, [isFullscreen]);
 
     useEffect(() => {
-        if (!chart || !chart.trim()) {
+        if (!chart || typeof chart !== 'string' || !chart.trim()) {
             setSvgContent('');
             setError(null);
             return;
@@ -131,6 +139,8 @@ const MermaidViewer = ({ chart, title = "Architecture Diagram" }) => {
             globalRenderQueue = globalRenderQueue.catch(() => {}).then(async () => {
                 if (isCancelled) return;
                 try {
+                    // Reapply secure configuration directly at rendering boundary
+                    initMermaid();
                     const { svg } = await mermaid.render(id, cleanChart);
                     if (!isCancelled) {
                         const sanitized = sanitizeSvg(svg);

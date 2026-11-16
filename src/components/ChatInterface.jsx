@@ -50,6 +50,8 @@ const ChatInterface = () => {
         }
     }, [location.state]);
 
+    const activeSendCountRef = useRef(0);
+
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     };
@@ -183,16 +185,16 @@ const ChatInterface = () => {
             });
 
             if (res.ok) {
-                setConversations(prev => {
-                    const remaining = prev.filter(c => c.id !== convId);
-                    setActiveConvId(currentId => {
-                        if (currentId !== convId) return currentId;
-                        if (remaining.length > 0) return remaining[0].id;
+                const remaining = conversations.filter(c => c.id !== convId);
+                setConversations(remaining);
+                if (activeConvId === convId) {
+                    if (remaining.length > 0) {
+                        setActiveConvId(remaining[0].id);
+                    } else {
+                        setActiveConvId(null);
                         setMessages([DEFAULT_GREETING]);
-                        return null;
-                    });
-                    return remaining;
-                });
+                    }
+                }
             }
         } catch (err) {
             console.error("Error deleting session:", err);
@@ -251,6 +253,7 @@ const ChatInterface = () => {
         const userMessage = { role: 'user', content: textToSend, timestamp: currentTime };
         setMessages(prev => [...prev, userMessage]);
         if (!messageText) setInput('');
+        activeSendCountRef.current += 1;
         setIsLoading(true);
 
         try {
@@ -301,7 +304,7 @@ const ChatInterface = () => {
 
                     const isStillCurrentConv = () => (
                         originatingConvId === activeConvIdRef.current || 
-                        (streamConvId && activeConvIdRef.current === streamConvId)
+                        (originatingConvId === null && streamConvId && activeConvIdRef.current === streamConvId)
                     );
 
                     while (!doneReading) {
@@ -314,7 +317,11 @@ const ChatInterface = () => {
                         }
 
                         const lines = buffer.split('\n');
-                        buffer = done ? '' : (lines.pop() || '');
+                        if (done) {
+                            buffer = '';
+                        } else {
+                            buffer = lines.pop() ?? '';
+                        }
 
                         for (const line of lines) {
                             const trimmed = line.trim();
@@ -337,9 +344,9 @@ const ChatInterface = () => {
                                 throw new Error(parsed.error);
                             }
 
-                            if (parsed.conversation_id && parsed.conversation_id !== activeConvIdRef.current) {
+                            if (parsed.conversation_id) {
                                 streamConvId = parsed.conversation_id;
-                                if (originatingConvId === activeConvIdRef.current || activeConvIdRef.current === null) {
+                                if (originatingConvId === activeConvIdRef.current || (originatingConvId === null && activeConvIdRef.current === null)) {
                                     setActiveConvId(parsed.conversation_id);
                                     fetchConversations();
                                 }
@@ -463,7 +470,10 @@ const ChatInterface = () => {
                 ]);
             }
         } finally {
-            setIsLoading(false);
+            activeSendCountRef.current = Math.max(0, activeSendCountRef.current - 1);
+            if (activeSendCountRef.current === 0) {
+                setIsLoading(false);
+            }
         }
     };
 

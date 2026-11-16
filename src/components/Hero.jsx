@@ -145,67 +145,61 @@ const Hero = () => {
 
                         {/* Window Body */}
                         <div className="p-6 font-mono text-xs sm:text-sm">
-                            {activeTab === 'chat' && (
-                                <div role="tabpanel" id="panel-chat" aria-labelledby="tab-chat" className="space-y-4">
-                                    <div className="flex items-start gap-3">
-                                        <span className="text-emerald-400 font-bold">Student:</span>
-                                        <span className="text-slate-300">How does Photosynthesis work in plants?</span>
-                                    </div>
-                                    <div className="p-4 rounded-xl bg-slate-950/70 border border-slate-800/80 space-y-2 text-slate-300 leading-relaxed">
-                                        <div className="flex items-center gap-2 text-emerald-400 font-semibold mb-1">
-                                            <Sparkles className="w-3.5 h-3.5" />
-                                            <span>AI Tutor (Step-by-Step Explanation):</span>
-                                        </div>
-                                        <p>
-                                            Photosynthesis is how green plants convert light energy into chemical energy:
-                                        </p>
-                                        <ul className="list-disc pl-4 space-y-1 text-slate-400">
-                                            <li><span className="text-emerald-300 font-semibold">Light Reaction:</span> Chlorophyll absorbs sunlight and splits water molecules (H₂O), releasing oxygen (O₂).</li>
-                                            <li><span className="text-teal-300 font-semibold">Calvin Cycle:</span> Plants capture carbon dioxide (CO₂) to synthesize glucose (sugar) for food.</li>
-                                            <li><span className="text-cyan-300 font-semibold">Key Equation:</span> 6CO₂ + 6H₂O + Sunlight → C₆H₁₂O₆ + 6O₂</li>
-                                        </ul>
-                                        <div className="pt-2 flex items-center justify-between text-[11px] text-slate-500 font-mono">
-                                            <span>AI Tutor v2.1</span>
-                                            <span className="text-emerald-400">✓ Grounded with your study notes</span>
-                                        </div>
-                                    </div>
+                            <div role="tabpanel" id="panel-chat" aria-labelledby="tab-chat" hidden={activeTab !== 'chat'} className={activeTab === 'chat' ? "space-y-4" : "hidden"}>
+                                <div className="flex items-start gap-3">
+                                    <span className="text-emerald-400 font-bold">Student:</span>
+                                    <span className="text-slate-300">How does Photosynthesis work in plants?</span>
                                 </div>
-                            )}
-
-                            {activeTab === 'flashcards' && (
-                                <div role="tabpanel" id="panel-flashcards" aria-labelledby="tab-flashcards" className="p-6 rounded-2xl bg-slate-950 border border-emerald-500/30 text-center space-y-3">
-                                    <span className="px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-400 text-xs font-mono font-semibold border border-emerald-500/20">
-                                        Active Card 1 of 12 • Biology Deck
-                                    </span>
-                                    <h4 className="text-lg font-bold text-white">
-                                        What is the primary function of Mitochondria?
-                                    </h4>
-                                    <p className="text-slate-400 text-xs">
-                                        Known as the powerhouse of the cell, mitochondria generate most of the chemical energy (ATP) needed for cellular biochemical reactions.
+                                <div className="p-4 rounded-xl bg-slate-950/70 border border-slate-800/80 space-y-2 text-slate-300 leading-relaxed">
+                                    <div className="flex items-center gap-2 text-emerald-400 font-semibold mb-1">
+                                        <Sparkles className="w-3.5 h-3.5" />
+                                        <span>AI Tutor (Step-by-Step Explanation):</span>
+                                    </div>
+                                    <p>
+                                        Photosynthesis is how green plants convert light energy into chemical energy:
                                     </p>
-                                    <div className="pt-2 flex justify-center gap-3">
-                                        <span className="px-2.5 py-1 rounded-lg bg-rose-950/40 text-rose-300 text-xs border border-rose-900/50">1: Hard</span>
-                                        <span className="px-2.5 py-1 rounded-lg bg-amber-950/40 text-amber-300 text-xs border border-amber-900/50">2: Good</span>
-                                        <span className="px-2.5 py-1 rounded-lg bg-emerald-950/40 text-emerald-300 text-xs border border-emerald-900/50">3: Mastered</span>
+                                    <ul className="list-disc pl-4 space-y-1 text-slate-400">
+                                        <li><span className="text-emerald-300 font-semibold">Light Reaction:</span> Chlorophyll absorbs sunlight and splits water molecules (H₂O), releasing oxygen (O₂).</li>
+                                        <li><span className="text-teal-300 font-semibold">Calvin Cycle:</span> Plants capture carbon dioxide (CO₂) to synthesize glucose (sugar) for food.</li>
+                                        <li><span className="text-cyan-300 font-semibold">Key Equation:</span> 6CO₂ + 6H₂O + Sunlight → C₆H₁₂O₆ + 6O₂</li>
+                                    </ul>
+                                    <div className="pt-2 flex items-center justify-between text-[11px] text-slate-500 font-mono">
+                                        <span>AI Tutor v2.1</span>
+                                        <span className="text-emerald-400">✓ Grounded with your study notes</span>
                                     </div>
                                 </div>
-                            )}
+                            </div>
 
-                            {activeTab === 'maps' && (
-                                <div role="tabpanel" id="panel-maps" aria-labelledby="tab-maps" className="p-6 rounded-2xl bg-slate-950 border border-slate-800 text-slate-300 space-y-2">
-                                    <div className="flex items-center justify-between text-xs text-slate-400 mb-2">
-                                        <span>Concept Map: Cell Biology Hierarchy</span>
-                                        <span className="text-teal-400">Interactive Concept Flow</span>
-                                    </div>
-                                    <div className="flex flex-wrap gap-2 text-xs">
-                                        <span className="px-3 py-1.5 rounded-lg bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 font-bold">Animal Cell</span>
-                                        <span className="px-2 py-1.5 text-slate-500">──&gt;</span>
-                                        <span className="px-3 py-1.5 rounded-lg bg-cyan-500/20 border border-cyan-500/40 text-cyan-300 font-bold">Nucleus (DNA)</span>
-                                        <span className="px-2 py-1.5 text-slate-500">──&gt;</span>
-                                        <span className="px-3 py-1.5 rounded-lg bg-violet-500/20 border border-violet-500/40 text-violet-300 font-bold">Mitochondria (ATP Energy)</span>
-                                    </div>
+                            <div role="tabpanel" id="panel-flashcards" aria-labelledby="tab-flashcards" hidden={activeTab !== 'flashcards'} className={activeTab === 'flashcards' ? "p-6 rounded-2xl bg-slate-950 border border-emerald-500/30 text-center space-y-3" : "hidden"}>
+                                <span className="px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-400 text-xs font-mono font-semibold border border-emerald-500/20">
+                                    Active Card 1 of 12 • Biology Deck
+                                </span>
+                                <h4 className="text-lg font-bold text-white">
+                                    What is the primary function of Mitochondria?
+                                </h4>
+                                <p className="text-slate-400 text-xs">
+                                    Known as the powerhouse of the cell, mitochondria generate most of the chemical energy (ATP) needed for cellular biochemical reactions.
+                                </p>
+                                <div className="pt-2 flex justify-center gap-3">
+                                    <span className="px-2.5 py-1 rounded-lg bg-rose-950/40 text-rose-300 text-xs border border-rose-900/50">1: Hard</span>
+                                    <span className="px-2.5 py-1 rounded-lg bg-amber-950/40 text-amber-300 text-xs border border-amber-900/50">2: Good</span>
+                                    <span className="px-2.5 py-1 rounded-lg bg-emerald-950/40 text-emerald-300 text-xs border border-emerald-900/50">3: Mastered</span>
                                 </div>
-                            )}
+                            </div>
+
+                            <div role="tabpanel" id="panel-maps" aria-labelledby="tab-maps" hidden={activeTab !== 'maps'} className={activeTab === 'maps' ? "p-6 rounded-2xl bg-slate-950 border border-slate-800 text-slate-300 space-y-2" : "hidden"}>
+                                <div className="flex items-center justify-between text-xs text-slate-400 mb-2">
+                                    <span>Concept Map: Cell Biology Hierarchy</span>
+                                    <span className="text-teal-400">Interactive Concept Flow</span>
+                                </div>
+                                <div className="flex flex-wrap gap-2 text-xs">
+                                    <span className="px-3 py-1.5 rounded-lg bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 font-bold">Animal Cell</span>
+                                    <span className="px-2 py-1.5 text-slate-500">──&gt;</span>
+                                    <span className="px-3 py-1.5 rounded-lg bg-cyan-500/20 border border-cyan-500/40 text-cyan-300 font-bold">Nucleus (DNA)</span>
+                                    <span className="px-2 py-1.5 text-slate-500">──&gt;</span>
+                                    <span className="px-3 py-1.5 rounded-lg bg-violet-500/20 border border-violet-500/40 text-violet-300 font-bold">Mitochondria (ATP Energy)</span>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>

@@ -12,6 +12,7 @@ const Voice = () => {
     const [error, setError] = useState(null);
     const recognitionRef = useRef(null);
     const recognitionSessionRef = useRef(0);
+    const playbackGenRef = useRef(0);
     const aiAbortControllerRef = useRef(null);
     const isMountedRef = useRef(true);
 
@@ -29,16 +30,19 @@ const Voice = () => {
         recognition.lang = 'en-US';
 
         recognition.onresult = (event) => {
+            if (recognition._session !== recognitionSessionRef.current) return;
             let fullTranscript = '';
             for (let i = 0; i < event.results.length; i++) {
                 fullTranscript += event.results[i][0].transcript;
             }
-            if (isMountedRef.current) setTranscript(fullTranscript);
+            if (isMountedRef.current && recognition._session === recognitionSessionRef.current) {
+                setTranscript(fullTranscript);
+            }
         };
 
         recognition.onerror = (event) => {
             console.error('Speech recognition error:', event.error);
-            if (!isMountedRef.current) return;
+            if (!isMountedRef.current || recognition._session !== recognitionSessionRef.current) return;
             setIsListening(false);
             if (event.error === 'not-allowed') {
                 setError('Microphone access was denied. Please allow microphone permissions in your browser.');
@@ -52,7 +56,7 @@ const Voice = () => {
         };
 
         recognition.onend = () => {
-            if (isMountedRef.current) {
+            if (isMountedRef.current && recognition._session === recognitionSessionRef.current) {
                 setIsListening(false);
             }
         };
@@ -61,6 +65,8 @@ const Voice = () => {
 
         return () => {
             isMountedRef.current = false;
+            playbackGenRef.current += 1;
+            recognitionSessionRef.current += 1;
             if (aiAbortControllerRef.current) {
                 try { aiAbortControllerRef.current.abort(); } catch (_) {}
             }
@@ -83,7 +89,10 @@ const Voice = () => {
         } else {
             setTranscript('');
             try {
-                recognitionSessionRef.current += 1;
+                const thisSession = ++recognitionSessionRef.current;
+                if (recognitionRef.current) {
+                    recognitionRef.current._session = thisSession;
+                }
                 recognitionRef.current?.start();
                 setIsListening(true);
             } catch (err) {
@@ -149,11 +158,20 @@ const Voice = () => {
             if (isMountedRef.current && 'speechSynthesis' in window && typeof window.SpeechSynthesisUtterance !== 'undefined') {
                 window.speechSynthesis.cancel();
                 setIsSpeaking(false);
+                const thisPlayback = ++playbackGenRef.current;
                 const cleanText = reply.replace(/[#*`_\[\]()]/g, '');
                 const utterance = new SpeechSynthesisUtterance(cleanText);
                 utterance.rate = 1.0;
-                utterance.onend = () => { if (isMountedRef.current) setIsSpeaking(false); };
-                utterance.onerror = () => { if (isMountedRef.current) setIsSpeaking(false); };
+                utterance.onend = () => {
+                    if (thisPlayback === playbackGenRef.current && isMountedRef.current) {
+                        setIsSpeaking(false);
+                    }
+                };
+                utterance.onerror = () => {
+                    if (thisPlayback === playbackGenRef.current && isMountedRef.current) {
+                        setIsSpeaking(false);
+                    }
+                };
                 try {
                     window.speechSynthesis.speak(utterance);
                     setIsSpeaking(true);
@@ -178,16 +196,30 @@ const Voice = () => {
         if (!('speechSynthesis' in window) || typeof window.SpeechSynthesisUtterance === 'undefined' || !aiResponse) return;
 
         if (isSpeaking) {
+            playbackGenRef.current += 1;
             window.speechSynthesis.cancel();
             setIsSpeaking(false);
         } else {
+            const thisPlayback = ++playbackGenRef.current;
             const cleanText = aiResponse.replace(/[#*`_\[\]()]/g, '');
             const utterance = new SpeechSynthesisUtterance(cleanText);
             utterance.rate = 1.0;
-            utterance.onend = () => { if (isMountedRef.current) setIsSpeaking(false); };
-            utterance.onerror = () => { if (isMountedRef.current) setIsSpeaking(false); };
-            window.speechSynthesis.speak(utterance);
-            setIsSpeaking(true);
+            utterance.onend = () => {
+                if (thisPlayback === playbackGenRef.current && isMountedRef.current) {
+                    setIsSpeaking(false);
+                }
+            };
+            utterance.onerror = () => {
+                if (thisPlayback === playbackGenRef.current && isMountedRef.current) {
+                    setIsSpeaking(false);
+                }
+            };
+            try {
+                window.speechSynthesis.speak(utterance);
+                setIsSpeaking(true);
+            } catch (_) {
+                setIsSpeaking(false);
+            }
         }
     };
 

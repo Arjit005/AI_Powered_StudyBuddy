@@ -5,6 +5,7 @@ and output sanitization (PII redaction, hallucination & grounding verification).
 """
 
 import re
+import unicodedata
 import logging
 from typing import Dict, Tuple, List, Optional
 
@@ -68,8 +69,9 @@ def validate_input(prompt: str) -> GuardrailResult:
     if not prompt.strip():
         return GuardrailResult(passed=False, reason="Invalid input: prompt cannot be empty.")
 
-    # 1. Strip zero-width, non-printing, and invisible characters before security inspection
-    sanitized = re.sub(r'[\u200B-\u200D\uFEFF\u00A0\x00-\x08\x0B\x0C\x0E-\x1F]', '', prompt)
+    # 1. Normalize unicode (NFKD) and strip zero-width, non-printing, and invisible characters
+    nfkd_prompt = unicodedata.normalize('NFKD', prompt)
+    sanitized = re.sub(r'[\u200B-\u200D\uFEFF\u00A0\x00-\x08\x0B\x0C\x0E-\x1F]', '', nfkd_prompt)
 
     # 2. Multi-tier normalization to defeat punctuation-insertion and delimiter evasion
     normalized = sanitized.lower()

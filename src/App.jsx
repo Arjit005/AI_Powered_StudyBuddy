@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Header from './components/Header';
 import Layout from './components/Layout';
@@ -42,6 +42,7 @@ const isTokenValid = (token) => {
 // Protected Route Component checking token presence, structure, and server verification (Fails Closed)
 const ProtectedRoute = ({ children }) => {
   const [currentToken, setCurrentToken] = useState(() => localStorage.getItem('auth_token'));
+  const [failedToken, setFailedToken] = useState(null);
   const [retryCount, setRetryCount] = useState(0);
   const verificationGenRef = useRef(0);
   const [authStatus, setAuthStatus] = useState(() => {
@@ -54,6 +55,7 @@ const ProtectedRoute = ({ children }) => {
     const handleAuthChange = () => {
       const freshToken = localStorage.getItem('auth_token');
       verificationGenRef.current += 1;
+      setFailedToken(null);
       setCurrentToken(freshToken);
     };
     window.addEventListener('storage', handleAuthChange);
@@ -71,6 +73,7 @@ const ProtectedRoute = ({ children }) => {
 
     if (!currentToken || !isTokenValid(currentToken)) {
       setAuthStatus('unauthorized');
+      if (currentToken) setFailedToken(currentToken);
       return;
     }
     setAuthStatus('checking');
@@ -88,10 +91,13 @@ const ProtectedRoute = ({ children }) => {
           if (!isMounted || thisGen !== verificationGenRef.current) return;
           if (data && (data.id || data.email || data.username)) {
             setAuthStatus('authorized');
+            setFailedToken(null);
           } else {
+            setFailedToken(currentToken);
             setAuthStatus('unauthorized');
           }
         } else if (res.status === 401 || res.status === 403) {
+          setFailedToken(currentToken);
           setAuthStatus('unauthorized');
         } else {
           setNetworkError(true);
@@ -110,17 +116,17 @@ const ProtectedRoute = ({ children }) => {
     };
   }, [currentToken, retryCount]);
 
-  // Clean up credentials inside an effect when unauthorized, ensuring token matches current session
+  // Clean up credentials inside an effect when unauthorized, strictly when verification confirmed this token failed
   useEffect(() => {
-    if (authStatus === 'unauthorized') {
+    if (authStatus === 'unauthorized' && failedToken) {
       const storedToken = localStorage.getItem('auth_token');
-      if (!storedToken || storedToken === currentToken) {
+      if (storedToken === failedToken) {
         localStorage.removeItem('auth_token');
         localStorage.removeItem('isAuthenticated');
         localStorage.removeItem('user');
       }
     }
-  }, [authStatus, currentToken]);
+  }, [authStatus, failedToken]);
 
   if (networkError) {
     return (

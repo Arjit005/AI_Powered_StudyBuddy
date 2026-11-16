@@ -90,14 +90,16 @@ class RateLimiter:
             forwarded = request.headers.get("X-Forwarded-For")
             if forwarded:
                 ips = [p.strip() for p in forwarded.split(",") if p.strip()]
-                # Traverse right-to-left: pick the first IP before the trusted proxy hops
+                # Traverse right-to-left: the client IP is the first non-trusted hop.
+                # Stop at the rightmost untrusted hop to prevent header spoofing.
                 for candidate in reversed(ips):
-                    if candidate not in trusted_proxy_set and candidate not in ("127.0.0.1", "::1", "localhost"):
-                        try:
-                            import ipaddress
-                            return str(ipaddress.ip_address(candidate))
-                        except ValueError:
-                            continue
+                    if candidate in trusted_proxy_set or candidate in ("127.0.0.1", "::1", "localhost"):
+                        continue
+                    try:
+                        import ipaddress
+                        return str(ipaddress.ip_address(candidate))
+                    except ValueError:
+                        break
             real_ip = request.headers.get("X-Real-IP")
             if real_ip:
                 try:

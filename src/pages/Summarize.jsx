@@ -9,7 +9,6 @@ import {
   ShieldCheck, 
   Volume2, 
   VolumeX, 
-  Square, 
   Save, 
   Download 
 } from 'lucide-react';
@@ -67,7 +66,11 @@ const Summarize = () => {
                 let errDetail = 'Failed to synthesize summary';
                 try {
                     const errData = await response.json();
-                    errDetail = errData.detail || errDetail;
+                    if (typeof errData?.detail === 'string') {
+                        errDetail = errData.detail;
+                    } else if (errData?.detail) {
+                        errDetail = JSON.stringify(errData.detail);
+                    }
                 } catch (_) {}
                 throw new Error(errDetail);
             }
@@ -96,7 +99,19 @@ const Summarize = () => {
     const handleCopy = async () => {
         if (!summary) return;
         try {
-            await navigator.clipboard.writeText(summary);
+            if (navigator?.clipboard?.writeText) {
+                await navigator.clipboard.writeText(summary);
+            } else {
+                const ta = document.createElement('textarea');
+                ta.value = summary;
+                ta.style.position = 'fixed';
+                ta.style.opacity = '0';
+                document.body.appendChild(ta);
+                ta.focus();
+                ta.select();
+                document.execCommand('copy');
+                document.body.removeChild(ta);
+            }
             setCopied(true);
             if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
             copyTimeoutRef.current = setTimeout(() => setCopied(false), 2000);

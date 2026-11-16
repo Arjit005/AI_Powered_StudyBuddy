@@ -34,8 +34,14 @@ const Flashcards = () => {
     const advanceTimeoutRef = useRef(null);
     const saveTimeoutRef = useRef(null);
     const currentUtteranceRef = useRef(null);
+    const flashcardsGenRef = useRef(0);
+    const deckIdRef = useRef(Date.now());
+    const isFlippedRef = useRef(isFlipped);
+    isFlippedRef.current = isFlipped;
+
     useEffect(() => {
         return () => {
+            flashcardsGenRef.current += 1;
             currentUtteranceRef.current = null;
             if ('speechSynthesis' in window) window.speechSynthesis.cancel();
             if (advanceTimeoutRef.current) clearTimeout(advanceTimeoutRef.current);
@@ -44,7 +50,8 @@ const Flashcards = () => {
     }, []);
 
     const generateFlashcards = async () => {
-        if (!topic.trim() || loading) return;
+        if (!topic.trim() || loading || saving) return;
+        const thisGen = ++flashcardsGenRef.current;
         setLoading(true);
         setIsFlipped(false);
         setSaved(false);
@@ -65,8 +72,10 @@ const Flashcards = () => {
                 headers,
                 body: JSON.stringify({ topic: topic.trim() })
             });
+            if (thisGen !== flashcardsGenRef.current) return;
             if (res.ok) {
                 const data = await res.json();
+                if (thisGen !== flashcardsGenRef.current) return;
                 if (data.flashcards && Array.isArray(data.flashcards) && data.flashcards.length > 0) {
                     const validCards = data.flashcards
                         .filter(c => c && typeof c === 'object')
@@ -77,6 +86,7 @@ const Flashcards = () => {
                         }));
                     if (validCards.length > 0) {
                         if (advanceTimeoutRef.current) clearTimeout(advanceTimeoutRef.current);
+                        deckIdRef.current = Date.now();
                         setCards(validCards);
                         setCurrentCard(0);
                         setMastery({});
@@ -90,10 +100,13 @@ const Flashcards = () => {
                 alert("Failed to generate flashcards. Please try another topic.");
             }
         } catch (err) {
+            if (thisGen !== flashcardsGenRef.current) return;
             console.error(err);
             alert("Network error generating flashcards.");
         } finally {
-            setLoading(false);
+            if (thisGen === flashcardsGenRef.current) {
+                setLoading(false);
+            }
         }
     };
 
@@ -175,6 +188,7 @@ const Flashcards = () => {
             if (!cards || cards.length === 0) alert("Cannot save an empty flashcard deck.");
             return;
         }
+        const savedSnapshotDeckId = deckIdRef.current;
         setSaving(true);
         try {
             const token = localStorage.getItem('auth_token');
@@ -193,12 +207,14 @@ const Flashcards = () => {
                 })
             });
             if (res.ok) {
-                setSaved(true);
-                if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
-                saveTimeoutRef.current = setTimeout(() => {
-                    setSaved(false);
-                    saveTimeoutRef.current = null;
-                }, 3000);
+                if (deckIdRef.current === savedSnapshotDeckId) {
+                    setSaved(true);
+                    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+                    saveTimeoutRef.current = setTimeout(() => {
+                        setSaved(false);
+                        saveTimeoutRef.current = null;
+                    }, 3000);
+                }
             } else {
                 alert("Failed to save flashcards to library.");
             }
@@ -232,11 +248,11 @@ const Flashcards = () => {
 
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [cards, currentCard]);
+    }, [cards, currentCard, nextCard, prevCard, handleRateMastery]);
 
     const activeCardData = cards[currentCard] || { front: '', back: '' };
     const currentRating = mastery[activeCardData.id || currentCard];
-    const masteredCount = Object.values(mastery).filter(r => r === 'mastered').length;
+    const masteredCount = cards.filter(c => mastery[c.id] === 'mastered').length;
 
     return (
         <div className="py-12 min-h-screen">
