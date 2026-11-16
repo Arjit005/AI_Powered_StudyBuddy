@@ -36,8 +36,8 @@ export default function CommandPalette({ isOpen, onClose }) {
     },
     {
       id: 'canvas',
-      title: 'Visual Canvas Studio (MCP)',
-      description: 'Model systems on interactive canvas with Excalidraw export',
+      title: 'Visual Canvas Studio',
+      description: 'Draw flowcharts, mind maps, and interactive concept diagrams',
       icon: Layout,
       category: 'Navigation',
       action: () => navigate('/canvas')
@@ -52,8 +52,8 @@ export default function CommandPalette({ isOpen, onClose }) {
     },
     {
       id: 'maps',
-      title: 'Concept & Architecture Maps',
-      description: 'Generate high-fidelity Mermaid vector diagrams',
+      title: 'Concept Mind Maps',
+      description: 'Generate visual knowledge maps and topic flowcharts',
       icon: Map,
       category: 'Navigation',
       action: () => navigate('/maps')
@@ -69,7 +69,7 @@ export default function CommandPalette({ isOpen, onClose }) {
     {
       id: 'flashcards',
       title: 'Spaced Repetition Flashcards',
-      description: 'Flip cards and track mastery with Anki-style intervals',
+      description: 'Flip cards and track mastery with active recall intervals',
       icon: Layers,
       category: 'Study Tools',
       action: () => navigate('/flashcards')
@@ -77,7 +77,7 @@ export default function CommandPalette({ isOpen, onClose }) {
     {
       id: 'summarize',
       title: 'AI Chapter Summarizer',
-      description: 'Synthesize complex texts with TTS audio speech playback',
+      description: 'Synthesize complex texts with audio speech playback',
       icon: FileText,
       category: 'Study Tools',
       action: () => navigate('/summarize')
@@ -101,7 +101,7 @@ export default function CommandPalette({ isOpen, onClose }) {
     {
       id: 'new_chat',
       title: '+ New Chat Session',
-      description: 'Start a fresh conversation thread with fresh short-term memory',
+      description: 'Start a fresh conversation with your AI Study Tutor',
       icon: Plus,
       category: 'Quick Action',
       action: () => {
@@ -109,12 +109,12 @@ export default function CommandPalette({ isOpen, onClose }) {
       }
     },
     {
-      id: 'mcp_status',
-      title: 'Inspect MCP Server Telemetry',
-      description: 'Check active Model Context Protocol tools and schemas',
-      icon: Cpu,
-      category: 'Developer',
-      action: () => navigate('/canvas')
+      id: 'sources',
+      title: 'Study Materials & Sources',
+      description: 'Upload lecture PDFs, notes, and textbook chapters',
+      icon: BookOpen,
+      category: 'Study Tools',
+      action: () => navigate('/sources')
     }
   ];
 
@@ -218,7 +218,7 @@ export default function CommandPalette({ isOpen, onClose }) {
             aria-activedescendant={filtered[selectedIndex] ? `cmd-option-${filtered[selectedIndex].id}` : undefined}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Type a command, tool name, or search (e.g. Canvas, Quiz, MCP)..."
+            placeholder="Type a command, subject, or tool (e.g. Flashcards, Quiz, Chat)..."
             className="w-full bg-transparent text-white placeholder-slate-400 text-base focus:outline-none"
             aria-label="Command search query"
           />

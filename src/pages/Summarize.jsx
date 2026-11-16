@@ -197,7 +197,7 @@ const Summarize = () => {
                             </div>
                             <textarea
                                 className="w-full h-80 p-4 rounded-2xl glass-input text-sm font-sans placeholder:text-slate-600 resize-none leading-relaxed"
-                                placeholder="Paste or type an academic concept, documentation, or topic... (e.g. ACID Properties in Databases, Microservices vs Monolith)"
+                                placeholder="Paste or type a topic, textbook chapter, or concept... (e.g. Photosynthesis, Supply & Demand, Newton's Laws, Machine Learning Basics)"
                                 value={topic}
                                 maxLength={1000}
                                 onChange={(e) => setTopic(e.target.value)}

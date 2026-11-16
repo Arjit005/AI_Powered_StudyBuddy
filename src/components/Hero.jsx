@@ -113,24 +113,24 @@ const Hero = () => {
                                 <div className="space-y-4">
                                     <div className="flex items-start gap-3">
                                         <span className="text-emerald-400 font-bold">Student:</span>
-                                        <span className="text-slate-300">How does SQLite handle concurrent writes under WAL mode?</span>
+                                        <span className="text-slate-300">How does Photosynthesis work in plants?</span>
                                     </div>
                                     <div className="p-4 rounded-xl bg-slate-950/70 border border-slate-800/80 space-y-2 text-slate-300 leading-relaxed">
                                         <div className="flex items-center gap-2 text-emerald-400 font-semibold mb-1">
                                             <Sparkles className="w-3.5 h-3.5" />
-                                            <span>AI Tutor (Socratic Response):</span>
+                                            <span>AI Tutor (Step-by-Step Explanation):</span>
                                         </div>
                                         <p>
-                                            In <b>Write-Ahead Logging (WAL)</b> mode, SQLite decouples readers from writers:
+                                            Photosynthesis is how green plants convert light energy into chemical energy:
                                         </p>
                                         <ul className="list-disc pl-4 space-y-1 text-slate-400">
-                                            <li>Readers and a writer can usually proceed concurrently, though checkpointing and database locking still apply.</li>
-                                            <li>Changes append to a separate <code className="text-emerald-300 bg-slate-900 px-1 py-0.5 rounded">-wal</code> file instead of the primary database.</li>
-                                            <li>However, WAL still permits <span className="text-amber-400">only one write transaction at a time</span>, coordinated through its WAL write-lock mechanism.</li>
+                                            <li><span className="text-emerald-300 font-semibold">Light Reaction:</span> Chlorophyll absorbs sunlight and splits water molecules (H₂O), releasing oxygen (O₂).</li>
+                                            <li><span className="text-teal-300 font-semibold">Calvin Cycle:</span> Plants capture carbon dioxide (CO₂) to synthesize glucose (sugar) for food.</li>
+                                            <li><span className="text-cyan-300 font-semibold">Key Equation:</span> 6CO₂ + 6H₂O + Sunlight → C₆H₁₂O₆ + 6O₂</li>
                                         </ul>
                                         <div className="pt-2 flex items-center justify-between text-[11px] text-slate-500 font-mono">
-                                            <span>Model: Gemini 2.5 Flash / LiteLLM</span>
-                                            <span className="text-emerald-400">✓ Grounded with local notes</span>
+                                            <span>AI Tutor v2.1</span>
+                                            <span className="text-emerald-400">✓ Grounded with your study notes</span>
                                         </div>
                                     </div>
                                 </div>
@@ -139,13 +139,13 @@ const Hero = () => {
                             {activeTab === 'flashcards' && (
                                 <div className="p-6 rounded-2xl bg-slate-950 border border-emerald-500/30 text-center space-y-3">
                                     <span className="px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-400 text-xs font-mono font-semibold border border-emerald-500/20">
-                                        Active Card 1 of 12 • Leitner Box 3
+                                        Active Card 1 of 12 • Biology Deck
                                     </span>
                                     <h4 className="text-lg font-bold text-white">
-                                        What is the CAP Theorem in Distributed Systems?
+                                        What is the primary function of Mitochondria?
                                     </h4>
                                     <p className="text-slate-400 text-xs">
-                                        It is impossible for a distributed data store to simultaneously provide more than two out of three guarantees: Consistency, Availability, and Partition Tolerance.
+                                        Known as the powerhouse of the cell, mitochondria generate most of the chemical energy (ATP) needed for cellular biochemical reactions.
                                     </p>
                                     <div className="pt-2 flex justify-center gap-3">
                                         <span className="px-2.5 py-1 rounded-lg bg-rose-950/40 text-rose-300 text-xs border border-rose-900/50">1: Hard</span>
@@ -158,15 +158,15 @@ const Hero = () => {
                             {activeTab === 'maps' && (
                                 <div className="p-6 rounded-2xl bg-slate-950 border border-slate-800 text-slate-300 space-y-2">
                                     <div className="flex items-center justify-between text-xs text-slate-400 mb-2">
-                                        <span>Graph Hierarchy: Computer Systems</span>
-                                        <span className="text-teal-400">Directed Acyclic Graph (DAG)</span>
+                                        <span>Concept Map: Cell Biology Hierarchy</span>
+                                        <span className="text-teal-400">Interactive Concept Flow</span>
                                     </div>
                                     <div className="flex flex-wrap gap-2 text-xs">
-                                        <span className="px-3 py-1.5 rounded-lg bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 font-bold">OS Kernel</span>
+                                        <span className="px-3 py-1.5 rounded-lg bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 font-bold">Animal Cell</span>
                                         <span className="px-2 py-1.5 text-slate-500">──&gt;</span>
-                                        <span className="px-3 py-1.5 rounded-lg bg-cyan-500/20 border border-cyan-500/40 text-cyan-300 font-bold">Virtual Memory</span>
+                                        <span className="px-3 py-1.5 rounded-lg bg-cyan-500/20 border border-cyan-500/40 text-cyan-300 font-bold">Nucleus (DNA)</span>
                                         <span className="px-2 py-1.5 text-slate-500">──&gt;</span>
-                                        <span className="px-3 py-1.5 rounded-lg bg-violet-500/20 border border-violet-500/40 text-violet-300 font-bold">Page Faults &amp; TLB</span>
+                                        <span className="px-3 py-1.5 rounded-lg bg-violet-500/20 border border-violet-500/40 text-violet-300 font-bold">Mitochondria (ATP Energy)</span>
                                     </div>
                                 </div>
                             )}

@@ -195,14 +195,26 @@ _dist_dir = os.path.join(_project_root, "dist")
 if not os.path.exists(_dist_dir):
     _dist_dir = os.path.join(os.getcwd(), "dist")
 
+def _get_spa_index_path() -> Optional[str]:
+    candidates = [
+        os.path.join(_dist_dir, "index.html"),
+        os.path.join(os.getcwd(), "dist", "index.html"),
+        os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "dist", "index.html"),
+        os.path.abspath("dist/index.html")
+    ]
+    for c in candidates:
+        if os.path.exists(c) and os.path.isfile(c):
+            return os.path.abspath(c)
+    return None
+
 # ============================================================================
 # ROOT & SYSTEM HEALTH
 # ============================================================================
 @app.get("/")
 def read_root():
     # If compiled production SPA frontend exists in dist, serve index.html directly!
-    index_file = os.path.join(_dist_dir, "index.html")
-    if os.path.exists(index_file):
+    index_file = _get_spa_index_path()
+    if index_file and os.path.exists(index_file):
         from fastapi.responses import FileResponse
         return FileResponse(index_file)
     return {
@@ -1539,8 +1551,8 @@ if os.path.exists(_dist_dir):
 
         if os.path.exists(target_path) and os.path.isfile(target_path):
             return FileResponse(target_path)
-        index_file = os.path.join(resolved_dist, "index.html")
-        if os.path.exists(index_file):
+        index_file = _get_spa_index_path() or os.path.join(resolved_dist, "index.html")
+        if index_file and os.path.exists(index_file):
             return FileResponse(index_file)
         raise HTTPException(status_code=404, detail="SPA index.html not found.")
 

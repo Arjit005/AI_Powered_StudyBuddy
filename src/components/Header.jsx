@@ -98,7 +98,7 @@ const Header = () => {
                                     AI Study Buddy
                                 </span>
                                 <span className="text-[10px] uppercase font-mono tracking-widest text-emerald-500/70 -mt-1">
-                                    Developer Edition
+                                    Student Edition
                                 </span>
                             </div>
                         </Link>
@@ -154,7 +154,7 @@ const Header = () => {
                                         </div>
                                     </div>
                                     <div className="mt-3 pt-2 border-t border-emerald-500/20 flex justify-between items-center text-[11px] font-mono text-emerald-400">
-                                        <span>Status: {securityData?.shield_active ? 'ENFORCING' : (securityData ? 'DEGRADED' : 'UNAVAILABLE')}</span>
+                                        <span>Status: {securityData?.shield_active ? 'Active & Secure' : (securityData ? 'Degraded' : 'Offline')}</span>
                                         <button onClick={() => setSecurityOpen(false)} className="hover:text-white underline">Close</button>
                                     </div>
                                 </div>

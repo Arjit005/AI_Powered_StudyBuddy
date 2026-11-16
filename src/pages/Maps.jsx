@@ -204,7 +204,7 @@ const Maps = () => {
                     {loading && (
                         <div className="flex flex-col items-center justify-center min-h-[400px] gap-3 text-slate-400 font-mono text-xs">
                             <div className="w-8 h-8 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin" />
-                            <span>Designing Subsystem Boundaries & Compiling Vector Flowchart...</span>
+                            <span>Designing concept structure & generating visual flowchart...</span>
                         </div>
                     )}
 
@@ -225,7 +225,7 @@ const Maps = () => {
                             {Array.isArray(diagramData.key_components) && diagramData.key_components.length > 0 && (
                                 <div className="mt-6 pt-6 border-t border-white/5 space-y-3">
                                     <h3 className="text-sm font-bold text-emerald-400 font-mono uppercase tracking-wider flex items-center gap-2">
-                                        <Layers className="w-4 h-4" /> Subsystem Architectural Breakdown
+                                        <Layers className="w-4 h-4" /> Key Topic Breakdown & Concepts
                                     </h3>
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                                         {diagramData.key_components.map((comp, idx) => (

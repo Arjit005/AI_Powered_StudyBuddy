@@ -299,7 +299,7 @@ const Progress = () => {
                                     <Clock className="w-4 h-4 text-emerald-400" />
                                     Recent Study Sessions Log
                                 </h2>
-                                <p className="text-xs text-slate-400 font-mono mt-0.5">Persisted in SQLite database</p>
+                                <p className="text-xs text-slate-400 mt-0.5">Saved to your personal study history</p>
                             </div>
                             <span className="text-xs font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-400">{sessions.length} Logged</span>
                         </div>

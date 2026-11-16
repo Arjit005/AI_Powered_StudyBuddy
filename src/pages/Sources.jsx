@@ -98,7 +98,7 @@ const Sources = () => {
                 await fetchSources();
             } else {
                 const err = await res.json().catch(() => ({}));
-                alert(err.detail || 'Failed to ingest source.');
+                alert(err.detail || 'Failed to save study material.');
             }
         } catch (err) {
             console.error("Upload error:", err);
@@ -143,7 +143,7 @@ const Sources = () => {
     };
 
     const handleDelete = async (id) => {
-        if (!confirm("Are you sure you want to delete this source and its embedded chunks?")) return;
+        if (!confirm("Are you sure you want to delete this study source?")) return;
         try {
             const token = localStorage.getItem('auth_token');
             const headers = {};
@@ -283,7 +283,7 @@ const Sources = () => {
                                             <button
                                                 onClick={() => handleReindex(s.id)}
                                                 className="p-2 rounded-xl bg-slate-900 text-slate-400 hover:text-emerald-400 border border-slate-800 hover:border-emerald-500/40 transition-all"
-                                                title="Re-index Chunks"
+                                                title="Refresh & Re-index Material"
                                             >
                                                 <RefreshCw className="w-3.5 h-3.5" />
                                             </button>
@@ -306,7 +306,7 @@ const Sources = () => {
                 <div className="max-w-2xl mx-auto glass-panel p-8 rounded-2xl border border-emerald-500/30 shadow-2xl">
                     <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
                         <Upload className="w-5 h-5 text-emerald-400" />
-                        Ingest New Study Source
+                        Add New Study Material
                     </h2>
 
                     <div className="flex gap-3 mb-6">

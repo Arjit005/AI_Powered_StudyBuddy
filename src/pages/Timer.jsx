@@ -173,7 +173,7 @@ const StudyTimer = () => {
                     </div>
                 )}
                 <div className="mt-6 text-center text-slate-500 text-xs font-mono">
-                    Completed 25-minute focus intervals are persisted to SQLite database and reflected in your analytics.
+                    Completed 25-minute focus intervals are automatically saved and reflected in your study analytics.
                 </div>
             </div>
         </div>

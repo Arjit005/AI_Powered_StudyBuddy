@@ -239,7 +239,7 @@ const MermaidViewer = ({ chart, title = "Architecture Diagram" }) => {
                 ) : (
                     <div className="flex items-center gap-2 text-xs font-mono text-slate-500">
                         <div className="w-4 h-4 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin" />
-                        <span>Compiling vector diagram...</span>
+                        <span>Rendering diagram...</span>
                     </div>
                 )}
             </div>
@@ -250,7 +250,7 @@ const MermaidViewer = ({ chart, title = "Architecture Diagram" }) => {
                     ref={modalRef}
                     role="dialog"
                     aria-modal="true"
-                    aria-label={`${title} Fullscreen Inspection`}
+                    aria-label={`${title} Fullscreen View`}
                     tabIndex={-1}
                     className="fixed inset-0 z-50 bg-black/95 backdrop-blur-md flex flex-col p-6 animate-in fade-in duration-200"
                     onClick={() => setIsFullscreen(false)}
@@ -263,7 +263,7 @@ const MermaidViewer = ({ chart, title = "Architecture Diagram" }) => {
                 >
                     <div className="flex justify-between items-center pb-4 border-b border-white/10" onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center gap-2">
-                            <span className="text-sm font-bold text-white font-mono">{title} - Fullscreen Inspection</span>
+                            <span className="text-sm font-bold text-white font-mono">{title} - Fullscreen View</span>
                         </div>
                         <button
                             onClick={() => setIsFullscreen(false)}
@@ -289,7 +289,7 @@ const MermaidViewer = ({ chart, title = "Architecture Diagram" }) => {
                         ) : (!chart || !chart.trim()) ? (
                             <div className="text-slate-400 font-mono text-sm">No diagram code provided.</div>
                         ) : (
-                            <div className="text-slate-400 font-mono text-sm animate-pulse">Compiling vector diagram...</div>
+                            <div className="text-slate-400 font-mono text-sm animate-pulse">Rendering diagram...</div>
                         )}
                     </div>
                 </div>

@@ -44,7 +44,7 @@ const LoginPage = () => {
                 throw new Error(data.detail || 'Google sign-in failed');
             }
             if (!data.access_token || !data.user) {
-                throw new Error('Authentication response is missing required credentials.');
+                throw new Error('Sign in failed. Please try again.');
             }
             localStorage.setItem('isAuthenticated', 'true');
             localStorage.setItem('auth_token', data.access_token);
@@ -53,9 +53,9 @@ const LoginPage = () => {
         } catch (err) {
             console.error("Google auth error:", err);
             if (err.code === 'auth/unauthorized-domain' || err.message?.includes('unauthorized-domain')) {
-                setError(`Domain Authorization Required: Please add '${window.location.hostname}' to Authorized Domains in Firebase Console (Authentication > Settings > Authorized domains). Or use the Username & Password form below to sign in immediately.`);
+                setError("Google Sign-In is not configured for this web domain yet. Please sign in with your email and password below.");
             } else {
-                setError(err.message || 'Google sign-in encountered an error.');
+                setError(err.message || 'Google sign-in encountered an error. Please use email sign-in.');
             }
         } finally {
             setIsGoogleLoading(false);
@@ -99,7 +99,7 @@ const LoginPage = () => {
             }
 
             if (!data.access_token || !data.user) {
-                throw new Error('Authentication response is missing required credentials.');
+                throw new Error('Sign in failed. Please try again.');
             }
 
             localStorage.setItem('isAuthenticated', 'true');
@@ -107,7 +107,7 @@ const LoginPage = () => {
             localStorage.setItem('user', JSON.stringify(data.user));
             navigate('/');
         } catch (err) {
-            setError(err.message || 'Login failed. Please check credentials.');
+            setError(err.message || 'Login failed. Please check your username/email and password.');
         } finally {
             setIsLoading(false);
         }

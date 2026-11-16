@@ -737,8 +737,8 @@ const ChatInterface = () => {
                                     <Brain className="w-5 h-5" />
                                 </div>
                                 <div>
-                                    <h3 className="text-base font-bold text-white">Hybrid Memory Architecture</h3>
-                                    <p className="text-xs text-slate-400 font-mono">Cognitive Memory Engine Telemetry</p>
+                                    <h3 className="text-base font-bold text-white">Smart Study Memory</h3>
+                                    <p className="text-xs text-slate-400">How your AI Tutor remembers your sessions</p>
                                 </div>
                             </div>
                             <button
@@ -754,12 +754,12 @@ const ChatInterface = () => {
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-2">
                                     <Cpu className="w-4 h-4 text-emerald-400" />
-                                    <span className="text-xs font-bold text-emerald-300 font-mono uppercase">Tier 1: Short-Term Working Buffer</span>
+                                    <span className="text-xs font-bold text-emerald-300 uppercase">Active Conversation Memory</span>
                                 </div>
                                 <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 font-bold">ACTIVE</span>
                             </div>
                             <p className="text-xs text-slate-300 leading-relaxed">
-                                Retains the last <strong>8 conversation turns</strong> verbatim to guarantee immediate conversational coherence, variable bindings, and detailed code-snippet context.
+                                Remembers your recent questions and answers so you can have natural, uninterrupted follow-up discussions.
                             </p>
                         </div>
 
@@ -768,12 +768,12 @@ const ChatInterface = () => {
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-2">
                                     <Layers className="w-4 h-4 text-teal-400" />
-                                    <span className="text-xs font-bold text-teal-300 font-mono uppercase">Tier 2: Episodic Long-Term Memory</span>
+                                    <span className="text-xs font-bold text-teal-300 uppercase">Long-Term Study Highlights</span>
                                 </div>
-                                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-teal-500/20 text-teal-400 font-bold">COMPACTOR</span>
+                                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-teal-500/20 text-teal-400 font-bold">SUMMARY</span>
                             </div>
                             <p className="text-xs text-slate-300 leading-relaxed">
-                                When a session extends beyond working capacity, older turns are distilled into rolling executive concept bullet points, eliminating context limits while permanently preserving learned insights.
+                                Key concepts and definitions from earlier in your study session are summarized and remembered, so no important insight is lost.
                             </p>
                             {activeConv && activeConv.long_term_summary ? (
                                 <div className="mt-3 p-3 rounded-xl bg-slate-950 border border-slate-800 text-[11px] font-mono text-slate-300 whitespace-pre-wrap max-h-36 overflow-y-auto">
@@ -781,7 +781,7 @@ const ChatInterface = () => {
                                 </div>
                             ) : (
                                 <div className="text-[11px] font-mono text-slate-500 pt-1">
-                                    Status: Awaiting session depth (&gt;10 turns) to trigger automatic consolidation.
+                                    Status: Will automatically summarize key study points as your session progresses.
                                 </div>
                             )}
                         </div>

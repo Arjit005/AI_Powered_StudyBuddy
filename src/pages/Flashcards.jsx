@@ -29,11 +29,11 @@ const Flashcards = () => {
     const [mastery, setMastery] = useState({});
 
     const [cards, setCards] = useState([
-        { id: 1, front: "What is an Index in Relational Databases?", back: "A data structure (usually B-Tree or Hash) that improves the speed of data retrieval operations on a database table at the cost of additional storage and slower writes." },
-        { id: 2, front: "Explain CAP Theorem in Distributed Systems", back: "In any asynchronous network partition, a distributed system can guarantee at most two of: Consistency, Availability, and Partition Tolerance." },
-        { id: 3, front: "What is the difference between Synchronous and Asynchronous execution?", back: "Synchronous blocking waits for tasks to finish sequentially; Asynchronous non-blocking continues executing subsequent operations while I/O tasks resolve via event loops." },
-        { id: 4, front: "What is Idempotency in HTTP APIs?", back: "An HTTP method is idempotent if the side-effects of making N identical requests is the same as making a single request (e.g. GET, PUT, DELETE are idempotent; POST is not)." },
-        { id: 5, front: "What is Connection Pooling?", back: "A caching technique where a pool of open database connections is kept alive and reused across requests to avoid the latency of TCP 3-way handshake and SSL negotiation on every query." }
+        { id: 1, front: "What is Photosynthesis?", back: "The biochemical process by which plants and other organisms convert sunlight, water, and carbon dioxide into oxygen and energy-rich glucose." },
+        { id: 2, front: "State Newton's Third Law of Motion", back: "For every action, there is an equal and opposite reaction. When one body exerts a force on a second body, the second body exerts a force equal in magnitude and opposite in direction." },
+        { id: 3, front: "What is Binary Search and its time complexity?", back: "An efficient search algorithm that finds an element in a sorted list by repeatedly dividing the search space in half. Its time complexity is O(log n)." },
+        { id: 4, front: "What is the difference between an Acid and a Base?", back: "Acids have a pH less than 7 and donate protons (H+ ions); Bases have a pH greater than 7 and accept protons or release hydroxide ions (OH-)." },
+        { id: 5, front: "What is Opportunity Cost in Economics?", back: "The value of the next best alternative that is forgone when making a choice between mutually exclusive options." }
     ]);
 
     // Audio Speech Synthesis & timeout cleanup

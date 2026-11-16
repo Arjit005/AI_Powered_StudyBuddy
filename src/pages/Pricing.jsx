@@ -9,13 +9,13 @@ const Pricing = () => {
                 <div className="text-center mb-16">
                     <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-mono text-xs mb-3">
                         <Sparkles className="w-3.5 h-3.5" />
-                        <span>Academic & Developer Plans</span>
+                        <span>Simple Student Plans</span>
                     </div>
                     <h1 className="text-4xl font-extrabold text-white mb-3 tracking-tight">
                         Simple, Transparent Learning Tiers
                     </h1>
                     <p className="text-slate-400 text-sm max-w-lg mx-auto">
-                        Empower your study workflow with MCP tooling, unlimited canvas modeling, and persistent hybrid memory.
+                        Supercharge your learning with unlimited AI tutoring, smart study materials, and interactive visual tools.
                     </p>
                 </div>
 
@@ -45,8 +45,8 @@ const Pricing = () => {
                             POPULAR
                         </div>
                         <div>
-                            <h3 className="text-xl font-bold text-white mb-1">Pro Engineer</h3>
-                            <p className="text-emerald-400/90 text-xs mb-6">Full MCP capability & canvas modeling.</p>
+                            <h3 className="text-xl font-bold text-white mb-1">Pro Scholar</h3>
+                            <p className="text-emerald-400/90 text-xs mb-6">Unlimited AI tutoring & visual learning.</p>
                             <div className="text-4xl font-extrabold text-white mb-6">$9<span className="text-sm font-normal text-slate-400">/mo</span></div>
                             <Link 
                                 to="/chat" 
@@ -56,13 +56,13 @@ const Pricing = () => {
                             </Link>
                             <ul className="space-y-3.5 text-xs text-slate-200">
                                 {[
-                                    'Unlimited AI Tutor with Hybrid Memory',
-                                    'Visual Canvas Studio with Excalidraw Export',
-                                    'Model Context Protocol (MCP) STDIO Hub',
-                                    'Unlimited Study Library & Notes Persistence',
-                                    'Instant High-Detail Mermaid Diagrams',
-                                    'Spaced-Repetition Leitner Flashcards',
-                                    'Priority Multi-Model Inference Failover'
+                                    'Unlimited AI Tutor with smart session memory',
+                                    'Visual Canvas Studio & Mind Maps',
+                                    'Desktop & Note-Taking Integrations',
+                                    'Unlimited Study Library & Saved Notes',
+                                    'Instant Visual Flowcharts & Diagrams',
+                                    'Interactive 3D Spaced-Repetition Flashcards',
+                                    'Priority Fast AI Response Time'
                                 ].map(feat => (
                                     <li key={feat} className="flex items-center gap-2.5">
                                         <Check className="w-4 h-4 text-emerald-400 shrink-0" /> {feat}
@@ -76,7 +76,7 @@ const Pricing = () => {
                     <div className="glass-panel p-8 rounded-3xl border border-white/10 hover:border-emerald-500/30 transition-all flex flex-col justify-between">
                         <div>
                             <h3 className="text-xl font-bold text-white mb-1">Study Cohort</h3>
-                            <p className="text-slate-400 text-xs mb-6">Designed for university labs & teams.</p>
+                            <p className="text-slate-400 text-xs mb-6">Designed for study groups & classrooms.</p>
                             <div className="text-4xl font-extrabold text-white mb-6">$29<span className="text-sm font-normal text-slate-400">/mo</span></div>
                             <a 
                                 href="mailto:support@studybuddy.ai?subject=Inquiry%20about%20Study%20Cohort%20Plan" 
@@ -88,9 +88,9 @@ const Pricing = () => {
                                 {[
                                     'Up to 10 Team Members',
                                     'Shared Study Library & Decks',
-                                    'Collaborative Architecture Modeling',
+                                    'Collaborative Study Sessions',
                                     'Centralized Analytics Dashboard',
-                                    'Custom MCP Endpoint Connectors'
+                                    'Custom Study Group Integrations'
                                 ].map(feat => (
                                     <li key={feat} className="flex items-center gap-2.5">
                                         <Check className="w-4 h-4 text-emerald-400 shrink-0" /> {feat}

@@ -564,9 +564,9 @@ export default function CanvasStudio() {
               {telemetry.execution_time_ms}ms
             </span>
             <span>•</span>
-            <span>{telemetry.node_count} Nodes</span>
+            <span>{telemetry.node_count} Concepts</span>
             <span>•</span>
-            <span>{telemetry.edge_count} Connectors</span>
+            <span>{telemetry.edge_count} Connections</span>
           </div>
         )}
 
@@ -586,9 +586,9 @@ export default function CanvasStudio() {
           {loading ? (
             <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/60 backdrop-blur-sm z-30">
               <div className="p-4 rounded-2xl glass-panel-glow flex flex-col items-center gap-3 border border-emerald-500/30">
-                <Cpu className="w-8 h-8 text-emerald-400 animate-spin" />
-                <div className="text-sm font-semibold text-white">Model Context Protocol Engine Running...</div>
-                <div className="text-xs text-slate-400 font-mono">Executing tool: generate_canvas_diagram</div>
+                <Sparkles className="w-8 h-8 text-emerald-400 animate-pulse" />
+                <div className="text-sm font-semibold text-white">Generating Study Diagram...</div>
+                <div className="text-xs text-slate-400">Organizing concepts, relationships & visual layout</div>
               </div>
             </div>
           ) : null}
@@ -682,7 +682,7 @@ export default function CanvasStudio() {
 
             <div className="space-y-3">
               <div>
-                <label className="text-[10px] uppercase font-mono text-slate-400">Node Title</label>
+                <label className="text-[10px] uppercase font-mono text-slate-400">Concept Name</label>
                 <div className="text-sm font-bold text-white mt-0.5">{selectedNode.label}</div>
                 {selectedNode.subtitle && (
                   <div className="text-xs text-emerald-400">{selectedNode.subtitle}</div>
@@ -690,7 +690,7 @@ export default function CanvasStudio() {
               </div>
 
               <div>
-                <label className="text-[10px] uppercase font-mono text-slate-400">Subsystem Category</label>
+                <label className="text-[10px] uppercase font-mono text-slate-400">Category</label>
                 <div className="mt-1">
                   <span className="px-2 py-0.5 rounded text-xs font-mono uppercase bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
                     {selectedNode.category || 'Standard'}
@@ -699,17 +699,17 @@ export default function CanvasStudio() {
               </div>
 
               <div>
-                <label className="text-[10px] uppercase font-mono text-slate-400">Role & Functionality</label>
+                <label className="text-[10px] uppercase font-mono text-slate-400">Concept Summary</label>
                 <div className="text-xs text-slate-300 mt-1 leading-relaxed bg-slate-900/60 p-3 rounded-xl border border-white/5">
-                  {selectedNode.details || "Component handles communication and business logic validation."}
+                  {selectedNode.details || "Key concept in this study diagram."}
                 </div>
               </div>
 
               <div className="pt-2">
-                <label className="text-[10px] uppercase font-mono text-slate-400">Component Health</label>
+                <label className="text-[10px] uppercase font-mono text-slate-400">Concept Status</label>
                 <div className="flex items-center gap-2 mt-1 text-xs text-slate-300 bg-slate-900/60 p-2.5 rounded-xl border border-white/5">
                   <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                  <span>Verified & Interactive Component</span>
+                  <span>Active & Explorable Concept</span>
                 </div>
               </div>
             </div>
@@ -727,8 +727,8 @@ export default function CanvasStudio() {
                   <Terminal className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="font-bold text-white text-base">Model Context Protocol (MCP) Hub</h3>
-                  <p className="text-xs text-slate-400">Connect Claude Desktop, Cursor, or Canvas tools to Study Buddy</p>
+                  <h3 className="font-bold text-white text-base">Study Tools & App Integrations</h3>
+                  <p className="text-xs text-slate-400">Connect note-taking apps and visual tools to Study Buddy</p>
                 </div>
               </div>
               <button onClick={() => setShowMcpModal(false)} className="p-1 rounded-lg hover:bg-white/10 text-slate-400 hover:text-white">
@@ -739,19 +739,19 @@ export default function CanvasStudio() {
             <div className="space-y-4 text-xs">
               <div className="p-3 rounded-xl bg-slate-900/80 border border-white/10">
                 <div className="flex items-center justify-between text-slate-300 font-medium mb-1">
-                  <span>Server Status</span>
+                  <span>Connection Status</span>
                   <span className={`${mcpConfig?.server_status === 'offline' ? 'text-amber-400' : 'text-emerald-400'} font-mono`}>
-                    ● {mcpConfig?.server_status || 'ONLINE (JSON-RPC 2.0)'}
+                    ● Connected & Ready
                   </span>
                 </div>
                 <div className="text-slate-400 text-[11px]">
-                  HTTP Endpoint: <code className="text-emerald-300">{mcpConfig?.endpoint || (typeof window !== 'undefined' ? `${window.location.origin}/api/mcp` : 'http://127.0.0.1:8000/api/mcp')}</code>
+                  Connection Address: <code className="text-emerald-300">{mcpConfig?.endpoint || (typeof window !== 'undefined' ? `${window.location.origin}/api/mcp` : 'http://127.0.0.1:8000/api/mcp')}</code>
                 </div>
               </div>
 
               <div>
                 <label className="text-slate-300 font-medium block mb-1.5">
-                  Claude Desktop Config (<code className="text-slate-400">claude_desktop_config.json</code>)
+                  Desktop App Integration (<code className="text-slate-400">study_buddy_config.json</code>)
                 </label>
                 <pre className="p-3 rounded-xl bg-slate-950 font-mono text-[11px] text-emerald-300 border border-white/10 overflow-x-auto">
                   {JSON.stringify(mcpConfig?.claude_desktop_config || {
@@ -766,7 +766,7 @@ export default function CanvasStudio() {
               </div>
 
               <div className="text-slate-400 text-[11px] leading-relaxed">
-                💡 <b>How it works:</b> Any MCP-compliant client or visual canvas can invoke <code className="text-emerald-300">generate_canvas_diagram</code> or <code className="text-emerald-300">query_study_memory</code> to auto-render architectural models and query student notes.
+                💡 <b>How it works:</b> Connect your external note-taking tools, desktop editors, or whiteboard canvas to Study Buddy to automatically sync diagrams and query your study materials.
               </div>
             </div>
 

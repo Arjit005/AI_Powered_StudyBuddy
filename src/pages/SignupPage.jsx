@@ -36,7 +36,7 @@ const SignupPage = () => {
                 throw new Error(data.detail || 'Google sign-up failed');
             }
             if (!data.access_token || !data.user) {
-                throw new Error('Authentication response is missing required credentials.');
+                throw new Error('Account setup failed. Please try again.');
             }
             localStorage.setItem('isAuthenticated', 'true');
             localStorage.setItem('auth_token', data.access_token);
@@ -45,9 +45,9 @@ const SignupPage = () => {
         } catch (err) {
             console.error("Google auth error:", err);
             if (err.code === 'auth/unauthorized-domain' || err.message?.includes('unauthorized-domain')) {
-                setError(`Domain Authorization Required: Please add '${window.location.hostname}' to Authorized Domains in Firebase Console (Authentication > Settings > Authorized domains). Or use the Email & Password form below to sign up immediately.`);
+                setError("Google Sign-Up is not configured for this web domain yet. Please use the form below to create your account.");
             } else {
-                setError(err.message || 'Google sign-up encountered an error.');
+                setError(err.message || 'Google sign-up encountered an error. Please use email sign-up.');
             }
         } finally {
             setIsGoogleLoading(false);
@@ -131,7 +131,7 @@ const SignupPage = () => {
             }
 
             if (!data.access_token || !data.user) {
-                throw new Error('Authentication response is missing required credentials.');
+                throw new Error('Account setup failed. Please try again.');
             }
 
             localStorage.setItem('isAuthenticated', 'true');
