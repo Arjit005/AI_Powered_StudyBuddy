@@ -207,7 +207,7 @@ const SignupPage = () => {
 
                     <div className="relative flex items-center justify-center mb-5">
                         <div className="border-t border-slate-800 w-full" />
-                        <span className="bg-[#0b0f17] px-3 text-[11px] font-mono text-slate-500 uppercase">Or register manually</span>
+                        <span className="bg-[#0b0f17] px-3 text-[11px] font-mono text-slate-500 uppercase">Or sign up with email</span>
                         <div className="border-t border-slate-800 w-full" />
                     </div>
 
@@ -329,7 +329,7 @@ const SignupPage = () => {
                                 <div className="w-5 h-5 border-2 border-slate-950 border-t-transparent rounded-full animate-spin" />
                             ) : (
                                 <>
-                                    <span>Create Secure Account</span>
+                                    <span>Create Account</span>
                                     <ArrowRight className="w-4 h-4" />
                                 </>
                             )}
