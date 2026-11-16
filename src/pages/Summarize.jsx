@@ -21,6 +21,7 @@ const Summarize = () => {
     const [isLoading, setIsLoading] = useState(false);
     const [copied, setCopied] = useState(false);
     const [saved, setSaved] = useState(false);
+    const [isSaving, setIsSaving] = useState(false);
     const [error, setError] = useState('');
     const [isSpeaking, setIsSpeaking] = useState(false);
 
@@ -68,6 +69,9 @@ const Summarize = () => {
 
             const data = await response.json();
             if (thisGen !== summarizeGenRef.current) return;
+            if (!data || typeof data.summary !== 'string' || !data.summary.trim()) {
+                throw new Error('Received an invalid or empty summary from AI service.');
+            }
             setSummary(data.summary);
             setSummaryTopic(topic.trim());
         } catch (err) {
@@ -117,8 +121,9 @@ const Summarize = () => {
 
     // Save to Library
     const handleSaveToLibrary = async () => {
-        if (!summary) return;
+        if (!summary || isSaving) return;
         const activeTopic = summaryTopic || topic;
+        setIsSaving(true);
         try {
             const token = localStorage.getItem('auth_token');
             const headers = { 'Content-Type': 'application/json' };
@@ -144,6 +149,8 @@ const Summarize = () => {
         } catch (err) {
             console.error("Save error:", err);
             alert("Network error saving summary.");
+        } finally {
+            setIsSaving(false);
         }
     };
 
@@ -253,11 +260,12 @@ const Summarize = () => {
                                         {/* Save to Library */}
                                         <button
                                             onClick={handleSaveToLibrary}
-                                            className="p-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-300 hover:text-emerald-400 text-xs flex items-center gap-1 font-mono"
+                                            disabled={isSaving}
+                                            className="p-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-300 hover:text-emerald-400 text-xs flex items-center gap-1 font-mono disabled:opacity-50"
                                             title="Save to Personal Study Library"
                                         >
                                             {saved ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Save className="w-3.5 h-3.5" />}
-                                            <span>{saved ? 'Saved!' : 'Save'}</span>
+                                            <span>{isSaving ? 'Saving...' : (saved ? 'Saved!' : 'Save')}</span>
                                         </button>
 
                                         {/* Download Markdown */}

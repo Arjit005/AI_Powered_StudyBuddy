@@ -97,10 +97,19 @@ class RateLimiter:
         if trust_proxy and is_trusted_peer:
             forwarded = request.headers.get("X-Forwarded-For")
             if forwarded:
-                return forwarded.split(",")[0].strip()
+                raw_ip = forwarded.split(",")[0].strip()
+                try:
+                    import ipaddress
+                    return str(ipaddress.ip_address(raw_ip))
+                except ValueError:
+                    pass
             real_ip = request.headers.get("X-Real-IP")
             if real_ip:
-                return real_ip.strip()
+                try:
+                    import ipaddress
+                    return str(ipaddress.ip_address(real_ip.strip()))
+                except ValueError:
+                    pass
         return immediate_host
 
     def check_rate_limit(self, request: Request, category: str, max_requests: int, window_seconds: int):

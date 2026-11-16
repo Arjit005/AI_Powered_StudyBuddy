@@ -431,6 +431,7 @@ class AIService:
         if GEMINI_API_KEY and circuit_breaker.is_available("gemini"):
             try:
                 valid_models = AIService._get_valid_models()
+                gemini_succeeded = False
                 for model_name in valid_models:
                     try:
                         model = genai.GenerativeModel(model_name)
@@ -439,11 +440,13 @@ class AIService:
                             if chunk.text:
                                 yield sanitize_output(chunk.text)
                         circuit_breaker.record_success("gemini")
+                        gemini_succeeded = True
                         return
                     except Exception as me:
-                        circuit_breaker.record_failure("gemini")
                         print(f"Gemini Stream model {model_name} failed: {me}")
                         continue
+                if not gemini_succeeded:
+                    circuit_breaker.record_failure("gemini")
             except Exception as ge:
                 circuit_breaker.record_failure("gemini")
                 print(f"Gemini Streaming error: {ge}")
@@ -464,11 +467,12 @@ class AIService:
         try:
             memory_sections = []
             
-            # Tier 2: Episodic Long-Term Summary (Concepts mastered, prior discussions)
+            # Tier 2: Episodic Long-Term Summary (Concepts mastered, prior discussions - Untrusted Data)
             if long_term_summary and long_term_summary.strip():
+                clean_summary = re.sub(r'```', "'''", long_term_summary.strip())
                 memory_sections.append(
-                    f"--- TIER 2: LONG-TERM EPISODIC MEMORY (Prior Session Key Insights & Student Profile) ---\n"
-                    f"{long_term_summary.strip()}\n"
+                    f"--- TIER 2: LONG-TERM EPISODIC MEMORY (Prior Session Key Insights - Untrusted Data) ---\n"
+                    f"<untrusted_student_summary>\n{clean_summary}\n</untrusted_student_summary>\n"
                 )
 
             # Tier 1: Short-Term Working Buffer (Recent exact back-and-forth turns, safely delimited)
@@ -483,7 +487,7 @@ class AIService:
             memory_block = "\n".join(memory_sections)
             if memory_block:
                 full_prompt = (
-                    f"You are the AI Study Buddy (Developer Edition) — a patient, technically precise, and encouraging tutor.\n"
+                    f"You are the AI Study Buddy — a patient, clear, and encouraging academic tutor.\n"
                     f"Maintain consistency with the student's learning history provided in the Hybrid Memory below.\n\n"
                     f"{memory_block}\n"
                     f"--- CURRENT QUERY ---\n"
@@ -492,7 +496,7 @@ class AIService:
                 )
             else:
                 full_prompt = (
-                    f"You are the AI Study Buddy (Developer Edition) — a patient, technically precise, and encouraging tutor.\n"
+                    f"You are the AI Study Buddy — a patient, clear, and encouraging academic tutor.\n"
                     f"Student: {prompt}\n"
                     f"AI Tutor:"
                 )

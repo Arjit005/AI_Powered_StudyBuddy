@@ -148,6 +148,12 @@ const FeedbackWidget = () => {
                                 ></textarea>
                             </div>
 
+                            {submitError && (
+                                <div className="p-2.5 rounded-xl bg-rose-950/60 border border-rose-800/60 text-rose-300 text-[11px] leading-tight">
+                                    {submitError}
+                                </div>
+                            )}
+
                             <button
                                 type="submit"
                                 disabled={submitting}

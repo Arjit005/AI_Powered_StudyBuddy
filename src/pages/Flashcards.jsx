@@ -1,18 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import FlipCard3D from '../components/ui/FlipCard3D';
 import { 
-  FlipHorizontal, 
   ChevronLeft, 
   ChevronRight, 
   Sparkles, 
   BookOpen, 
-  RotateCcw, 
-  Volume2, 
-  VolumeX, 
   Save, 
   Check, 
-  Award, 
-  CheckCircle, 
   Flame 
 } from 'lucide-react';
 

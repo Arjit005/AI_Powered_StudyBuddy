@@ -298,12 +298,17 @@ class RAGService:
         # Generate genuine neural embeddings via EmbeddingService in batch
         try:
             batch_embeddings = EmbeddingService.embed_batch(chunks_data, task_type="retrieval_document")
+            if not isinstance(batch_embeddings, list) or len(batch_embeddings) != len(chunks_data):
+                raise ValueError("Mismatch in returned batch embedding count.")
         except Exception as e:
             print(f"EmbeddingService Warning (falling back to deterministic projection): {e}")
             batch_embeddings = [RAGService._compute_semantic_embedding(t, dim=1536) for t in chunks_data]
 
         for idx, text in enumerate(chunks_data):
-            embedding_1536 = batch_embeddings[idx]
+            emb = batch_embeddings[idx] if idx < len(batch_embeddings) else None
+            if not emb or not isinstance(emb, list) or len(emb) < 64:
+                emb = RAGService._compute_semantic_embedding(text, dim=1536)
+            embedding_1536 = emb
             token_count = len(text.split())
 
             chunk = SourceChunk(
@@ -550,6 +555,13 @@ class RAGService:
                             (user_id and (meta_user == str(user_id) or meta_user == "global")) or
                             (not user_id and meta_user in ("global", None))
                         )
+                        if source_ids and src_id:
+                            try:
+                                if int(src_id) not in source_ids:
+                                    is_allowed = False
+                            except (ValueError, TypeError):
+                                is_allowed = False
+
                         if is_allowed:
                             mock_chunk = SourceChunk(
                                 source_id=int(src_id) if src_id else 0,

@@ -305,12 +305,16 @@ export default function CanvasStudio() {
     
     // Construct complete standalone SVG with both nodes and connectors
     const nodesSvg = canvasData.nodes.map(n => {
-      const x = n.x || 100;
-      const y = n.y || 100;
-      const w = 180;
-      const h = 75;
-      const label = (n.label || 'Node').replace(/[<>&"]/g, '');
-      const sub = (n.subtitle || '').replace(/[<>&"]/g, '');
+      const rawX = Number(n.x);
+      const rawY = Number(n.y);
+      const rawW = Number(n.width);
+      const rawH = Number(n.height);
+      const x = Number.isFinite(rawX) ? rawX : 100;
+      const y = Number.isFinite(rawY) ? rawY : 100;
+      const w = Number.isFinite(rawW) && rawW > 0 ? rawW : 190;
+      const h = Number.isFinite(rawH) && rawH > 0 ? rawH : 85;
+      const label = String(n.label || 'Node').replace(/[<>&"]/g, '');
+      const sub = String(n.subtitle || '').replace(/[<>&"]/g, '');
       return `
         <g transform="translate(${x}, ${y})">
           <rect width="${w}" height="${h}" rx="12" fill="#0f172a" stroke="#10b981" stroke-width="2" />
@@ -741,7 +745,7 @@ export default function CanvasStudio() {
                 <div className="flex items-center justify-between text-slate-300 font-medium mb-1">
                   <span>Connection Status</span>
                   <span className={`${mcpConfig?.server_status === 'offline' ? 'text-amber-400' : 'text-emerald-400'} font-mono`}>
-                    ● Connected & Ready
+                    ● {mcpConfig?.server_status === 'offline' ? 'Offline' : (mcpConfig ? 'Connected & Ready' : 'Connecting...')}
                   </span>
                 </div>
                 <div className="text-slate-400 text-[11px]">

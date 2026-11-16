@@ -1,4 +1,5 @@
 import json
+import re
 from typing import Dict, Any, List, Optional
 from backend.ai_service import AIService
 from backend.database import SessionLocal

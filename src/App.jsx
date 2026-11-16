@@ -39,22 +39,36 @@ const isTokenValid = (token) => {
 
 // Protected Route Component checking token presence, structure, and server verification (Fails Closed)
 const ProtectedRoute = ({ children }) => {
-  const token = localStorage.getItem('auth_token');
+  const [currentToken, setCurrentToken] = useState(() => localStorage.getItem('auth_token'));
   const [authStatus, setAuthStatus] = useState(() => {
-    if (!token || !isTokenValid(token)) return 'unauthorized';
+    if (!currentToken || !isTokenValid(currentToken)) return 'unauthorized';
     return 'checking';
   });
 
   useEffect(() => {
+    const handleAuthChange = () => {
+      const freshToken = localStorage.getItem('auth_token');
+      setCurrentToken(freshToken);
+    };
+    window.addEventListener('storage', handleAuthChange);
+    window.addEventListener('auth-change', handleAuthChange);
+    return () => {
+      window.removeEventListener('storage', handleAuthChange);
+      window.removeEventListener('auth-change', handleAuthChange);
+    };
+  }, []);
+
+  useEffect(() => {
     let isMounted = true;
-    if (!token || !isTokenValid(token)) {
+    if (!currentToken || !isTokenValid(currentToken)) {
       setAuthStatus('unauthorized');
       return;
     }
+    setAuthStatus('checking');
 
     // Cryptographic validation against server session endpoint
     fetch('/api/auth/me', {
-      headers: { 'Authorization': `Bearer ${token}` }
+      headers: { 'Authorization': `Bearer ${currentToken}` }
     })
       .then(res => {
         if (!isMounted) return;
@@ -74,7 +88,7 @@ const ProtectedRoute = ({ children }) => {
     return () => {
       isMounted = false;
     };
-  }, [token]);
+  }, [currentToken]);
 
   // Clean up credentials inside an effect when unauthorized, never during render
   useEffect(() => {

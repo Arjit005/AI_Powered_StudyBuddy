@@ -79,6 +79,8 @@ const Voice = () => {
                 setIsListening(true);
             } catch (err) {
                 console.error('Failed to start speech recognition:', err);
+                setIsListening(false);
+                setAiResponse('⚠️ Microphone capture could not be started. Please check microphone permissions and try again.');
             }
         }
     };
@@ -145,8 +147,8 @@ const Voice = () => {
             const cleanText = aiResponse.replace(/[#*`_\[\]()]/g, '');
             const utterance = new SpeechSynthesisUtterance(cleanText);
             utterance.rate = 1.0;
-            utterance.onend = () => setIsSpeaking(false);
-            utterance.onerror = () => setIsSpeaking(false);
+            utterance.onend = () => { if (isMountedRef.current) setIsSpeaking(false); };
+            utterance.onerror = () => { if (isMountedRef.current) setIsSpeaking(false); };
             window.speechSynthesis.speak(utterance);
             setIsSpeaking(true);
         }

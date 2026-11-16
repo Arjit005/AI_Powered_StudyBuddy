@@ -11,14 +11,13 @@ from . import models, database
 # Require JWT_SECRET_KEY in production / runtime; do not silently use insecure fallback
 SECRET_KEY = os.getenv('JWT_SECRET_KEY')
 if not SECRET_KEY:
-    if os.getenv('ENVIRONMENT', 'development').lower() == 'production':
+    if os.getenv('ENVIRONMENT', '').lower() == 'development':
+        SECRET_KEY = 'dev-insecure-study-buddy-secret-key-change-in-production'
+    else:
         raise RuntimeError(
-            "CRITICAL SECURITY CONFIGURATION ERROR: JWT_SECRET_KEY environment variable is missing in production. "
+            "CRITICAL SECURITY CONFIGURATION ERROR: JWT_SECRET_KEY environment variable is required outside development. "
             "Server startup halted to prevent token forgery."
         )
-    else:
-        # Development warning only
-        SECRET_KEY = 'dev-insecure-study-buddy-secret-key-change-in-production'
 ALGORITHM = 'HS256'
 ACCESS_TOKEN_EXPIRE_DAYS = 7
 

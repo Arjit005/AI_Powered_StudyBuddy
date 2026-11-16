@@ -10,15 +10,24 @@ const sanitizeSvg = (svgStr) => {
     try {
         const parser = new DOMParser();
         const doc = parser.parseFromString(svgStr, 'image/svg+xml');
-        // Strip any script tags
-        doc.querySelectorAll('script').forEach(s => s.remove());
-        // Strip event handler attributes and javascript: URLs
+        // Strip active executable elements including script, foreignObject, iframe, embed, object
+        doc.querySelectorAll('script, foreignObject, iframe, embed, object').forEach(s => s.remove());
+        // Strip event handler attributes, javascript: URLs, and active CSS url()
         doc.querySelectorAll('*').forEach(el => {
             for (let i = el.attributes.length - 1; i >= 0; i--) {
                 const attr = el.attributes[i];
                 const name = attr.name.toLowerCase();
                 const val = attr.value.trim().toLowerCase();
-                if (name.startsWith('on') || val.startsWith('javascript:') || val.startsWith('data:text/html')) {
+                if (
+                    name.startsWith('on') || 
+                    val.startsWith('javascript:') || 
+                    val.startsWith('data:text/html') ||
+                    (name === 'href' && !val.startsWith('#'))
+                ) {
+                    el.removeAttribute(attr.name);
+                }
+                // Strip url(...) from style attributes to prevent css data exfiltration
+                if (name === 'style' && /url\s*\(/i.test(attr.value)) {
                     el.removeAttribute(attr.name);
                 }
             }
@@ -71,11 +80,13 @@ const MermaidViewer = ({ chart, title = "Architecture Diagram" }) => {
         };
     }, []);
 
-    // Focus management for fullscreen modal
+    // Focus management for fullscreen modal (only restore focus if actually opened)
+    const hasOpenedFullscreenRef = useRef(false);
     useEffect(() => {
         if (isFullscreen) {
+            hasOpenedFullscreenRef.current = true;
             modalRef.current?.focus();
-        } else {
+        } else if (hasOpenedFullscreenRef.current) {
             triggerButtonRef.current?.focus();
         }
     }, [isFullscreen]);
@@ -108,12 +119,20 @@ const MermaidViewer = ({ chart, title = "Architecture Diagram" }) => {
                 try {
                     const { svg } = await mermaid.render(id, cleanChart);
                     if (!isCancelled) {
-                        setSvgContent(sanitizeSvg(svg));
+                        const sanitized = sanitizeSvg(svg);
+                        if (!sanitized) {
+                            setError("Diagram sanitization failed or produced invalid SVG.");
+                            setSvgContent('');
+                        } else {
+                            setSvgContent(sanitized);
+                            setError(null);
+                        }
                     }
                 } catch (err) {
                     console.error("Mermaid Render Error:", err);
                     if (!isCancelled) {
                         setError(err.message || "Failed to render diagram syntax.");
+                        setSvgContent('');
                     }
                 }
             });

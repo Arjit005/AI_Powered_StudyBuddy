@@ -178,16 +178,21 @@ const ChatInterface = () => {
             });
 
             if (res.ok) {
-                const remaining = conversations.filter(c => c.id !== convId);
-                setConversations(remaining);
-                if (activeConvId === convId) {
-                    if (remaining.length > 0) {
-                        setActiveConvId(remaining[0].id);
-                    } else {
-                        setActiveConvId(null);
-                        setMessages([DEFAULT_GREETING]);
-                    }
-                }
+                setConversations(prev => {
+                    const remaining = prev.filter(c => c.id !== convId);
+                    setActiveConvId(currentActive => {
+                        if (currentActive === convId) {
+                            if (remaining.length > 0) {
+                                return remaining[0].id;
+                            } else {
+                                setMessages([DEFAULT_GREETING]);
+                                return null;
+                            }
+                        }
+                        return currentActive;
+                    });
+                    return remaining;
+                });
             }
         } catch (err) {
             console.error("Error deleting session:", err);
@@ -255,6 +260,7 @@ const ChatInterface = () => {
 
             // 1. Attempt Real-Time SSE Token Streaming
             let streamSuccess = false;
+            let streamAccepted = false;
             let accumulatedText = '';
             const streamMsgId = Date.now();
             let streamConvId = originatingConvId;
@@ -270,6 +276,7 @@ const ChatInterface = () => {
                 });
 
                 if (streamResponse.ok && streamResponse.body) {
+                    streamAccepted = true;
                     const reader = streamResponse.body.getReader();
                     const decoder = new TextDecoder('utf-8');
 
@@ -364,6 +371,21 @@ const ChatInterface = () => {
             }
 
             if (!streamSuccess) {
+                if (streamAccepted) {
+                    // Avoid double-posting to /api/chat since the stream request was already accepted by the server
+                    if (accumulatedText.length === 0 && originatingConvId === activeConvIdRef.current) {
+                        setMessages(prev => [
+                            ...prev,
+                            {
+                                role: 'ai',
+                                content: '⚠️ **Stream Interrupted**: The server began generating your response, but the network stream closed prematurely. Please try again.',
+                                isError: true
+                            }
+                        ]);
+                    }
+                    return;
+                }
+
                 // 2. Fallback to standard synchronous endpoint
                 const response = await fetch('/api/chat', {
                     method: 'POST',
@@ -418,9 +440,7 @@ const ChatInterface = () => {
                 ]);
             }
         } finally {
-            if (originatingConvId === activeConvIdRef.current || activeConvIdRef.current === null) {
-                setIsLoading(false);
-            }
+            setIsLoading(false);
         }
     };
 

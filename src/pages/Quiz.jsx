@@ -14,7 +14,7 @@ const Quiz = () => {
     const [error, setError] = useState('');
 
     const generateQuiz = async () => {
-        if (!topic.trim() || saving) return;
+        if (!topic.trim() || saving || loading) return;
         setLoading(true);
         setQuiz(null);
         setAnswers({});
@@ -46,8 +46,10 @@ const Quiz = () => {
                 .map(q => {
                     const rawAnswer = String(q.correct_answer || q.answer || '').trim();
                     const normalizedOptions = q.options.map(opt => String(opt).trim());
-                    // Find option matching rawAnswer (case-insensitive fallback)
-                    const matchingOption = normalizedOptions.find(opt => opt.toLowerCase() === rawAnswer.toLowerCase()) || rawAnswer;
+                    // Find option matching rawAnswer (exact or case-insensitive or substring), fallback to first option
+                    const matchingOption = normalizedOptions.find(opt => opt.toLowerCase() === rawAnswer.toLowerCase())
+                        || normalizedOptions.find(opt => rawAnswer.toLowerCase().includes(opt.toLowerCase()) || opt.toLowerCase().includes(rawAnswer.toLowerCase()))
+                        || normalizedOptions[0];
                     return {
                         ...q,
                         question: q.question.trim(),

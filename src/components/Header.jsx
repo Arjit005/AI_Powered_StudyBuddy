@@ -11,25 +11,31 @@ const Header = () => {
     const [user, setUser] = useState(null);
 
     useEffect(() => {
-        try {
-            const rawUser = localStorage.getItem('user');
-            if (rawUser) {
-                setUser(JSON.parse(rawUser));
+        const syncUser = () => {
+            try {
+                const rawUser = localStorage.getItem('user');
+                setUser(rawUser ? JSON.parse(rawUser) : null);
+            } catch (e) {
+                console.error(e);
             }
-        } catch (e) {
-            console.error(e);
-        }
+        };
+        syncUser();
+        window.addEventListener('storage', syncUser);
+        window.addEventListener('auth-change', syncUser);
 
         // Fetch security telemetry from backend with unmount & single-flight protection
         let isMounted = true;
         let isPolling = false;
+        let currentAbortCtrl = null;
 
         const fetchTelemetry = async () => {
             if (isPolling) return;
             isPolling = true;
+            if (currentAbortCtrl) currentAbortCtrl.abort();
+            currentAbortCtrl = new AbortController();
             const start = performance.now();
             try {
-                const res = await fetch('/api/security/status');
+                const res = await fetch('/api/security/status', { signal: currentAbortCtrl.signal });
                 const duration = Math.round(performance.now() - start);
                 if (!isMounted) return;
 
@@ -44,6 +50,7 @@ const Header = () => {
                     setApiLatency('Unavailable');
                 }
             } catch (err) {
+                if (err.name === 'AbortError') return;
                 if (isMounted) {
                     setSecurityData(null);
                     setApiLatency('Offline');
@@ -58,6 +65,9 @@ const Header = () => {
         return () => {
             isMounted = false;
             clearInterval(interval);
+            if (currentAbortCtrl) currentAbortCtrl.abort();
+            window.removeEventListener('storage', syncUser);
+            window.removeEventListener('auth-change', syncUser);
         };
     }, []);
 
@@ -128,7 +138,13 @@ const Header = () => {
                                             <Shield className="w-4 h-4 text-emerald-400" />
                                             <span className="text-xs font-bold uppercase tracking-wider text-emerald-300">Safe Study Guard</span>
                                         </div>
-                                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-mono">Protected</span>
+                                        <span className={`text-[10px] px-1.5 py-0.5 rounded font-mono ${
+                                            securityData?.shield_active 
+                                                ? 'bg-emerald-500/20 text-emerald-300' 
+                                                : 'bg-amber-500/20 text-amber-300'
+                                        }`}>
+                                            {securityData?.shield_active ? 'Protected' : (securityData ? 'Degraded' : 'Offline')}
+                                        </span>
                                     </div>
                                     <div className="space-y-2 text-xs">
                                         <div className="flex items-start gap-2 text-slate-300">

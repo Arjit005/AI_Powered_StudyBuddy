@@ -57,6 +57,7 @@ def get_node_depths(G, root):
 
 def generate_network_graph(edge_data):
     fig = None
+    plt = None
     try:
         # Lazy-import networkx and matplotlib only when visual map generation is requested
         import networkx as nx
@@ -220,20 +221,22 @@ def generate_network_graph(edge_data):
 
     except Exception as e:
         print(f"CRITICAL MAP GENERATION ERROR: {e}")
-        if fig:
+        if fig and plt:
             try:
                 plt.close(fig)
             except Exception:
                 pass
-        # Fallback Image Generation
-        fail_fig = plt.figure(figsize=(16, 12)) # Reduced size based on feedback
-        try:
-            plt.text(0.5, 0.5, f"Map Generation Failed:\n{str(e)[:100]}", 
-                     ha='center', va='center', fontsize=14, color='red')
-            plt.axis('off')
-            buffer = io.BytesIO()
-            plt.savefig(buffer, format='png')
-            buffer.seek(0)
-            return base64.b64encode(buffer.getvalue()).decode('utf-8')
-        finally:
-            plt.close(fail_fig)
+        if plt:
+            try:
+                fail_fig = plt.figure(figsize=(16, 12))
+                plt.text(0.5, 0.5, f"Map Generation Failed:\n{str(e)[:100]}", 
+                         ha='center', va='center', fontsize=14, color='red')
+                plt.axis('off')
+                buffer = io.BytesIO()
+                plt.savefig(buffer, format='png')
+                buffer.seek(0)
+                plt.close(fail_fig)
+                return base64.b64encode(buffer.getvalue()).decode('utf-8')
+            except Exception:
+                pass
+        return ""

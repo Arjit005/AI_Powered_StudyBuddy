@@ -141,7 +141,11 @@ export default function CommandPalette({ isOpen, onClose }) {
 
   useEffect(() => {
     const handleKeyDown = (e) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        const target = e.target;
+        if (!isOpen && target instanceof HTMLElement && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName))) {
+          return;
+        }
         e.preventDefault();
         if (isOpen) {
           onClose();
@@ -157,13 +161,16 @@ export default function CommandPalette({ isOpen, onClose }) {
         e.preventDefault();
         onClose();
       } else if (e.key === 'Tab' && modalRef.current) {
-        const focusableElements = modalRef.current.querySelectorAll(
+        const focusableElements = Array.from(modalRef.current.querySelectorAll(
           'input, button, [tabindex]:not([tabindex="-1"])'
-        );
+        ));
         if (focusableElements.length > 0) {
           const firstElement = focusableElements[0];
           const lastElement = focusableElements[focusableElements.length - 1];
-          if (e.shiftKey && document.activeElement === firstElement) {
+          if (!modalRef.current.contains(document.activeElement)) {
+            e.preventDefault();
+            firstElement.focus();
+          } else if (e.shiftKey && document.activeElement === firstElement) {
             e.preventDefault();
             lastElement.focus();
           } else if (!e.shiftKey && document.activeElement === lastElement) {

@@ -30,21 +30,31 @@ const Progress = () => {
 
             let hasErrors = false;
             if (progRes.ok) {
-                const data = await progRes.json();
-                if (thisGen !== progressRequestGenRef.current) return;
-                setStats(data);
+                try {
+                    const data = await progRes.json();
+                    if (thisGen !== progressRequestGenRef.current) return;
+                    setStats(data);
+                } catch {
+                    setStats({ study_hours: 0, quizzes_taken: 0, streak_days: 0 });
+                    hasErrors = true;
+                }
             } else {
                 setStats({ study_hours: 0, quizzes_taken: 0, streak_days: 0 });
                 hasErrors = true;
             }
 
             if (heatRes.ok) {
-                const data = await heatRes.json();
-                if (thisGen !== progressRequestGenRef.current) return;
-                if (data && Array.isArray(data.days)) {
-                    setHeatmapData(data.days);
-                } else {
+                try {
+                    const data = await heatRes.json();
+                    if (thisGen !== progressRequestGenRef.current) return;
+                    if (data && Array.isArray(data.days)) {
+                        setHeatmapData(data.days);
+                    } else {
+                        setHeatmapData([]);
+                    }
+                } catch {
                     setHeatmapData([]);
+                    hasErrors = true;
                 }
             } else {
                 setHeatmapData([]);
@@ -52,12 +62,17 @@ const Progress = () => {
             }
 
             if (dashRes.ok) {
-                const data = await dashRes.json();
-                if (thisGen !== progressRequestGenRef.current) return;
-                if (data && data.chart) {
-                    setChartImage(`data:image/png;base64,${data.chart}`);
-                } else {
+                try {
+                    const data = await dashRes.json();
+                    if (thisGen !== progressRequestGenRef.current) return;
+                    if (data && data.chart) {
+                        setChartImage(`data:image/png;base64,${data.chart}`);
+                    } else {
+                        setChartImage(null);
+                    }
+                } catch {
                     setChartImage(null);
+                    hasErrors = true;
                 }
             } else {
                 setChartImage(null);
@@ -65,12 +80,17 @@ const Progress = () => {
             }
 
             if (sessRes.ok) {
-                const data = await sessRes.json();
-                if (thisGen !== progressRequestGenRef.current) return;
-                if (Array.isArray(data)) {
-                    setSessions(data);
-                } else {
+                try {
+                    const data = await sessRes.json();
+                    if (thisGen !== progressRequestGenRef.current) return;
+                    if (Array.isArray(data)) {
+                        setSessions(data);
+                    } else {
+                        setSessions([]);
+                    }
+                } catch {
                     setSessions([]);
+                    hasErrors = true;
                 }
             } else {
                 setSessions([]);
@@ -259,7 +279,10 @@ const Progress = () => {
                                     {(weekDays.length > 0 ? weekDays : Array.from({ length: 7 })).map((day, dayIdx) => {
                                         const isDayObj = day && typeof day === 'object';
                                         const rawIntensity = isDayObj ? day.intensity : 0;
-                                        const intensity = Math.max(0, Math.min(4, Math.floor(rawIntensity || 0)));
+                                        const parsedIntensity = Number(rawIntensity);
+                                        const intensity = Number.isFinite(parsedIntensity)
+                                            ? Math.max(0, Math.min(4, Math.floor(parsedIntensity)))
+                                            : 0;
                                         const dateLabel = isDayObj ? day.date : `Day ${dayIdx}`;
                                         const countLabel = isDayObj ? day.count : 0;
                                         const durationLabel = isDayObj ? day.duration_minutes : 0;

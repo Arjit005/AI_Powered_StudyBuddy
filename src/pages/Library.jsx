@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef } from 'react';
 import { 
   BookOpen, 
   Search, 
-  Filter, 
   Star, 
   Trash2, 
   ExternalLink, 
@@ -10,10 +9,8 @@ import {
   Layers, 
   HelpCircle, 
   Layout, 
-  Clock, 
   Calendar, 
   Sparkles,
-  Download,
   X
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -34,6 +31,9 @@ export default function Library() {
 
   useEffect(() => {
     fetchLibrary();
+    return () => {
+      requestGenRef.current++;
+    };
   }, [activeTab, search]);
 
   const getAuthHeaders = () => {

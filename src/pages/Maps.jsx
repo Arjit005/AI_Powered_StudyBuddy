@@ -84,6 +84,10 @@ const Maps = () => {
                 }
             }
 
+            if (!hasDiagram && !hasMap) {
+                throw new Error('The server returned no usable diagram or concept map. Please try again.');
+            }
+
             // Automatically switch to available view if one failed
             if (!hasDiagram && hasMap) {
                 setViewMode('networkx');

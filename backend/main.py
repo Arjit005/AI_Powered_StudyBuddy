@@ -285,9 +285,16 @@ def register(req: RegisterRequest, request: Request, db: Session = Depends(get_d
         email=clean_email,
         hashed_password=hashed_pw
     )
-    db.add(user)
-    db.commit()
-    db.refresh(user)
+    try:
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="An account with this username or email already exists."
+        )
 
     client_ip = request.client.host if request.client else "unknown"
     security.limiter.reset_failed_logins(client_ip)
@@ -961,6 +968,10 @@ async def chat_with_ai_stream(
                 db.commit()
             except Exception as persist_err:
                 print(f"Error persisting stream chat: {persist_err}")
+                try:
+                    db.rollback()
+                except Exception:
+                    pass
 
     return StreamingResponse(event_generator(), media_type="text/event-stream")
 
