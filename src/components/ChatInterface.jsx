@@ -255,6 +255,10 @@ const ChatInterface = () => {
 
             // 1. Attempt Real-Time SSE Token Streaming
             let streamSuccess = false;
+            let accumulatedText = '';
+            const streamMsgId = Date.now();
+            let streamConvId = originatingConvId;
+
             try {
                 const streamResponse = await fetch('/api/chat/stream', {
                     method: 'POST',
@@ -268,9 +272,6 @@ const ChatInterface = () => {
                 if (streamResponse.ok && streamResponse.body) {
                     const reader = streamResponse.body.getReader();
                     const decoder = new TextDecoder('utf-8');
-                    let accumulatedText = '';
-                    let streamConvId = originatingConvId;
-                    const streamMsgId = Date.now();
 
                     // Insert initial streaming message only if user is still on the originating conversation
                     if (originatingConvId === activeConvIdRef.current) {
@@ -334,9 +335,17 @@ const ChatInterface = () => {
                         }
                     }
 
-                    if (!doneReading && accumulatedText.length === 0) {
-                        setMessages(prev => prev.filter(m => m.id !== streamMsgId));
-                        throw new Error('Streaming connection closed unexpectedly before response was received.');
+                    if (!doneReading) {
+                        if (accumulatedText.length === 0) {
+                            setMessages(prev => prev.filter(m => m.id !== streamMsgId));
+                            throw new Error('Streaming connection closed unexpectedly before response was received.');
+                        } else {
+                            // Truncated stream EOF without [DONE]: indicate interrupted state
+                            setMessages(prev => prev.map(m => m.id === streamMsgId ? { ...m, isStreaming: false, content: accumulatedText + "\n\n*(Generation interrupted)*" } : m));
+                            fetchConversations();
+                            streamSuccess = true;
+                            return;
+                        }
                     }
 
                     // Mark streaming complete
@@ -351,7 +360,7 @@ const ChatInterface = () => {
                     setMessages(prev => prev.map(m => m.id === streamMsgId ? { ...m, isStreaming: false } : m));
                     return;
                 }
-                setMessages(prev => prev.filter(m => m.id === streamMsgId));
+                setMessages(prev => prev.filter(m => m.id !== streamMsgId));
             }
 
             if (!streamSuccess) {
@@ -409,7 +418,9 @@ const ChatInterface = () => {
                 ]);
             }
         } finally {
-            setIsLoading(false);
+            if (originatingConvId === activeConvIdRef.current || activeConvIdRef.current === null) {
+                setIsLoading(false);
+            }
         }
     };
 

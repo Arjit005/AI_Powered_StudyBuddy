@@ -40,11 +40,21 @@ const FlipCard3D = ({
 
     return (
         <div
-            className="w-full max-w-xl mx-auto min-h-[21rem] h-[21rem] cursor-pointer select-none"
+            role="button"
+            tabIndex={0}
+            aria-label={isFlipped ? "Flip card to view question" : "Flip card to reveal answer"}
+            aria-pressed={isFlipped}
+            className="w-full max-w-xl mx-auto min-h-[21rem] h-[21rem] cursor-pointer select-none focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 rounded-3xl"
             style={{ perspective: '1200px' }}
             onMouseMove={handleMouseMove}
             onMouseLeave={handleMouseLeave}
             onClick={onFlip}
+            onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    if (onFlip) onFlip();
+                }
+            }}
         >
             <div
                 ref={cardRef}

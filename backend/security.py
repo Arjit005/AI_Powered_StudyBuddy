@@ -2,6 +2,7 @@ import os
 import re
 import time
 import html
+import threading
 from typing import Dict, List, Tuple, Optional
 from fastapi import Request, HTTPException, status
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -39,6 +40,7 @@ class RateLimiter:
         # Maps "client_ip" -> lockout until epoch
         self.lockouts: Dict[str, float] = {}
         self._last_global_cleanup: float = time.time()
+        self._lock = threading.Lock()
 
     def _clean_old_requests(self, key: str, window_seconds: int, current_time: float):
         if key in self.history:
@@ -77,67 +79,83 @@ class RateLimiter:
                     del self.lockouts[ip]
 
     def _get_client_ip(self, request: Request) -> str:
-        # Only trust forwarded headers if explicitly running behind a trusted reverse proxy
+        immediate_host = request.client.host if request.client else "unknown"
         trust_proxy = os.getenv("TRUST_PROXY", "false").lower() == "true"
-        if trust_proxy:
+        
+        # Verify that immediate connecting client is in trusted proxy list or private/loopback network
+        trusted_proxies_cfg = os.getenv("TRUSTED_PROXIES", "127.0.0.1,::1")
+        trusted_proxy_set = {p.strip() for p in trusted_proxies_cfg.split(",") if p.strip()}
+        
+        is_trusted_peer = (
+            immediate_host in trusted_proxy_set or
+            immediate_host in ("127.0.0.1", "::1", "localhost") or
+            immediate_host.startswith("10.") or
+            immediate_host.startswith("192.168.") or
+            (immediate_host.startswith("172.") and len(immediate_host.split(".")) > 1 and 
+             immediate_host.split(".")[1].isdigit() and 16 <= int(immediate_host.split(".")[1]) <= 31)
+        )
+        if trust_proxy and is_trusted_peer:
             forwarded = request.headers.get("X-Forwarded-For")
             if forwarded:
                 return forwarded.split(",")[0].strip()
             real_ip = request.headers.get("X-Real-IP")
             if real_ip:
                 return real_ip.strip()
-        return request.client.host if request.client else "unknown"
+        return immediate_host
 
     def check_rate_limit(self, request: Request, category: str, max_requests: int, window_seconds: int):
         client_ip = self._get_client_ip(request)
         current_time = time.time()
 
-        # Check if IP is currently under lockout (e.g. from repeated login failures)
-        if client_ip in self.lockouts:
-            remaining_lock = self.lockouts[client_ip] - current_time
-            if remaining_lock > 0:
+        with self._lock:
+            # Check if IP is currently under lockout (e.g. from repeated login failures)
+            if client_ip in self.lockouts:
+                remaining_lock = self.lockouts[client_ip] - current_time
+                if remaining_lock > 0:
+                    raise HTTPException(
+                        status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                        detail=f"Security Alert: Too many failed attempts. Temporary lockout for {int(remaining_lock)} more seconds.",
+                        headers={"Retry-After": str(int(remaining_lock))}
+                    )
+                else:
+                    del self.lockouts[client_ip]
+
+            key = f"{category}:{client_ip}"
+            self._clean_old_requests(key, window_seconds, current_time)
+
+            if len(self.history.get(key, [])) >= max_requests:
+                # If auth abuse, trigger a 60 second cooling-off lockout
+                if category == "auth":
+                    self.lockouts[client_ip] = current_time + 60
+
                 raise HTTPException(
                     status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                    detail=f"Security Alert: Too many failed attempts. Temporary lockout for {int(remaining_lock)} more seconds.",
-                    headers={"Retry-After": str(int(remaining_lock))}
+                    detail=f"Rate limit exceeded: Maximum {max_requests} requests per {window_seconds}s for {category}. Please slow down.",
+                    headers={"Retry-After": str(window_seconds)}
                 )
-            else:
-                del self.lockouts[client_ip]
 
-        key = f"{category}:{client_ip}"
-        self._clean_old_requests(key, window_seconds, current_time)
-
-        if len(self.history.get(key, [])) >= max_requests:
-            # If auth abuse, trigger a 60 second cooling-off lockout
-            if category == "auth":
-                self.lockouts[client_ip] = current_time + 60
-
-            raise HTTPException(
-                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                detail=f"Rate limit exceeded: Maximum {max_requests} requests per {window_seconds}s for {category}. Please slow down.",
-                headers={"Retry-After": str(window_seconds)}
-            )
-
-        if key not in self.history:
-            self.history[key] = []
-        self.history[key].append(current_time)
+            if key not in self.history:
+                self.history[key] = []
+            self.history[key].append(current_time)
 
     def record_failed_login(self, client_ip: str):
-        key = f"auth_fail:{client_ip}"
         current_time = time.time()
-        self._clean_old_requests(key, 300, current_time)
-        if key not in self.history:
-            self.history[key] = []
-        self.history[key].append(current_time)
+        with self._lock:
+            key = f"auth_fail:{client_ip}"
+            self._clean_old_requests(key, 300, current_time)
+            if key not in self.history:
+                self.history[key] = []
+            self.history[key].append(current_time)
 
-        # 5 consecutive failures within 5 minutes = 3-minute lockout (set on threshold crossing)
-        if len(self.history[key]) >= 5 and client_ip not in self.lockouts:
-            self.lockouts[client_ip] = current_time + 180
+            # 5 consecutive failures within 5 minutes = 3-minute lockout (set on threshold crossing)
+            if len(self.history[key]) >= 5 and client_ip not in self.lockouts:
+                self.lockouts[client_ip] = current_time + 180
 
     def reset_failed_logins(self, client_ip: str):
-        key = f"auth_fail:{client_ip}"
-        if key in self.history:
-            del self.history[key]
+        with self._lock:
+            key = f"auth_fail:{client_ip}"
+            if key in self.history:
+                del self.history[key]
 
 
 # Global rate limiter instance

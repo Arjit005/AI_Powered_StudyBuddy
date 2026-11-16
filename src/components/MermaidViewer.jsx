@@ -3,6 +3,31 @@ import mermaid from 'mermaid';
 import { ZoomIn, ZoomOut, RotateCcw, Download, Copy, Check, Maximize2, X, AlertCircle } from 'lucide-react';
 
 let mermaidInitialized = false;
+let globalRenderQueue = Promise.resolve();
+
+const sanitizeSvg = (svgStr) => {
+    if (!svgStr || typeof svgStr !== 'string') return '';
+    try {
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(svgStr, 'image/svg+xml');
+        // Strip any script tags
+        doc.querySelectorAll('script').forEach(s => s.remove());
+        // Strip event handler attributes and javascript: URLs
+        doc.querySelectorAll('*').forEach(el => {
+            for (let i = el.attributes.length - 1; i >= 0; i--) {
+                const attr = el.attributes[i];
+                const name = attr.name.toLowerCase();
+                const val = attr.value.trim().toLowerCase();
+                if (name.startsWith('on') || val.startsWith('javascript:') || val.startsWith('data:text/html')) {
+                    el.removeAttribute(attr.name);
+                }
+            }
+        });
+        return doc.documentElement ? new XMLSerializer().serializeToString(doc.documentElement) : '';
+    } catch {
+        return '';
+    }
+};
 
 const initMermaid = () => {
     if (!mermaidInitialized) {
@@ -30,6 +55,8 @@ const initMermaid = () => {
 const MermaidViewer = ({ chart, title = "Architecture Diagram" }) => {
     const containerRef = useRef(null);
     const copyTimeoutRef = useRef(null);
+    const modalRef = useRef(null);
+    const triggerButtonRef = useRef(null);
     const [svgContent, setSvgContent] = useState('');
     const [error, setError] = useState(null);
     const [copied, setCopied] = useState(false);
@@ -44,6 +71,15 @@ const MermaidViewer = ({ chart, title = "Architecture Diagram" }) => {
         };
     }, []);
 
+    // Focus management for fullscreen modal
+    useEffect(() => {
+        if (isFullscreen) {
+            modalRef.current?.focus();
+        } else {
+            triggerButtonRef.current?.focus();
+        }
+    }, [isFullscreen]);
+
     useEffect(() => {
         if (!chart || !chart.trim()) {
             setSvgContent('');
@@ -56,27 +92,31 @@ const MermaidViewer = ({ chart, title = "Architecture Diagram" }) => {
         setSvgContent(''); // Clear previous SVG while compiling
         setError(null);
 
-        const renderChart = async () => {
+        const renderChart = () => {
             const id = 'mermaid-' + Math.random().toString(36).substring(2, 9);
-            try {
-                // Clean markdown code blocks if passed with backticks
-                let cleanChart = chart.trim();
-                if (cleanChart.startsWith('```mermaid')) {
-                    cleanChart = cleanChart.replace(/^```mermaid\s*/, '').replace(/```$/, '').trim();
-                } else if (cleanChart.startsWith('```')) {
-                    cleanChart = cleanChart.replace(/^```\s*/, '').replace(/```$/, '').trim();
-                }
-
-                const { svg } = await mermaid.render(id, cleanChart);
-                if (!isCancelled) {
-                    setSvgContent(svg);
-                }
-            } catch (err) {
-                console.error("Mermaid Render Error:", err);
-                if (!isCancelled) {
-                    setError(err.message || "Failed to render diagram syntax.");
-                }
+            // Clean markdown code blocks if passed with backticks
+            let cleanChart = chart.trim();
+            if (cleanChart.startsWith('```mermaid')) {
+                cleanChart = cleanChart.replace(/^```mermaid\s*/, '').replace(/```$/, '').trim();
+            } else if (cleanChart.startsWith('```')) {
+                cleanChart = cleanChart.replace(/^```\s*/, '').replace(/```$/, '').trim();
             }
+
+            // Serialize through global render queue to prevent concurrent mermaid DOM race conditions
+            globalRenderQueue = globalRenderQueue.then(async () => {
+                if (isCancelled) return;
+                try {
+                    const { svg } = await mermaid.render(id, cleanChart);
+                    if (!isCancelled) {
+                        setSvgContent(sanitizeSvg(svg));
+                    }
+                } catch (err) {
+                    console.error("Mermaid Render Error:", err);
+                    if (!isCancelled) {
+                        setError(err.message || "Failed to render diagram syntax.");
+                    }
+                }
+            });
         };
 
         renderChart();
@@ -162,6 +202,7 @@ const MermaidViewer = ({ chart, title = "Architecture Diagram" }) => {
                         <Download className="w-3.5 h-3.5" />
                     </button>
                     <button
+                        ref={triggerButtonRef}
                         onClick={() => setIsFullscreen(true)}
                         className="p-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-400 hover:text-emerald-400"
                         title="Fullscreen"
@@ -206,6 +247,7 @@ const MermaidViewer = ({ chart, title = "Architecture Diagram" }) => {
             {/* Fullscreen View Modal */}
             {isFullscreen && (
                 <div
+                    ref={modalRef}
                     role="dialog"
                     aria-modal="true"
                     aria-label={`${title} Fullscreen Inspection`}

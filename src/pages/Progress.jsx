@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { BarChart3, Calendar, TrendingUp, RotateCcw, Award, Flame, Shield, Activity, Clock, CheckCircle2, Bot, Zap } from 'lucide-react';
+import { BarChart3, Calendar, RotateCcw, Award, Flame, Activity, Clock, Bot, Zap } from 'lucide-react';
 
 const Progress = () => {
     const [stats, setStats] = useState({ study_hours: 0, quizzes_taken: 0, streak_days: 0 });
@@ -43,24 +43,37 @@ const Progress = () => {
                 if (thisGen !== progressRequestGenRef.current) return;
                 if (data && Array.isArray(data.days)) {
                     setHeatmapData(data.days);
+                } else {
+                    setHeatmapData([]);
                 }
             } else {
+                setHeatmapData([]);
                 hasErrors = true;
             }
 
             if (dashRes.ok) {
                 const data = await dashRes.json();
                 if (thisGen !== progressRequestGenRef.current) return;
-                if (data.chart) setChartImage(`data:image/png;base64,${data.chart}`);
+                if (data && data.chart) {
+                    setChartImage(`data:image/png;base64,${data.chart}`);
+                } else {
+                    setChartImage(null);
+                }
             } else {
+                setChartImage(null);
                 hasErrors = true;
             }
 
             if (sessRes.ok) {
                 const data = await sessRes.json();
                 if (thisGen !== progressRequestGenRef.current) return;
-                if (Array.isArray(data)) setSessions(data);
+                if (Array.isArray(data)) {
+                    setSessions(data);
+                } else {
+                    setSessions([]);
+                }
             } else {
+                setSessions([]);
                 hasErrors = true;
             }
 
@@ -100,9 +113,11 @@ const Progress = () => {
                 setSessions([]);
                 fetchAnalytics();
             } else {
+                setLoading(false);
                 alert("Failed to reset progress on server.");
             }
         } catch (err) {
+            setLoading(false);
             console.error("Reset error:", err);
             alert("Network error resetting progress.");
         }

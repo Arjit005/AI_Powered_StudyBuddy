@@ -9,9 +9,12 @@ const Voice = () => {
     const [isLoading, setIsLoading] = useState(false);
     const [isSpeaking, setIsSpeaking] = useState(false);
     const [browserSupported, setBrowserSupported] = useState(true);
+    const [error, setError] = useState(null);
     const recognitionRef = useRef(null);
+    const isMountedRef = useRef(true);
 
     useEffect(() => {
+        isMountedRef.current = true;
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
         if (!SpeechRecognition) {
             setBrowserSupported(false);
@@ -28,11 +31,12 @@ const Voice = () => {
             for (let i = 0; i < event.results.length; i++) {
                 fullTranscript += event.results[i][0].transcript;
             }
-            setTranscript(fullTranscript);
+            if (isMountedRef.current) setTranscript(fullTranscript);
         };
 
         recognition.onerror = (event) => {
             console.error('Speech recognition error:', event.error);
+            if (!isMountedRef.current) return;
             setIsListening(false);
             if (event.error === 'not-allowed') {
                 setError('Microphone access was denied. Please allow microphone permissions in your browser.');
@@ -46,14 +50,15 @@ const Voice = () => {
         };
 
         recognition.onend = () => {
-            setIsListening(false);
+            if (isMountedRef.current) setIsListening(false);
         };
 
         recognitionRef.current = recognition;
 
         return () => {
+            isMountedRef.current = false;
             if (recognitionRef.current) {
-                recognitionRef.current.stop();
+                try { recognitionRef.current.stop(); } catch (_) {}
             }
             if ('speechSynthesis' in window) {
                 window.speechSynthesis.cancel();
@@ -103,25 +108,30 @@ const Voice = () => {
 
             if (!res.ok) throw new Error('AI consultation failed');
             const data = await res.json();
+            if (!isMountedRef.current) return;
             const reply = data.response || 'No response generated.';
             setAiResponse(reply);
 
-            // Auto-read response if speech synthesis available
-            if ('speechSynthesis' in window && typeof window.SpeechSynthesisUtterance !== 'undefined') {
+            // Auto-read response if speech synthesis available and still mounted
+            if (isMountedRef.current && 'speechSynthesis' in window && typeof window.SpeechSynthesisUtterance !== 'undefined') {
                 window.speechSynthesis.cancel();
                 const cleanText = reply.replace(/[#*`_\[\]()]/g, '');
                 const utterance = new SpeechSynthesisUtterance(cleanText);
                 utterance.rate = 1.0;
-                utterance.onend = () => setIsSpeaking(false);
-                utterance.onerror = () => setIsSpeaking(false);
+                utterance.onend = () => { if (isMountedRef.current) setIsSpeaking(false); };
+                utterance.onerror = () => { if (isMountedRef.current) setIsSpeaking(false); };
                 window.speechSynthesis.speak(utterance);
                 setIsSpeaking(true);
             }
         } catch (err) {
             console.error("Voice response error:", err);
-            setAiResponse('⚠️ Unable to connect to the AI tutor right now. Please check your connection and try again.');
+            if (isMountedRef.current) {
+                setAiResponse('⚠️ Unable to connect to the AI tutor right now. Please check your connection and try again.');
+            }
         } finally {
-            setIsLoading(false);
+            if (isMountedRef.current) {
+                setIsLoading(false);
+            }
         }
     };
 
@@ -165,6 +175,19 @@ const Voice = () => {
                         <div>
                             <b>Browser Audio Notice:</b> Live microphone speech recognition is optimized for Chrome, Edge, and Chromium browsers. On Firefox or Safari, you can type your query in the prompt box below to receive oral audio synthesis answers!
                         </div>
+                    </div>
+                )}
+
+                {/* Error Banner */}
+                {error && (
+                    <div className="mb-6 p-4 rounded-2xl bg-rose-950/40 border border-rose-800/60 flex items-center justify-between text-rose-300 text-xs font-mono">
+                        <div className="flex items-center gap-2">
+                            <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
+                            <span>{error}</span>
+                        </div>
+                        <button onClick={() => setError(null)} className="text-rose-400 hover:text-white text-xs underline font-sans ml-4 cursor-pointer">
+                            Dismiss
+                        </button>
                     </div>
                 )}
 

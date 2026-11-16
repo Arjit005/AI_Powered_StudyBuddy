@@ -210,7 +210,9 @@ const Header = () => {
                                     <div className="w-6 h-6 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold text-xs uppercase">
                                         {typeof user.username === 'string' && user.username ? user.username.slice(0, 2) : 'SB'}
                                     </div>
-                                    <span className="text-xs font-mono text-slate-300 max-w-[100px] truncate">{user.username}</span>
+                                    <span className="text-xs font-mono text-slate-300 max-w-[100px] truncate">
+                                        {typeof user.username === 'string' ? user.username : (typeof user.email === 'string' ? user.email.split('@')[0] : 'User')}
+                                    </span>
                                     <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-mono font-bold border border-emerald-500/20">PRO</span>
                                 </div>
 

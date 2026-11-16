@@ -149,7 +149,7 @@ const LoginPage = () => {
                     <button
                         type="button"
                         onClick={handleGoogleSignIn}
-                        disabled={isGoogleLoading}
+                        disabled={isGoogleLoading || isLoading}
                         className="w-full mb-5 py-3 px-4 rounded-xl font-medium text-sm bg-slate-900/90 hover:bg-slate-800 border border-slate-700/80 text-white transition-all flex items-center justify-center gap-3 shadow-lg hover:border-emerald-500/50 cursor-pointer disabled:opacity-50"
                     >
                         {isGoogleLoading ? (

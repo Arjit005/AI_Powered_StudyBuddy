@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { Share2, Sparkles, X, ZoomIn, Download, Network, ArrowRight, Layers, Cpu, CheckCircle2 } from 'lucide-react';
+import { Sparkles, X, ZoomIn, Download, Network, Layers, Cpu, CheckCircle2 } from 'lucide-react';
 import MermaidViewer from '../components/MermaidViewer';
 
 const SUGGESTIONS = [
@@ -61,18 +61,26 @@ const Maps = () => {
             let hasMap = false;
 
             if (diagramRes.ok) {
-                const data = await diagramRes.json();
-                if (data && typeof data === 'object' && typeof data.mermaid_code === 'string' && data.mermaid_code.trim()) {
-                    setDiagramData(data);
-                    hasDiagram = true;
+                try {
+                    const data = await diagramRes.json();
+                    if (data && typeof data === 'object' && typeof data.mermaid_code === 'string' && data.mermaid_code.trim()) {
+                        setDiagramData(data);
+                        hasDiagram = true;
+                    }
+                } catch (pErr) {
+                    console.warn("Diagram JSON parse error:", pErr);
                 }
             }
 
             if (mapRes.ok) {
-                const mapJson = await mapRes.json();
-                if (mapJson.map_image) {
-                    setMapImage(`data:image/png;base64,${mapJson.map_image}`);
-                    hasMap = true;
+                try {
+                    const mapJson = await mapRes.json();
+                    if (mapJson && mapJson.map_image) {
+                        setMapImage(`data:image/png;base64,${mapJson.map_image}`);
+                        hasMap = true;
+                    }
+                } catch (pErr) {
+                    console.warn("Map JSON parse error:", pErr);
                 }
             }
 
@@ -161,28 +169,32 @@ const Maps = () => {
                 {(diagramData || mapImage) && (
                     <div className="flex justify-center mb-6">
                         <div className="p-1 rounded-xl bg-slate-900 border border-slate-800 flex gap-1 text-xs font-mono">
-                            <button
-                                onClick={() => setViewMode('mermaid')}
-                                className={`px-4 py-2 rounded-lg font-bold transition-all flex items-center gap-2 ${
-                                    viewMode === 'mermaid'
-                                        ? 'bg-emerald-500 text-slate-950 shadow-[0_0_12px_rgba(16,185,129,0.3)]'
-                                        : 'text-slate-400 hover:text-white'
-                                }`}
-                            >
-                                <Cpu className="w-3.5 h-3.5" />
-                                <span>Interactive Architecture (Mermaid SVG)</span>
-                            </button>
-                            <button
-                                onClick={() => setViewMode('networkx')}
-                                className={`px-4 py-2 rounded-lg font-bold transition-all flex items-center gap-2 ${
-                                    viewMode === 'networkx'
-                                        ? 'bg-cyan-500 text-slate-950 shadow-[0_0_12px_rgba(6,182,212,0.3)]'
-                                        : 'text-slate-400 hover:text-white'
-                                }`}
-                            >
-                                <Network className="w-3.5 h-3.5" />
-                                <span>Topology Graph (NetworkX)</span>
-                            </button>
+                            {diagramData && (
+                                <button
+                                    onClick={() => setViewMode('mermaid')}
+                                    className={`px-4 py-2 rounded-lg font-bold transition-all flex items-center gap-2 ${
+                                        viewMode === 'mermaid'
+                                            ? 'bg-emerald-500 text-slate-950 shadow-[0_0_12px_rgba(16,185,129,0.3)]'
+                                            : 'text-slate-400 hover:text-white'
+                                    }`}
+                                >
+                                    <Cpu className="w-3.5 h-3.5" />
+                                    <span>Interactive Architecture (Mermaid SVG)</span>
+                                </button>
+                            )}
+                            {mapImage && (
+                                <button
+                                    onClick={() => setViewMode('networkx')}
+                                    className={`px-4 py-2 rounded-lg font-bold transition-all flex items-center gap-2 ${
+                                        viewMode === 'networkx'
+                                            ? 'bg-cyan-500 text-slate-950 shadow-[0_0_12px_rgba(6,182,212,0.3)]'
+                                            : 'text-slate-400 hover:text-white'
+                                    }`}
+                                >
+                                    <Network className="w-3.5 h-3.5" />
+                                    <span>Topology Graph (NetworkX)</span>
+                                </button>
+                            )}
                         </div>
                     </div>
                 )}

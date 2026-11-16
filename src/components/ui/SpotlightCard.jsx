@@ -25,11 +25,22 @@ const SpotlightCard = ({
         });
     };
 
+    const handleMouseEnter = (e) => {
+        setIsHovered(true);
+        if (cardRef.current) {
+            const rect = cardRef.current.getBoundingClientRect();
+            setMousePos({
+                x: e.clientX - rect.left,
+                y: e.clientY - rect.top,
+            });
+        }
+    };
+
     return (
         <div
             ref={cardRef}
             onMouseMove={handleMouseMove}
-            onMouseEnter={() => setIsHovered(true)}
+            onMouseEnter={handleMouseEnter}
             onMouseLeave={() => setIsHovered(false)}
             className={`relative overflow-hidden rounded-2xl bg-slate-900/60 border border-slate-800/80 backdrop-blur-xl transition-all duration-300 ${className}`}
             {...props}

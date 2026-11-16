@@ -41,11 +41,23 @@ const Quiz = () => {
             if (!data || !Array.isArray(data.questions) || data.questions.length === 0) {
                 throw new Error('AI engine returned no questions. Please try another topic.');
             }
-            const validQuestions = data.questions.filter(q => {
-                if (!q || typeof q.question !== 'string' || !Array.isArray(q.options) || q.options.length < 2) return false;
-                const correct = q.correct_answer || q.answer;
-                return typeof correct === 'string' && correct.trim().length > 0;
-            });
+            const validQuestions = data.questions
+                .filter(q => q && typeof q.question === 'string' && Array.isArray(q.options) && q.options.length >= 2)
+                .map(q => {
+                    const rawAnswer = String(q.correct_answer || q.answer || '').trim();
+                    const normalizedOptions = q.options.map(opt => String(opt).trim());
+                    // Find option matching rawAnswer (case-insensitive fallback)
+                    const matchingOption = normalizedOptions.find(opt => opt.toLowerCase() === rawAnswer.toLowerCase()) || rawAnswer;
+                    return {
+                        ...q,
+                        question: q.question.trim(),
+                        options: normalizedOptions,
+                        correct_answer: matchingOption,
+                        answer: matchingOption
+                    };
+                })
+                .filter(q => q.correct_answer.length > 0);
+
             if (validQuestions.length === 0) {
                 throw new Error('Received malformed quiz questions. Please regenerate.');
             }
@@ -60,8 +72,12 @@ const Quiz = () => {
                 });
                 if (actRes.ok) {
                     setActivityLogged(true);
+                } else {
+                    setActivityLogged(false);
                 }
-            } catch (_) {}
+            } catch (_) {
+                setActivityLogged(false);
+            }
         } catch (err) {
             setError(err.message || 'Error creating quiz.');
         } finally {
@@ -78,8 +94,9 @@ const Quiz = () => {
         if (!quiz || !quiz.questions) return 0;
         let score = 0;
         quiz.questions.forEach((q, idx) => {
-            const correctAnswer = q.answer || q.correct_answer;
-            if (answers[idx] === correctAnswer) {
+            const correctAnswer = String(q.correct_answer || q.answer || '').trim().toLowerCase();
+            const selectedAnswer = String(answers[idx] || '').trim().toLowerCase();
+            if (selectedAnswer && selectedAnswer === correctAnswer) {
                 score++;
             }
         });

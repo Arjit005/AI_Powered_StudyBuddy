@@ -70,10 +70,10 @@ const Hero = () => {
                             </div>
 
                             {/* Live Demo Tabs */}
-                            <div className="flex flex-wrap items-center gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800" role="tablist" aria-label="Feature showcase tabs">
+                            <div className="flex flex-wrap items-center gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800" role="group" aria-label="Feature showcase tabs">
                                 <button
-                                    role="tab"
-                                    aria-selected={activeTab === 'chat'}
+                                    type="button"
+                                    aria-pressed={activeTab === 'chat'}
                                     onClick={() => setActiveTab('chat')}
                                     className={`px-3 py-1 rounded-lg text-xs font-mono transition-all flex items-center gap-1.5 ${
                                         activeTab === 'chat' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'text-slate-400 hover:text-white'
@@ -83,8 +83,8 @@ const Hero = () => {
                                     <span>AI Socratic Chat</span>
                                 </button>
                                 <button
-                                    role="tab"
-                                    aria-selected={activeTab === 'flashcards'}
+                                    type="button"
+                                    aria-pressed={activeTab === 'flashcards'}
                                     onClick={() => setActiveTab('flashcards')}
                                     className={`px-3 py-1 rounded-lg text-xs font-mono transition-all flex items-center gap-1.5 ${
                                         activeTab === 'flashcards' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'text-slate-400 hover:text-white'
@@ -94,8 +94,8 @@ const Hero = () => {
                                     <span>3D Active Recall</span>
                                 </button>
                                 <button
-                                    role="tab"
-                                    aria-selected={activeTab === 'maps'}
+                                    type="button"
+                                    aria-pressed={activeTab === 'maps'}
                                     onClick={() => setActiveTab('maps')}
                                     className={`px-3 py-1 rounded-lg text-xs font-mono transition-all flex items-center gap-1.5 ${
                                         activeTab === 'maps' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'text-slate-400 hover:text-white'
@@ -126,7 +126,7 @@ const Hero = () => {
                                         <ul className="list-disc pl-4 space-y-1 text-slate-400">
                                             <li>Readers and a writer can usually proceed concurrently, though checkpointing and database locking still apply.</li>
                                             <li>Changes append to a separate <code className="text-emerald-300 bg-slate-900 px-1 py-0.5 rounded">-wal</code> file instead of the primary database.</li>
-                                            <li>However, SQLite still restricts to <span className="text-amber-400">at most ONE writer at a time</span> via a database-level lock.</li>
+                                            <li>However, WAL still permits <span className="text-amber-400">only one write transaction at a time</span>, coordinated through its WAL write-lock mechanism.</li>
                                         </ul>
                                         <div className="pt-2 flex items-center justify-between text-[11px] text-slate-500 font-mono">
                                             <span>Model: Gemini 2.5 Flash / LiteLLM</span>

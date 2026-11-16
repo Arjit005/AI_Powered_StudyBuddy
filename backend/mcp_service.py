@@ -218,11 +218,22 @@ class MCPService:
             response = AIService._generate_content_safe(prompt, generation_config={"response_mime_type": "application/json"})
             cleaned = AIService._clean_json_response(response.text)
             parsed = json.loads(cleaned)
-            if "nodes" in parsed and isinstance(parsed["nodes"], list) and len(parsed["nodes"]) >= 3:
-                # Enrich with Excalidraw compatible elements and Mermaid code
-                parsed["excalidraw_elements"] = cls._convert_to_excalidraw_elements(parsed.get("nodes", []), parsed.get("edges", []))
-                parsed["mermaid_code"] = cls._nodes_to_mermaid(parsed.get("nodes", []), parsed.get("edges", []))
-                return parsed
+            if isinstance(parsed, dict) and "nodes" in parsed and isinstance(parsed["nodes"], list):
+                valid_nodes = [
+                    n for n in parsed["nodes"]
+                    if isinstance(n, dict) and isinstance(n.get("id"), str) and isinstance(n.get("label"), str)
+                ]
+                valid_edges = [
+                    e for e in parsed.get("edges", [])
+                    if isinstance(e, dict) and isinstance(e.get("source"), str) and isinstance(e.get("target"), str)
+                ]
+                if len(valid_nodes) >= 3:
+                    parsed["nodes"] = valid_nodes
+                    parsed["edges"] = valid_edges
+                    # Enrich with Excalidraw compatible elements and Mermaid code
+                    parsed["excalidraw_elements"] = cls._convert_to_excalidraw_elements(valid_nodes, valid_edges)
+                    parsed["mermaid_code"] = cls._nodes_to_mermaid(valid_nodes, valid_edges)
+                    return parsed
         except Exception as e:
             print(f"MCP Canvas AI generation note: {e}")
 
@@ -485,6 +496,17 @@ class MCPService:
 
         return elements
 
+    @staticmethod
+    def _escape_mermaid_label(text: str) -> str:
+        """
+        Escapes Mermaid special characters, HTML markup, and delimiters to avoid syntax breakage.
+        """
+        if not text:
+            return ""
+        clean = str(text).replace('"', "'").replace('[', '(').replace(']', ')').replace(';', ',')
+        clean = clean.replace('<', '&lt;').replace('>', '&gt;').replace('\n', ' ')
+        return clean[:120].strip()
+
     @classmethod
     def _nodes_to_mermaid(cls, nodes: List[Dict[str, Any]], edges: List[Dict[str, Any]]) -> str:
         """
@@ -492,16 +514,16 @@ class MCPService:
         """
         lines = ["flowchart LR"]
         for node in nodes:
-            nid = node["id"].replace("-", "_")
-            label = node["label"].replace('"', "'")
-            sub = node.get("subtitle", "")
+            nid = re.sub(r'[^a-zA-Z0-9_]', '_', str(node.get("id", "node")))
+            label = cls._escape_mermaid_label(node.get("label", "Node"))
+            sub = cls._escape_mermaid_label(node.get("subtitle", ""))
             display = f"{label}<br/><i>{sub}</i>" if sub else label
             lines.append(f'    {nid}["{display}"]')
 
         for edge in edges:
-            src = edge["source"].replace("-", "_")
-            tgt = edge["target"].replace("-", "_")
-            lbl = edge.get("label", "").replace('"', "'")
+            src = re.sub(r'[^a-zA-Z0-9_]', '_', str(edge.get("source", "node1")))
+            tgt = re.sub(r'[^a-zA-Z0-9_]', '_', str(edge.get("target", "node2")))
+            lbl = cls._escape_mermaid_label(edge.get("label", ""))
             style = edge.get("style", "solid")
             if style == "dashed":
                 arrow = f"-.->|{lbl}|" if lbl else "-.->"
@@ -663,8 +685,26 @@ class MCPService:
             }
 
         elif method == "tools/call":
+            if not isinstance(params, dict):
+                return {
+                    "jsonrpc": "2.0",
+                    "id": rpc_id,
+                    "error": {
+                        "code": -32602,
+                        "message": "Invalid params: payload must be a JSON object."
+                    }
+                }
             tool_name = params.get("name")
             tool_args = params.get("arguments", {})
+            if not tool_name or not isinstance(tool_name, str) or not isinstance(tool_args, dict):
+                return {
+                    "jsonrpc": "2.0",
+                    "id": rpc_id,
+                    "error": {
+                        "code": -32602,
+                        "message": "Invalid params: 'name' must be a non-empty string and 'arguments' must be an object."
+                    }
+                }
             try:
                 result_data = cls.execute_tool(tool_name, tool_args)
                 return {

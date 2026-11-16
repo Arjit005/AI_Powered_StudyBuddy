@@ -915,10 +915,12 @@ async def chat_with_ai_stream(
         yield f"data: {json.dumps(init_payload)}\n\n"
 
         full_content = []
+        stream_succeeded = False
         try:
             for token in ai_service.AIService._generate_content_stream(prompt):
                 full_content.append(token)
                 yield f"data: {json.dumps({'token': token})}\n\n"
+            stream_succeeded = True
         except Exception as e:
             import logging
             logging.error(f"Streaming token generation error: {e}", exc_info=True)
@@ -927,22 +929,23 @@ async def chat_with_ai_stream(
         # Signal completion
         yield "data: [DONE]\n\n"
 
-        # Save to DB asynchronously
-        try:
-            complete_text = "".join(full_content)
-            db_user_msg = models.ChatHistory(role="user", content=clean_message, user_id=user_id, conversation_id=conv.id)
-            db.add(db_user_msg)
-            db_ai_msg = models.ChatHistory(
-                role="ai",
-                content=complete_text,
-                user_id=user_id,
-                conversation_id=conv.id,
-                citations_json=json.dumps(citations_list) if citations_list else None
-            )
-            db.add(db_ai_msg)
-            db.commit()
-        except Exception as persist_err:
-            print(f"Error persisting stream chat: {persist_err}")
+        # Save to DB asynchronously only if generation completed successfully
+        if stream_succeeded and full_content:
+            try:
+                complete_text = "".join(full_content)
+                db_user_msg = models.ChatHistory(role="user", content=clean_message, user_id=user_id, conversation_id=conv.id)
+                db.add(db_user_msg)
+                db_ai_msg = models.ChatHistory(
+                    role="ai",
+                    content=complete_text,
+                    user_id=user_id,
+                    conversation_id=conv.id,
+                    citations_json=json.dumps(citations_list) if citations_list else None
+                )
+                db.add(db_ai_msg)
+                db.commit()
+            except Exception as persist_err:
+                print(f"Error persisting stream chat: {persist_err}")
 
     return StreamingResponse(event_generator(), media_type="text/event-stream")
 

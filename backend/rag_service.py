@@ -125,47 +125,50 @@ class RAGService:
     @staticmethod
     def extract_text_from_url(url: str) -> str:
         """
-        Fetches and cleans webpage text strictly enforcing SSRF safety with zero unvalidated redirects.
+        Fetches and cleans webpage text strictly enforcing SSRF safety with bounded redirect validation.
         """
-        if not RAGService._is_safe_url(url):
-            print(f"SSRF Alert: Blocked unsafe or internal URL: {url}")
-            return ""
-
         import requests
-        try:
-            resp = requests.get(
-                url, 
-                timeout=10, 
-                allow_redirects=False,
-                headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
-            )
-            # If redirect, validate destination explicitly
-            if resp.is_redirect or resp.status_code in [301, 302, 307, 308]:
-                redirect_url = resp.headers.get("location")
-                if redirect_url and RAGService._is_safe_url(redirect_url):
-                    resp = requests.get(
-                        redirect_url,
-                        timeout=10,
-                        allow_redirects=False,
-                        headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
-                    )
-                else:
-                    return ""
+        from urllib.parse import urljoin
 
-            if resp.status_code == 200:
-                html_text = resp.text
-                if trafilatura:
-                    try:
-                        extracted = trafilatura.extract(html_text)
-                        if extracted:
-                            return extracted.strip()
-                    except Exception:
-                        pass
-                # Strip HTML fallback
-                clean = re.sub(r'<[^>]+>', ' ', html_text)
-                return re.sub(r'\s+', ' ', clean).strip()
-        except Exception as e:
-            print(f"URL fetch error: {e}")
+        current_url = url
+        max_redirects = 3
+        resp = None
+
+        for redirect_hop in range(max_redirects + 1):
+            if not RAGService._is_safe_url(current_url):
+                print(f"SSRF Alert: Blocked unsafe or internal URL during hop {redirect_hop}: {current_url}")
+                return ""
+            try:
+                resp = requests.get(
+                    current_url,
+                    timeout=10,
+                    allow_redirects=False,
+                    headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AIStudyBuddy/1.0"}
+                )
+                if resp.is_redirect or resp.status_code in (301, 302, 303, 307, 308):
+                    loc = resp.headers.get("location")
+                    if not loc:
+                        return ""
+                    current_url = urljoin(current_url, loc)
+                    continue
+                break
+            except Exception as req_err:
+                print(f"URL extraction network error at hop {redirect_hop}: {req_err}")
+                return ""
+
+        if resp and resp.status_code == 200:
+            html_text = resp.text
+            if trafilatura:
+                try:
+                    extracted = trafilatura.extract(html_text)
+                    if extracted:
+                        return extracted.strip()
+                except Exception:
+                    pass
+            # Strip HTML fallback
+            clean = re.sub(r'<[^>]+>', ' ', html_text)
+            clean = re.sub(r'\s+', ' ', clean)
+            return clean[:30000].strip()
 
         return ""
 
@@ -526,22 +529,35 @@ class RAGService:
 
                     chunk = None
                     if src_id is not None and c_idx is not None:
-                        chunk = db.query(SourceChunk).filter(
+                        chunk_q = db.query(SourceChunk).join(Source, SourceChunk.source_id == Source.id).filter(
                             SourceChunk.source_id == int(src_id),
                             SourceChunk.chunk_index == int(c_idx)
-                        ).first()
+                        )
+                        if user_id:
+                            chunk_q = chunk_q.filter((Source.user_id == user_id) | (Source.user_id.is_(None)))
+                        else:
+                            chunk_q = chunk_q.filter(Source.user_id.is_(None))
+                        if source_ids:
+                            chunk_q = chunk_q.filter(SourceChunk.source_id.in_(source_ids))
+                        chunk = chunk_q.first()
 
                     if chunk:
                         scored_results.append((chunk, score))
                     elif meta.get("text"):
-                        # Reconstruct temporary SourceChunk representation if DB row was delayed
-                        mock_chunk = SourceChunk(
-                            source_id=int(src_id) if src_id else 0,
-                            chunk_index=int(c_idx) if c_idx else 0,
-                            text=meta.get("text", ""),
-                            token_count=len(meta.get("text", "").split())
+                        # Strict tenant boundary check: verify metadata user_id matches or is global
+                        meta_user = meta.get("user_id")
+                        is_allowed = (
+                            (user_id and (meta_user == str(user_id) or meta_user == "global")) or
+                            (not user_id and meta_user in ("global", None))
                         )
-                        scored_results.append((mock_chunk, score))
+                        if is_allowed:
+                            mock_chunk = SourceChunk(
+                                source_id=int(src_id) if src_id else 0,
+                                chunk_index=int(c_idx) if c_idx else 0,
+                                text=meta.get("text", ""),
+                                token_count=len(meta.get("text", "").split())
+                            )
+                            scored_results.append((mock_chunk, score))
 
                 if scored_results:
                     return scored_results

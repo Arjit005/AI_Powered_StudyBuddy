@@ -102,7 +102,10 @@ export default function Library() {
       const res = await fetch(`/api/library/${id}`, { method: 'DELETE', headers: getAuthHeaders() });
       if (res.ok) {
         setItems(prev => prev.filter(item => item.id !== id));
-        if (selectedItem?.id === id) setSelectedItem(null);
+        if (selectedItem?.id === id) {
+          detailRequestGenRef.current += 1;
+          setSelectedItem(null);
+        }
       } else {
         alert("Failed to delete item from library.");
       }
@@ -110,6 +113,13 @@ export default function Library() {
       console.error("Delete error:", err);
       alert("Network error deleting item.");
     }
+  };
+
+  const handleCloseModal = () => {
+    detailRequestGenRef.current += 1;
+    setSelectedItem(null);
+    setDetailError(null);
+    setDetailLoading(false);
   };
 
   const handleOpenItem = async (item) => {
@@ -255,7 +265,7 @@ export default function Library() {
                 <div className="flex items-start justify-between gap-2 mb-3">
                   <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono uppercase border flex items-center gap-1.5 ${getTypeBadge(item.material_type)}`}>
                     {getTypeIcon(item.material_type)}
-                    {item.material_type.replace('_', ' ')}
+                    {(item.material_type || 'note').replace('_', ' ')}
                   </span>
                   <div className="flex items-center gap-1">
                     <button
@@ -312,7 +322,7 @@ export default function Library() {
                 </div>
               </div>
               <button 
-                onClick={() => setSelectedItem(null)}
+                onClick={handleCloseModal}
                 className="p-1.5 rounded-xl hover:bg-white/10 text-slate-400 hover:text-white"
               >
                 <X className="w-5 h-5" />
@@ -329,7 +339,9 @@ export default function Library() {
               </div>
             ) : (
               <div className="flex-1 overflow-y-auto p-4 rounded-2xl bg-slate-900/60 border border-white/5 text-sm text-slate-300 leading-relaxed font-mono whitespace-pre-wrap">
-                {selectedItem.content_json}
+                {typeof selectedItem.content_json === 'object' 
+                  ? JSON.stringify(selectedItem.content_json, null, 2) 
+                  : (selectedItem.content_json || 'No content available.')}
               </div>
             )}
 
@@ -338,7 +350,7 @@ export default function Library() {
                 Saved on {selectedItem.created_at ? new Date(selectedItem.created_at).toLocaleString() : 'N/A'}
               </span>
               <button
-                onClick={() => setSelectedItem(null)}
+                onClick={handleCloseModal}
                 className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold"
               >
                 Close

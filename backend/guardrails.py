@@ -68,29 +68,37 @@ def validate_input(prompt: str) -> GuardrailResult:
     if not prompt.strip():
         return GuardrailResult(passed=False, reason="Invalid input: prompt cannot be empty.")
 
-    normalized = prompt.lower()
-    clean_normalized = re.sub(r'[\s\-_,\.;:!?]+', ' ', normalized).strip()
+    # 1. Strip zero-width, non-printing, and invisible characters before security inspection
+    sanitized = re.sub(r'[\u200B-\u200D\uFEFF\u00A0\x00-\x08\x0B\x0C\x0E-\x1F]', '', prompt)
 
-    # 1. Check prompt injection patterns against raw and punctuation-normalized input
+    # 2. Multi-tier normalization to defeat punctuation-insertion and delimiter evasion
+    normalized = sanitized.lower()
+    clean_normalized = re.sub(r'[\s\-_,\.;:!?/\\]+', ' ', normalized).strip()
+    # Punctuation-stripped version (e.g., 'ig.nore' -> 'ignore')
+    alpha_only_normalized = re.sub(r'[^a-z0-9\s]', '', normalized)
+    alpha_collapsed = re.sub(r'\s+', ' ', alpha_only_normalized).strip()
+
+    # 3. Check prompt injection patterns against raw, separator-collapsed, and de-punctuated forms
     for pattern in INJECTION_PATTERNS:
-        if re.search(pattern, normalized) or re.search(pattern, clean_normalized):
+        if (re.search(pattern, normalized) or 
+            re.search(pattern, clean_normalized) or 
+            re.search(pattern, alpha_collapsed)):
             logger.warning(f"Security Alert: Prompt injection detected matching pattern: '{pattern}'")
             return GuardrailResult(
                 passed=False,
                 reason="Prompt injection or jailbreak attempt detected. Access denied by AI Safety Shield."
             )
 
-    # 2. Check harmful content patterns
+    # 4. Check harmful content patterns
     for pattern in HARMFUL_PATTERNS:
-        if re.search(pattern, normalized) or re.search(pattern, clean_normalized):
+        if (re.search(pattern, normalized) or 
+            re.search(pattern, clean_normalized) or 
+            re.search(pattern, alpha_collapsed)):
             logger.warning(f"Security Alert: Harmful content detected matching pattern: '{pattern}'")
             return GuardrailResult(
                 passed=False,
                 reason="Content violates academic and ethical safety guidelines. Request blocked."
             )
-
-    # 3. Sanitize control characters and zero-width spaces
-    sanitized = re.sub(r'[​-‍﻿]', '', prompt)
 
     return GuardrailResult(passed=True, sanitized_text=sanitized)
 
@@ -109,31 +117,55 @@ def sanitize_output(output_text: str) -> str:
     return sanitized
 
 
+STOP_WORDS = {
+    'this', 'that', 'with', 'from', 'have', 'were', 'which', 'there', 'their', 'about',
+    'would', 'these', 'other', 'could', 'after', 'first', 'should', 'where', 'while',
+    'being', 'under', 'between', 'through', 'during', 'before', 'above', 'below'
+}
+
 def verify_rag_grounding(answer: str, retrieved_chunks: List[str]) -> Tuple[bool, float]:
     """
     Verifies whether the generated answer is grounded in the retrieved RAG chunks.
-    Computes keyword overlap score as a heuristic faithfulness check.
+    Uses sentence-level claim alignment combined with salient token coverage.
     """
-    if not retrieved_chunks:
-        # If no chunks provided, cannot claim grounded RAG verification
+    if not retrieved_chunks or not answer:
         return False, 0.0
 
-    answer_words = set(re.findall(r'\w+', answer.lower()))
-    if not answer_words:
+    corpus_text = " ".join(retrieved_chunks).lower()
+    corpus_tokens = set(re.findall(r'\b[a-z]{4,}\b', corpus_text)) - STOP_WORDS
+    if not corpus_tokens:
         return False, 0.0
 
-    corpus_words = set()
-    for chunk in retrieved_chunks:
-        corpus_words.update(re.findall(r'\w+', chunk.lower()))
+    # Clean citations e.g. [1], [2] before sentence parsing
+    clean_answer = re.sub(r'\[\d+\]', '', answer)
+    sentences = [s.strip() for s in re.split(r'[.!?\n]+', clean_answer) if len(s.strip()) > 15]
 
-    # Calculate overlap of meaningful words (length > 3)
-    meaningful_answer_words = {w for w in answer_words if len(w) > 3}
-    if not meaningful_answer_words:
-        return False, 0.0
+    if not sentences:
+        # Fall back to token overlap if no full sentences
+        answer_tokens = set(re.findall(r'\b[a-z]{4,}\b', clean_answer.lower())) - STOP_WORDS
+        if not answer_tokens:
+            return False, 0.0
+        score = len(answer_tokens.intersection(corpus_tokens)) / len(answer_tokens)
+        return score >= 0.25, round(score, 3)
 
-    overlap = meaningful_answer_words.intersection(corpus_words)
-    faithfulness_score = len(overlap) / len(meaningful_answer_words)
+    supported_sentences = 0
+    total_sentence_scores = 0.0
 
-    # Threshold for faithfulness based on actual textual evidence overlap
-    is_faithful = faithfulness_score >= 0.15
+    for sent in sentences:
+        sent_tokens = set(re.findall(r'\b[a-z]{4,}\b', sent.lower())) - STOP_WORDS
+        if not sent_tokens:
+            continue
+        overlap = sent_tokens.intersection(corpus_tokens)
+        sent_ratio = len(overlap) / len(sent_tokens)
+        total_sentence_scores += sent_ratio
+        if sent_ratio >= 0.30:  # At least 30% of content words exist in corpus
+            supported_sentences += 1
+
+    sentence_grounding_ratio = supported_sentences / max(len(sentences), 1)
+    avg_sentence_support = total_sentence_scores / max(len(sentences), 1)
+    
+    # Composite calibrated faithfulness score
+    faithfulness_score = round((0.6 * sentence_grounding_ratio) + (0.4 * avg_sentence_support), 3)
+    is_faithful = faithfulness_score >= 0.25
+
     return is_faithful, faithfulness_score

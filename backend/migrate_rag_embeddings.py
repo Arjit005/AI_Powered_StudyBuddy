@@ -57,12 +57,16 @@ def migrate_embeddings():
                 }
             })
 
-        db.commit()
-
-        # Upsert into Pinecone
+        # 1. Upsert into Pinecone first; only commit local DB if remote upsert succeeds
         namespace = f"user_{src.user_id}" if src.user_id else "global"
-        RAGService._upsert_to_pinecone(vectors_to_upsert, namespace=namespace)
-        total_chunks_reembedded += len(chunks)
+        try:
+            RAGService._upsert_to_pinecone(vectors_to_upsert, namespace=namespace)
+            db.commit()
+            total_chunks_reembedded += len(chunks)
+        except Exception as upsert_err:
+            db.rollback()
+            print(f"Error upserting vectors for source {src.id} to Pinecone: {upsert_err}")
+            raise
 
     print(f"Migration Complete: Successfully processed {len(sources)} sources, {total_chunks_reembedded} chunks.")
 

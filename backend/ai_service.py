@@ -435,12 +435,13 @@ class AIService:
                     try:
                         model = genai.GenerativeModel(model_name)
                         response = model.generate_content(prompt, stream=True)
-                        circuit_breaker.record_success("gemini")
                         for chunk in response:
                             if chunk.text:
                                 yield sanitize_output(chunk.text)
+                        circuit_breaker.record_success("gemini")
                         return
                     except Exception as me:
+                        circuit_breaker.record_failure("gemini")
                         print(f"Gemini Stream model {model_name} failed: {me}")
                         continue
             except Exception as ge:
@@ -653,8 +654,14 @@ flowchart TD
             """
             response = AIService._generate_content_safe(prompt, generation_config={"response_mime_type": "application/json"})
             data = json.loads(AIService._clean_json_response(response.text))
-            if len(data.get("flashcards", [])) > 0:
-                return data
+            if isinstance(data, dict) and isinstance(data.get("flashcards"), list):
+                valid_cards = [
+                    {"front": str(c["front"]).strip(), "back": str(c["back"]).strip()}
+                    for c in data["flashcards"]
+                    if isinstance(c, dict) and c.get("front") and c.get("back") and str(c["front"]).strip() and str(c["back"]).strip()
+                ]
+                if len(valid_cards) >= 3:
+                    return {"flashcards": valid_cards}
         except Exception as e:
             print(f"Flashcards note: {e}")
 
@@ -699,8 +706,18 @@ flowchart TD
             response = AIService._generate_content_safe(prompt, generation_config={"response_mime_type": "application/json"})
             cleaned_json = AIService._clean_json_response(response.text)
             data = json.loads(cleaned_json)
-            if "root" in data and "edges" in data and len(data["edges"]) > 0:
-                return data
+            if isinstance(data, dict) and isinstance(data.get("root"), str) and isinstance(data.get("edges"), list):
+                valid_edges = [
+                    {"source": str(e["source"]).strip(), "target": str(e["target"]).strip(), "relationship": str(e.get("relationship", "relates-to")).strip()}
+                    for e in data["edges"]
+                    if isinstance(e, dict) and e.get("source") and e.get("target") and str(e["source"]).strip() and str(e["target"]).strip()
+                ]
+                if len(valid_edges) >= 3:
+                    return {
+                        "layout": data.get("layout", "tree"),
+                        "root": data["root"].strip(),
+                        "edges": valid_edges
+                    }
         except Exception as e:
             print(f"Concept map note: {e}")
 
@@ -745,8 +762,16 @@ flowchart TD
             response = AIService._generate_content_safe(prompt, generation_config={"response_mime_type": "application/json"})
             cleaned = AIService._clean_json_response(response.text)
             data = json.loads(cleaned)
-            if "mermaid_code" in data and len(data["mermaid_code"]) > 20:
-                return data
+            if (isinstance(data, dict) and 
+                isinstance(data.get("mermaid_code"), str) and len(data["mermaid_code"].strip()) > 20 and
+                isinstance(data.get("title"), str) and isinstance(data.get("description"), str)):
+                components = [str(c).strip() for c in data.get("key_components", []) if str(c).strip()] if isinstance(data.get("key_components"), list) else []
+                return {
+                    "title": data["title"].strip(),
+                    "description": data["description"].strip(),
+                    "mermaid_code": data["mermaid_code"].strip(),
+                    "key_components": components
+                }
         except Exception as e:
             print(f"Mermaid generation note: {e}")
 

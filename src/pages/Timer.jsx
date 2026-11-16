@@ -1,13 +1,17 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Play, Pause, RotateCcw, Flame } from 'lucide-react';
 
+const FOCUS_DURATION_SECONDS = 25 * 60;
+const BREAK_DURATION_SECONDS = 5 * 60;
+const TRACK_ACTIVITY_ENDPOINT = '/api/track-activity';
+
 const StudyTimer = () => {
-    const [timeLeft, setTimeLeft] = useState(25 * 60);
+    const [timeLeft, setTimeLeft] = useState(FOCUS_DURATION_SECONDS);
     const [isActive, setIsActive] = useState(false);
     const [mode, setMode] = useState('focus'); // 'focus' or 'break'
     const [trackingStatus, setTrackingStatus] = useState(null);
     const targetEndTimeRef = useRef(null);
-    const totalTime = mode === 'focus' ? 25 * 60 : 5 * 60;
+    const totalTime = mode === 'focus' ? FOCUS_DURATION_SECONDS : BREAK_DURATION_SECONDS;
 
     useEffect(() => {
         if (!isActive) {
@@ -29,13 +33,13 @@ const StudyTimer = () => {
                 setIsActive(false);
                 targetEndTimeRef.current = null;
 
-                const duration = mode === 'focus' ? 25 * 60 : 5 * 60;
+                const duration = mode === 'focus' ? FOCUS_DURATION_SECONDS : BREAK_DURATION_SECONDS;
                 if (mode === 'focus') {
                     const token = localStorage.getItem('auth_token');
                     const headers = { 'Content-Type': 'application/json' };
                     if (token) headers['Authorization'] = `Bearer ${token}`;
 
-                    fetch('/api/track-activity', {
+                    fetch(TRACK_ACTIVITY_ENDPOINT, {
                         method: 'POST',
                         headers,
                         body: JSON.stringify({ activity_type: 'timer_focus', duration_seconds: duration })
@@ -70,14 +74,14 @@ const StudyTimer = () => {
     const resetTimer = () => {
         targetEndTimeRef.current = null;
         setIsActive(false);
-        setTimeLeft(mode === 'focus' ? 25 * 60 : 5 * 60);
+        setTimeLeft(mode === 'focus' ? FOCUS_DURATION_SECONDS : BREAK_DURATION_SECONDS);
     };
 
     const switchMode = (newMode) => {
         targetEndTimeRef.current = null;
         setMode(newMode);
         setIsActive(false);
-        setTimeLeft(newMode === 'focus' ? 25 * 60 : 5 * 60);
+        setTimeLeft(newMode === 'focus' ? FOCUS_DURATION_SECONDS : BREAK_DURATION_SECONDS);
     };
 
     const formatTime = (seconds) => {

@@ -20,14 +20,15 @@ import Pricing from './pages/Pricing';
 import LoginPage from './pages/LoginPage';
 import SignupPage from './pages/SignupPage';
 
-// Helper to check JWT format and expiration
+// Helper to check JWT format and valid expiration
 const isTokenValid = (token) => {
   if (!token || typeof token !== 'string') return false;
   try {
     const parts = token.split('.');
     if (parts.length !== 3) return false;
     const payloadJson = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
-    if (payloadJson.exp && payloadJson.exp * 1000 < Date.now()) {
+    // Must have a valid future expiration
+    if (!payloadJson.exp || typeof payloadJson.exp !== 'number' || payloadJson.exp * 1000 <= Date.now()) {
       return false;
     }
     return true;
@@ -36,17 +37,18 @@ const isTokenValid = (token) => {
   }
 };
 
-// Protected Route Component checking token presence, structure, and server verification
+// Protected Route Component checking token presence, structure, and server verification (Fails Closed)
 const ProtectedRoute = ({ children }) => {
   const token = localStorage.getItem('auth_token');
-  const [isAuthorized, setIsAuthorized] = useState(() => {
-    return localStorage.getItem('isAuthenticated') === 'true' && isTokenValid(token);
+  const [authStatus, setAuthStatus] = useState(() => {
+    if (!token || !isTokenValid(token)) return 'unauthorized';
+    return 'checking';
   });
 
   useEffect(() => {
     let isMounted = true;
     if (!token || !isTokenValid(token)) {
-      setIsAuthorized(false);
+      setAuthStatus('unauthorized');
       return;
     }
 
@@ -57,16 +59,16 @@ const ProtectedRoute = ({ children }) => {
       .then(res => {
         if (!isMounted) return;
         if (res.ok) {
-          setIsAuthorized(true);
+          setAuthStatus('authorized');
         } else {
-          localStorage.removeItem('auth_token');
-          localStorage.removeItem('isAuthenticated');
-          localStorage.removeItem('user');
-          setIsAuthorized(false);
+          setAuthStatus('unauthorized');
         }
       })
       .catch(() => {
-        // In transient offline states, retain local optimistic verification
+        // Fail closed on network failure or offline state to prevent unauthorized bypass
+        if (isMounted) {
+          setAuthStatus('unauthorized');
+        }
       });
 
     return () => {
@@ -74,12 +76,27 @@ const ProtectedRoute = ({ children }) => {
     };
   }, [token]);
 
-  if (!isAuthorized) {
-    localStorage.removeItem('auth_token');
-    localStorage.removeItem('isAuthenticated');
-    localStorage.removeItem('user');
+  // Clean up credentials inside an effect when unauthorized, never during render
+  useEffect(() => {
+    if (authStatus === 'unauthorized') {
+      localStorage.removeItem('auth_token');
+      localStorage.removeItem('isAuthenticated');
+      localStorage.removeItem('user');
+    }
+  }, [authStatus]);
+
+  if (authStatus === 'checking') {
+    return (
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+        <div className="w-8 h-8 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    );
+  }
+
+  if (authStatus === 'unauthorized') {
     return <Navigate to="/login" replace />;
   }
+
   return children;
 };
 

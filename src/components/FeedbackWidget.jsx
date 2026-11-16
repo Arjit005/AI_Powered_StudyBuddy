@@ -11,9 +11,18 @@ const FeedbackWidget = () => {
     const [submitted, setSubmitted] = useState(false);
     const [submitError, setSubmitError] = useState(null);
     const closeTimerRef = useRef(null);
+    const isOpenRef = useRef(false);
+    const abortControllerRef = useRef(null);
+
+    useEffect(() => {
+        isOpenRef.current = isOpen;
+    }, [isOpen]);
 
     useEffect(() => {
         return () => {
+            if (abortControllerRef.current) {
+                abortControllerRef.current.abort();
+            }
             if (closeTimerRef.current) {
                 clearTimeout(closeTimerRef.current);
             }
@@ -21,6 +30,10 @@ const FeedbackWidget = () => {
     }, []);
 
     const handleClose = () => {
+        if (abortControllerRef.current) {
+            abortControllerRef.current.abort();
+            abortControllerRef.current = null;
+        }
         if (closeTimerRef.current) {
             clearTimeout(closeTimerRef.current);
             closeTimerRef.current = null;
@@ -35,10 +48,12 @@ const FeedbackWidget = () => {
         e.preventDefault();
         setSubmitting(true);
         setSubmitError(null);
+        abortControllerRef.current = new AbortController();
         try {
             const res = await fetch('/api/feedback', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
+                signal: abortControllerRef.current.signal,
                 body: JSON.stringify({
                     page: location.pathname,
                     rating,
@@ -49,6 +64,9 @@ const FeedbackWidget = () => {
                 const errData = await res.json().catch(() => ({}));
                 throw new Error(errData.detail || 'Feedback submission failed');
             }
+            if (!isOpenRef.current) {
+                return; // Ignore completion if widget was closed while request was in-flight
+            }
             setSubmitted(true);
             if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
             closeTimerRef.current = setTimeout(() => {
@@ -58,8 +76,11 @@ const FeedbackWidget = () => {
                 closeTimerRef.current = null;
             }, 2500);
         } catch (err) {
+            if (err.name === 'AbortError') return;
             console.error("Feedback error:", err);
-            setSubmitError(err.message || 'Submission failed. Please try again.');
+            if (isOpenRef.current) {
+                setSubmitError(err.message || 'Submission failed. Please try again.');
+            }
         } finally {
             setSubmitting(false);
         }

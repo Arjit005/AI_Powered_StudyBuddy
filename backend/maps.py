@@ -12,6 +12,8 @@ def hierarchy_pos(G, root=None, width=1., vert_gap = 0.2, vert_loc = 0, xcenter 
     If the graph is a tree this will return the positions to plot this in a 
     hierarchical layout. If it contains cycles, it uses a BFS tree to force hierarchy.
     '''
+    if len(G.nodes) == 0:
+        return {}
     if root is None:
         # Find a node that is a likely root (zero in-degree) or just first node
         sources = [n for n in G.nodes if G.in_degree(n) == 0]

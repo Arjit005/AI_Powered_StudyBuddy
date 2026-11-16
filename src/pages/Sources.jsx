@@ -127,6 +127,7 @@ const Sources = () => {
                 setSourceGuide(data);
             } else {
                 const errData = await res.json().catch(() => ({}));
+                if (thisGen !== guideRequestGenRef.current) return;
                 setGuideError(errData.detail || 'Could not generate study guide for this source.');
             }
         } catch (e) {

@@ -50,6 +50,7 @@ export default function CanvasStudio() {
   const canvasRef = useRef(null);
   const copyTimeoutRef = useRef(null);
   const saveTimeoutRef = useRef(null);
+  const requestGenRef = useRef(0);
 
   // Initial load
   useEffect(() => {
@@ -70,6 +71,7 @@ export default function CanvasStudio() {
 
   const fetchInitialCanvas = async () => {
     setLoading(true);
+    const thisGen = ++requestGenRef.current;
     try {
       const res = await fetch('/api/canvas/generate', {
         method: 'POST',
@@ -80,8 +82,11 @@ export default function CanvasStudio() {
           diagram_type: 'architecture'
         })
       });
+      if (thisGen !== requestGenRef.current) return;
       if (res.ok) {
         const data = await res.json();
+        if (thisGen !== requestGenRef.current) return;
+        setSelectedNode(null);
         setCanvasData(data.canvas);
         setTelemetry({
           execution_time_ms: data.execution_time_ms,
@@ -93,10 +98,14 @@ export default function CanvasStudio() {
         setError(errData.detail || 'Could not initialize template architecture.');
       }
     } catch (err) {
-      console.error("Canvas fetch error:", err);
-      setError('Network error initializing canvas diagram.');
+      if (thisGen === requestGenRef.current) {
+        console.error("Canvas fetch error:", err);
+        setError('Network error initializing canvas diagram.');
+      }
     } finally {
-      setLoading(false);
+      if (thisGen === requestGenRef.current) {
+        setLoading(false);
+      }
     }
   };
 
@@ -118,6 +127,7 @@ export default function CanvasStudio() {
     setLoading(true);
     setError(null);
     setSelectedNode(null);
+    const thisGen = ++requestGenRef.current;
     try {
       const res = await fetch('/api/canvas/generate', {
         method: 'POST',
@@ -128,8 +138,10 @@ export default function CanvasStudio() {
           diagram_type: diagramType
         })
       });
+      if (thisGen !== requestGenRef.current) return;
       if (res.ok) {
         const data = await res.json();
+        if (thisGen !== requestGenRef.current) return;
         setCanvasData(data.canvas);
         setTelemetry({
           execution_time_ms: data.execution_time_ms,
@@ -143,10 +155,14 @@ export default function CanvasStudio() {
         setError(errData.detail || 'Diagram generation failed. Please try another prompt.');
       }
     } catch (err) {
-      console.error("Generate canvas error:", err);
-      setError("Network error communicating with canvas generation engine.");
+      if (thisGen === requestGenRef.current) {
+        console.error("Generate canvas error:", err);
+        setError("Network error communicating with canvas generation engine.");
+      }
     } finally {
-      setLoading(false);
+      if (thisGen === requestGenRef.current) {
+        setLoading(false);
+      }
     }
   };
 
@@ -281,13 +297,42 @@ export default function CanvasStudio() {
     }
   };
 
-  // Download SVG with proper Blob URL cleanup
+  // Download complete standalone SVG containing both edges and node rectangles with labels
   const handleDownloadSvg = () => {
-    if (!canvasRef.current) return;
-    const svgEl = canvasRef.current.querySelector('svg');
-    if (!svgEl) return;
-    const svgData = new XMLSerializer().serializeToString(svgEl);
-    const blob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
+    if (!canvasData?.nodes?.length) return;
+    const svgEl = canvasRef.current?.querySelector('svg');
+    const edgePaths = svgEl ? svgEl.innerHTML : '';
+    
+    // Construct complete standalone SVG with both nodes and connectors
+    const nodesSvg = canvasData.nodes.map(n => {
+      const x = n.x || 100;
+      const y = n.y || 100;
+      const w = 180;
+      const h = 75;
+      const label = (n.label || 'Node').replace(/[<>&"]/g, '');
+      const sub = (n.subtitle || '').replace(/[<>&"]/g, '');
+      return `
+        <g transform="translate(${x}, ${y})">
+          <rect width="${w}" height="${h}" rx="12" fill="#0f172a" stroke="#10b981" stroke-width="2" />
+          <text x="${w/2}" y="32" fill="#f8fafc" font-family="monospace" font-size="12" font-weight="bold" text-anchor="middle">${label}</text>
+          <text x="${w/2}" y="52" fill="#94a3b8" font-family="sans-serif" font-size="10" text-anchor="middle">${sub}</text>
+        </g>
+      `;
+    }).join('\n');
+
+    const fullSvg = `
+      <svg xmlns="http://www.w3.org/2000/svg" width="2400" height="1400" viewBox="0 0 2400 1400" style="background-color: #020617;">
+        <defs>
+          <marker id="arrow" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M 0 1 L 10 5 L 0 9 z" fill="#10b981" />
+          </marker>
+        </defs>
+        ${edgePaths}
+        ${nodesSvg}
+      </svg>
+    `.trim();
+
+    const blob = new Blob([fullSvg], { type: 'image/svg+xml;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
