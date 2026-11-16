@@ -1,5 +1,6 @@
 import os
 import json
+import re
 import time 
 import requests
 import warnings
@@ -428,22 +429,28 @@ class AIService:
         """
         Yields tokens in real-time using Gemini streaming API with fallback to non-streaming generators.
         """
+        has_yielded = False
         if GEMINI_API_KEY and circuit_breaker.is_available("gemini"):
             try:
                 valid_models = AIService._get_valid_models()
                 gemini_succeeded = False
                 for model_name in valid_models:
+                    if has_yielded:
+                        break
                     try:
                         model = genai.GenerativeModel(model_name)
                         response = model.generate_content(prompt, stream=True)
                         for chunk in response:
                             if chunk.text:
+                                has_yielded = True
                                 yield sanitize_output(chunk.text)
                         circuit_breaker.record_success("gemini")
                         gemini_succeeded = True
                         return
                     except Exception as me:
                         print(f"Gemini Stream model {model_name} failed: {me}")
+                        if has_yielded:
+                            return
                         continue
                 if not gemini_succeeded:
                     circuit_breaker.record_failure("gemini")
@@ -451,9 +458,10 @@ class AIService:
                 circuit_breaker.record_failure("gemini")
                 print(f"Gemini Streaming error: {ge}")
 
-        # Fallback to standard safe generation and yield as a single sanitized chunk
-        fallback_resp = AIService._generate_content_safe(prompt)
-        yield sanitize_output(fallback_resp.text)
+        # Fallback to standard safe generation only if no tokens were emitted yet
+        if not has_yielded:
+            fallback_resp = AIService._generate_content_safe(prompt)
+            yield sanitize_output(fallback_resp.text)
 
     # =========================================================================
     # HYBRID MEMORY ARCHITECTURE IMPLEMENTATION

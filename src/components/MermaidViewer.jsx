@@ -12,7 +12,7 @@ const sanitizeSvg = (svgStr) => {
         const doc = parser.parseFromString(svgStr, 'image/svg+xml');
         // Strip active executable elements including script, foreignObject, iframe, embed, object
         doc.querySelectorAll('script, foreignObject, iframe, embed, object').forEach(s => s.remove());
-        // Strip event handler attributes, javascript: URLs, and active CSS url()
+        // Strip event handler attributes, javascript/vbscript/data URLs, and active CSS url()
         doc.querySelectorAll('*').forEach(el => {
             for (let i = el.attributes.length - 1; i >= 0; i--) {
                 const attr = el.attributes[i];
@@ -21,8 +21,9 @@ const sanitizeSvg = (svgStr) => {
                 if (
                     name.startsWith('on') || 
                     val.startsWith('javascript:') || 
-                    val.startsWith('data:text/html') ||
-                    (name === 'href' && !val.startsWith('#'))
+                    val.startsWith('vbscript:') ||
+                    val.startsWith('data:') ||
+                    ((name === 'href' || name.endsWith(':href')) && !val.startsWith('#'))
                 ) {
                     el.removeAttribute(attr.name);
                 }
@@ -114,7 +115,7 @@ const MermaidViewer = ({ chart, title = "Architecture Diagram" }) => {
             }
 
             // Serialize through global render queue to prevent concurrent mermaid DOM race conditions
-            globalRenderQueue = globalRenderQueue.then(async () => {
+            globalRenderQueue = globalRenderQueue.catch(() => {}).then(async () => {
                 if (isCancelled) return;
                 try {
                     const { svg } = await mermaid.render(id, cleanChart);

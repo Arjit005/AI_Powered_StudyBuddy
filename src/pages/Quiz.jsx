@@ -248,8 +248,9 @@ const Quiz = () => {
                             {quiz.questions.map((q, idx) => {
                                 const correctAnswer = q.answer || q.correct_answer;
                                 const selectedOption = answers[idx];
-                                const isCorrect = submitted && selectedOption === correctAnswer;
-                                const isWrong = submitted && selectedOption && selectedOption !== correctAnswer;
+                                const norm = (val) => String(val || '').trim().toLowerCase();
+                                const isCorrect = submitted && norm(selectedOption) === norm(correctAnswer);
+                                const isWrong = submitted && selectedOption && norm(selectedOption) !== norm(correctAnswer);
 
                                 return (
                                     <div key={idx} className="glass-panel p-6 rounded-3xl border border-white/5 space-y-4">
@@ -265,8 +266,8 @@ const Quiz = () => {
                                         <div className="grid grid-cols-1 gap-2.5 pt-2">
                                             {q.options && q.options.map((option, optIdx) => {
                                                 const isSelected = selectedOption === option;
-                                                const isThisCorrect = submitted && option === correctAnswer;
-                                                const isThisWrong = submitted && isSelected && option !== correctAnswer;
+                                                const isThisCorrect = submitted && norm(option) === norm(correctAnswer);
+                                                const isThisWrong = submitted && isSelected && norm(option) !== norm(correctAnswer);
 
                                                 let btnStyle = "glass-input text-slate-300 hover:bg-slate-800/60";
                                                 if (isSelected && !submitted) {

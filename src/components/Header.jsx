@@ -76,6 +76,7 @@ const Header = () => {
         localStorage.removeItem('auth_token');
         localStorage.removeItem('user');
         setUser(null);
+        window.dispatchEvent(new Event('auth-change'));
         navigate('/login');
     };
 

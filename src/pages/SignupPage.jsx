@@ -44,17 +44,22 @@ const SignupPage = () => {
             navigate('/');
         } catch (err) {
             console.error("Google auth error:", err);
-            if (err.code === 'auth/unauthorized-domain' || err.message?.includes('unauthorized-domain')) {
-                setError("Google Sign-Up is not configured for this web domain yet. Please use the form below to create your account.");
+            const errStr = String(err?.code || '') + ' ' + String(err?.message || '');
+            if (errStr.includes('unauthorized-domain')) {
+                setError("Google Sign-In is not enabled for this domain yet. Please create your account using the form below.");
+            } else if (errStr.includes('popup-closed-by-user')) {
+                setError("Sign-up popup was closed. Please try again or use the form below.");
+            } else if (errStr.includes('network-request-failed')) {
+                setError("Network error connecting to Google. Please check your internet connection.");
             } else {
-                setError(err.message || 'Google sign-up encountered an error. Please use email sign-up.');
+                setError("Google sign-up could not be completed. Please create your account using the form below.");
             }
         } finally {
             setIsGoogleLoading(false);
         }
     };
 
-    // Password Strength Evaluator (Developer Grade)
+    // Password Strength Evaluator
     const passwordChecks = useMemo(() => {
         return {
             hasLength: password.length >= 8,

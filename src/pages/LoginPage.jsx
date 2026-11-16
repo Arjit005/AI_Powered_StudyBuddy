@@ -52,10 +52,15 @@ const LoginPage = () => {
             navigate('/');
         } catch (err) {
             console.error("Google auth error:", err);
-            if (err.code === 'auth/unauthorized-domain' || err.message?.includes('unauthorized-domain')) {
-                setError("Google Sign-In is not configured for this web domain yet. Please sign in with your email and password below.");
+            const errStr = String(err?.code || '') + ' ' + String(err?.message || '');
+            if (errStr.includes('unauthorized-domain')) {
+                setError("Google Sign-In is not enabled for this domain yet. Please sign in with your email and password below.");
+            } else if (errStr.includes('popup-closed-by-user')) {
+                setError("Sign-in popup was closed. Please try again or use the form below.");
+            } else if (errStr.includes('network-request-failed')) {
+                setError("Network error connecting to Google. Please check your internet connection.");
             } else {
-                setError(err.message || 'Google sign-in encountered an error. Please use email sign-in.');
+                setError("Google sign-in could not be completed. Please sign in with your email and password below.");
             }
         } finally {
             setIsGoogleLoading(false);

@@ -327,6 +327,9 @@ export default function CanvasStudio() {
     const fullSvg = `
       <svg xmlns="http://www.w3.org/2000/svg" width="2400" height="1400" viewBox="0 0 2400 1400" style="background-color: #020617;">
         <defs>
+          <marker id="arrowhead" viewBox="0 0 10 10" refX="9" refY="3.5" markerWidth="10" markerHeight="7" orient="auto">
+            <polygon points="0 0, 10 3.5, 0 7" fill="#10b981" />
+          </marker>
           <marker id="arrow" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
             <path d="M 0 1 L 10 5 L 0 9 z" fill="#10b981" />
           </marker>

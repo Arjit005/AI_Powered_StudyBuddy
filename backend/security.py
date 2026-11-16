@@ -88,11 +88,7 @@ class RateLimiter:
         
         is_trusted_peer = (
             immediate_host in trusted_proxy_set or
-            immediate_host in ("127.0.0.1", "::1", "localhost") or
-            immediate_host.startswith("10.") or
-            immediate_host.startswith("192.168.") or
-            (immediate_host.startswith("172.") and len(immediate_host.split(".")) > 1 and 
-             immediate_host.split(".")[1].isdigit() and 16 <= int(immediate_host.split(".")[1]) <= 31)
+            immediate_host in ("127.0.0.1", "::1", "localhost")
         )
         if trust_proxy and is_trusted_peer:
             forwarded = request.headers.get("X-Forwarded-For")

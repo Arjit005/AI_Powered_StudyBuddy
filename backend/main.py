@@ -1256,19 +1256,19 @@ def get_activity_heatmap(
         record = activity_by_date.get(date_str, {"count": 0, "duration_minutes": 0})
 
         # Intensity scale (0 to 4):
-        # 0: 0 sessions, 1: 1 session, 2: 2 sessions, 3: 3-4 sessions, 4: 5+ sessions or >60 mins
+        # 0: 0 activity, 1: light, 2: moderate (25+ min / 2 sess), 3: high (45+ min / 3-4 sess), 4: intensive (60+ min / 5+ sess)
         count = record["count"]
         duration = record["duration_minutes"]
-        if count == 0:
+        if count == 0 and duration == 0:
             intensity = 0
-        elif count == 1:
-            intensity = 1
-        elif count == 2 or duration >= 30:
-            intensity = 2
-        elif count <= 4 or duration >= 60:
-            intensity = 3
-        else:
+        elif count >= 5 or duration >= 60:
             intensity = 4
+        elif count >= 3 or duration >= 45:
+            intensity = 3
+        elif count >= 2 or duration >= 25:
+            intensity = 2
+        else:
+            intensity = 1
 
         if intensity > 0:
             total_active_days += 1

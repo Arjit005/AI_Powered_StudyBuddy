@@ -14,6 +14,7 @@ const Sources = () => {
     const [urlInput, setUrlInput] = useState('');
     const [selectedFile, setSelectedFile] = useState(null);
     const [uploadType, setUploadType] = useState('pdf'); // 'pdf' | 'url' | 'text'
+    const fileInputRef = useRef(null);
 
     // Selected source guide modal state
     const [selectedSource, setSelectedSource] = useState(null);
@@ -94,6 +95,7 @@ const Sources = () => {
                 setTextInput('');
                 setUrlInput('');
                 setSelectedFile(null);
+                if (fileInputRef.current) fileInputRef.current.value = '';
                 setActiveTab('library');
                 await fetchSources();
             } else {
@@ -365,6 +367,7 @@ const Sources = () => {
                                     Upload PDF Document
                                 </label>
                                 <input
+                                    ref={fileInputRef}
                                     type="file"
                                     accept=".pdf,.txt,.md"
                                     onChange={(e) => setSelectedFile(e.target.files[0])}

@@ -120,7 +120,7 @@ class MCPService:
         ]
 
     @classmethod
-    def execute_tool(cls, name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
+    def execute_tool(cls, name: str, arguments: Dict[str, Any], user_id: Optional[int] = None) -> Dict[str, Any]:
         """
         Executes a registered tool by name with arguments.
         """
@@ -146,7 +146,7 @@ class MCPService:
             if not isinstance(limit, int) or isinstance(limit, bool) or limit < 1:
                 limit = 5
             limit = min(limit, 100)
-            return cls._query_study_memory(cid, limit)
+            return cls._query_study_memory(cid, limit, user_id=user_id)
 
         elif name == "create_study_flashcards":
             topic = arguments.get("topic", "General Topic")
@@ -539,7 +539,8 @@ class MCPService:
         """
         Takes notes or text content and builds a node/edge representation.
         """
-        lines = [line.strip("- *#1234567890. ") for line in content.strip().split("\n") if line.strip()]
+        lines = [re.sub(r'^(?:[-*#>]|\d+\.)\s*', '', line.strip()).strip() for line in content.strip().split("\n") if line.strip()]
+        lines = [l for l in lines if l]
         if not lines:
             lines = ["Core Concept", "Key Principle", "Implementation Step", "Final Outcome"]
 
@@ -644,7 +645,33 @@ class MCPService:
             db.close()
 
     @classmethod
-    def handle_jsonrpc(cls, payload: Dict[str, Any]) -> Dict[str, Any]:
+    def get_canvas_templates(cls) -> List[Dict[str, Any]]:
+        """
+        Returns pre-configured canvas architectural diagram templates.
+        """
+        return [
+            {
+                "id": "system_architecture",
+                "name": "System Architecture",
+                "description": "Multi-tier microservices layout with frontend, API gateway, cache, and database",
+                "nodes_count": 4
+            },
+            {
+                "id": "concept_map",
+                "name": "Concept Mind Map",
+                "description": "Central subject node branching into key principles and sub-concepts",
+                "nodes_count": 5
+            },
+            {
+                "id": "study_flow",
+                "name": "Sequential Study Flow",
+                "description": "Linear step-by-step revision progression with checkpoints",
+                "nodes_count": 4
+            }
+        ]
+
+    @classmethod
+    def handle_jsonrpc(cls, payload: Dict[str, Any], user_id: Optional[int] = None) -> Dict[str, Any]:
         """
         Standard Model Context Protocol JSON-RPC 2.0 processor.
         Supports initialize, tools/list, tools/call, resources/list, prompts/list.
@@ -707,7 +734,7 @@ class MCPService:
                     }
                 }
             try:
-                result_data = cls.execute_tool(tool_name, tool_args)
+                result_data = cls.execute_tool(tool_name, tool_args, user_id=user_id)
                 return {
                     "jsonrpc": "2.0",
                     "id": rpc_id,
@@ -722,6 +749,7 @@ class MCPService:
                     }
                 }
             except Exception as err:
+                logger.error(f"MCP tool {tool_name} execution error: {err}")
                 return {
                     "jsonrpc": "2.0",
                     "id": rpc_id,

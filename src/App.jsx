@@ -26,7 +26,9 @@ const isTokenValid = (token) => {
   try {
     const parts = token.split('.');
     if (parts.length !== 3) return false;
-    const payloadJson = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
+    let b64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+    while (b64.length % 4) b64 += '=';
+    const payloadJson = JSON.parse(atob(b64));
     // Must have a valid future expiration
     if (!payloadJson.exp || typeof payloadJson.exp !== 'number' || payloadJson.exp * 1000 <= Date.now()) {
       return false;
@@ -44,6 +46,7 @@ const ProtectedRoute = ({ children }) => {
     if (!currentToken || !isTokenValid(currentToken)) return 'unauthorized';
     return 'checking';
   });
+  const [networkError, setNetworkError] = useState(false);
 
   useEffect(() => {
     const handleAuthChange = () => {
@@ -60,33 +63,45 @@ const ProtectedRoute = ({ children }) => {
 
   useEffect(() => {
     let isMounted = true;
+    const abortCtrl = new AbortController();
+
     if (!currentToken || !isTokenValid(currentToken)) {
       setAuthStatus('unauthorized');
       return;
     }
     setAuthStatus('checking');
+    setNetworkError(false);
 
     // Cryptographic validation against server session endpoint
     fetch('/api/auth/me', {
-      headers: { 'Authorization': `Bearer ${currentToken}` }
+      headers: { 'Authorization': `Bearer ${currentToken}` },
+      signal: abortCtrl.signal
     })
-      .then(res => {
+      .then(async res => {
         if (!isMounted) return;
         if (res.ok) {
-          setAuthStatus('authorized');
-        } else {
+          const data = await res.json().catch(() => null);
+          if (data && (data.id || data.email || data.username)) {
+            setAuthStatus('authorized');
+          } else {
+            setAuthStatus('unauthorized');
+          }
+        } else if (res.status === 401 || res.status === 403) {
           setAuthStatus('unauthorized');
+        } else {
+          setNetworkError(true);
         }
       })
-      .catch(() => {
-        // Fail closed on network failure or offline state to prevent unauthorized bypass
+      .catch((err) => {
+        if (err.name === 'AbortError') return;
         if (isMounted) {
-          setAuthStatus('unauthorized');
+          setNetworkError(true);
         }
       });
 
     return () => {
       isMounted = false;
+      abortCtrl.abort();
     };
   }, [currentToken]);
 
@@ -98,6 +113,23 @@ const ProtectedRoute = ({ children }) => {
       localStorage.removeItem('user');
     }
   }, [authStatus]);
+
+  if (networkError) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-4 text-center">
+        <div className="p-6 rounded-2xl glass-panel max-w-sm border border-white/10 space-y-3">
+          <div className="text-amber-400 font-bold text-base">Connection Interrupted</div>
+          <p className="text-slate-400 text-xs">Unable to verify session with server. Please check your connection and try again.</p>
+          <button 
+            onClick={() => setCurrentToken(localStorage.getItem('auth_token'))} 
+            className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold"
+          >
+            Retry Connection
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   if (authStatus === 'checking') {
     return (
