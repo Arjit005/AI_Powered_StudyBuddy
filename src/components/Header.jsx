@@ -1,14 +1,31 @@
-import React, { useState, useEffect } from 'react';
-import { Brain, LogOut, Shield, ShieldCheck, Terminal, ChevronDown, CheckCircle2, Search } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { 
+    Brain, 
+    LogOut, 
+    ChevronDown, 
+    Search,
+    Sparkles,
+    FolderKanban,
+    GraduationCap,
+    HelpCircle,
+    Layers,
+    FileText,
+    GitFork,
+    Clock,
+    FileSpreadsheet,
+    Palette,
+    Bookmark
+} from 'lucide-react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 
 const Header = () => {
     const navigate = useNavigate();
     const location = useLocation();
-    const [securityOpen, setSecurityOpen] = useState(false);
-    const [securityData, setSecurityData] = useState(null);
-    const [apiLatency, setApiLatency] = useState('12ms');
     const [user, setUser] = useState(null);
+    const [toolsOpen, setToolsOpen] = useState(false);
+    const [workspaceOpen, setWorkspaceOpen] = useState(false);
+    const toolsRef = useRef(null);
+    const workspaceRef = useRef(null);
 
     useEffect(() => {
         const syncUser = () => {
@@ -24,53 +41,28 @@ const Header = () => {
         window.addEventListener('storage', syncUser);
         window.addEventListener('auth-change', syncUser);
 
-        // Fetch security telemetry from backend with unmount & single-flight protection
-        let isMounted = true;
-        let isPolling = false;
-        let currentAbortCtrl = null;
-
-        const fetchTelemetry = async () => {
-            if (isPolling) return;
-            isPolling = true;
-            if (currentAbortCtrl) currentAbortCtrl.abort();
-            currentAbortCtrl = new AbortController();
-            const start = performance.now();
-            try {
-                const res = await fetch('/api/security/status', { signal: currentAbortCtrl.signal });
-                const duration = Math.round(performance.now() - start);
-                if (!isMounted) return;
-
-                if (res.ok) {
-                    const data = await res.json();
-                    if (!isMounted) return;
-                    setSecurityData(data);
-                    setApiLatency(`${duration}ms`);
-                } else {
-                    if (!isMounted) return;
-                    setSecurityData(null);
-                    setApiLatency('Unavailable');
-                }
-            } catch (err) {
-                if (err.name === 'AbortError') return;
-                if (isMounted) {
-                    setSecurityData(null);
-                    setApiLatency('Offline');
-                }
-            } finally {
-                isPolling = false;
+        const handleClickOutside = (e) => {
+            if (toolsRef.current && !toolsRef.current.contains(e.target)) {
+                setToolsOpen(false);
+            }
+            if (workspaceRef.current && !workspaceRef.current.contains(e.target)) {
+                setWorkspaceOpen(false);
             }
         };
+        document.addEventListener('mousedown', handleClickOutside);
 
-        fetchTelemetry();
-        const interval = setInterval(fetchTelemetry, 30000);
         return () => {
-            isMounted = false;
-            clearInterval(interval);
-            if (currentAbortCtrl) currentAbortCtrl.abort();
             window.removeEventListener('storage', syncUser);
             window.removeEventListener('auth-change', syncUser);
+            document.removeEventListener('mousedown', handleClickOutside);
         };
     }, []);
+
+    // Close dropdowns on route navigation
+    useEffect(() => {
+        setToolsOpen(false);
+        setWorkspaceOpen(false);
+    }, [location.pathname]);
 
     const handleLogout = () => {
         localStorage.removeItem('isAuthenticated');
@@ -81,165 +73,201 @@ const Header = () => {
         navigate('/login');
     };
 
-    const navLinks = [
-        { path: '/', label: 'Dashboard' },
-        { path: '/chat', label: 'AI Tutor' },
-        { path: '/sources', label: 'Sources' },
-        { path: '/canvas', label: 'Canvas Studio' },
-        { path: '/library', label: 'Library' },
-        { path: '/quiz', label: 'Quiz' },
-        { path: '/flashcards', label: 'Flashcards' },
-        { path: '/summarize', label: 'Summarizer' },
-        { path: '/maps', label: 'Concept Map' },
-        { path: '/timer', label: 'Focus Timer' },
-        { path: '/progress', label: 'Analytics' },
+    const studyTools = [
+        { path: '/quiz', label: 'Quiz', desc: 'Test knowledge with 10-Q MCQs', icon: HelpCircle },
+        { path: '/flashcards', label: 'Flashcards', desc: 'Active recall & flip decks', icon: Layers },
+        { path: '/summarize', label: 'Summarizer', desc: 'Instant key takeaways', icon: FileText },
+        { path: '/maps', label: 'Concept Map', desc: 'Visual relation diagrams', icon: GitFork },
+        { path: '/timer', label: 'Focus Timer', desc: 'Pomodoro study sessions', icon: Clock },
     ];
 
+    const workspaceItems = [
+        { path: '/sources', label: 'Sources', desc: 'Upload study files & notes', icon: FileSpreadsheet },
+        { path: '/canvas', label: 'Canvas Studio', desc: 'Visual whiteboard & notes', icon: Palette },
+        { path: '/library', label: 'Saved Library', desc: 'Bookmarks & archived decks', icon: Bookmark },
+    ];
+
+    const isToolsActive = studyTools.some(t => location.pathname === t.path);
+    const isWorkspaceActive = workspaceItems.some(w => location.pathname === w.path);
+
     return (
-        <header className="sticky top-0 z-50 bg-[#0b0f17]/80 backdrop-blur-xl border-b border-emerald-950/40">
+        <header className="sticky top-0 z-50 bg-[#0b0f17]/90 backdrop-blur-xl border-b border-emerald-950/40">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="flex justify-between items-center h-16">
                     {/* Brand Logo */}
-                    <div className="flex items-center gap-6">
-                        <Link to="/" className="flex items-center gap-2.5 group">
-                            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-emerald-500/20 to-teal-400/20 border border-emerald-500/30 flex items-center justify-center group-hover:border-emerald-400 transition-all shadow-[0_0_15px_rgba(16,185,129,0.25)]">
-                                <Brain className="h-5 w-5 text-emerald-400 group-hover:scale-110 transition-transform" />
+                    <div className="flex items-center gap-8">
+                        <Link to="/" className="flex items-center gap-3 group">
+                            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-emerald-500/20 to-teal-400/20 border border-emerald-500/30 flex items-center justify-center group-hover:border-emerald-400 transition-all shadow-[0_0_15px_rgba(16,185,129,0.25)]">
+                                <Brain className="h-5 w-5 text-emerald-400 group-hover:scale-105 transition-transform" />
                             </div>
-                            <div className="flex flex-col">
-                                <span className="text-lg font-bold bg-gradient-to-r from-emerald-400 via-teal-300 to-cyan-400 bg-clip-text text-transparent tracking-tight">
-                                    AI Study Buddy
-                                </span>
-                                <span className="text-[10px] uppercase font-mono tracking-widest text-emerald-500/70 -mt-1">
-                                    Student Edition
-                                </span>
-                            </div>
+                            <span className="text-base sm:text-lg font-bold bg-gradient-to-r from-emerald-400 via-teal-300 to-cyan-400 bg-clip-text text-transparent tracking-tight">
+                                Study Buddy
+                            </span>
                         </Link>
 
-                        {/* Security Guard Telemetry Pill */}
-                        <div className="relative hidden md:block">
-                            <button
-                                onClick={() => setSecurityOpen(!securityOpen)}
-                                className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium transition-all cursor-pointer shadow-sm ${
-                                    securityData?.shield_active 
-                                        ? 'bg-emerald-950/50 text-emerald-300 border border-emerald-800/50 hover:bg-emerald-900/40' 
-                                        : 'bg-amber-950/50 text-amber-300 border border-amber-800/50 hover:bg-amber-900/40'
+                        {/* Navigation Links (Organized into Clean Tabs + Dropdowns) */}
+                        <nav className="hidden md:flex items-center gap-1.5 text-sm font-medium">
+                            <Link
+                                to="/chat"
+                                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg transition-all ${
+                                    location.pathname === '/chat'
+                                        ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 font-semibold'
+                                        : 'text-slate-300 hover:text-emerald-300 hover:bg-slate-800/50'
                                 }`}
-                                title="Your study space safety & privacy status"
                             >
-                                <span className={`w-2 h-2 rounded-full ${securityData?.shield_active ? 'bg-emerald-400 animate-ping' : 'bg-amber-400'}`} />
-                                <ShieldCheck className={`w-3.5 h-3.5 ${securityData?.shield_active ? 'text-emerald-400' : 'text-amber-400'}`} />
-                                <span>Study Space: {securityData?.shield_active ? 'Protected' : 'Safe Mode'}</span>
-                                <ChevronDown className={`w-3 h-3 text-emerald-400 transition-transform ${securityOpen ? 'rotate-180' : ''}`} />
-                            </button>
+                                <Sparkles className="w-4 h-4 text-emerald-400" />
+                                <span>AI Tutor</span>
+                            </Link>
 
-                            {/* Privacy & Safety Popover */}
-                            {securityOpen && (
-                                <div className="absolute top-10 left-0 w-80 p-4 rounded-2xl glass-panel-glow border border-emerald-500/30 shadow-2xl z-50 animate-in fade-in duration-200">
-                                    <div className="flex items-center justify-between pb-2 mb-2 border-b border-emerald-500/20">
-                                        <div className="flex items-center gap-2">
-                                            <Shield className="w-4 h-4 text-emerald-400" />
-                                            <span className="text-xs font-bold uppercase tracking-wider text-emerald-300">Privacy & Safety</span>
-                                        </div>
-                                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${
-                                            securityData?.shield_active 
-                                                ? 'bg-emerald-500/20 text-emerald-300' 
-                                                : 'bg-amber-500/20 text-amber-300'
-                                        }`}>
-                                            {securityData?.shield_active ? 'Active & Protected' : 'Safe Mode'}
-                                        </span>
-                                    </div>
-                                    <div className="space-y-2 text-xs">
-                                        <div className="flex items-start gap-2 text-slate-300">
-                                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 mt-0.5 shrink-0" />
-                                            <div>
-                                                <div className="font-semibold text-white">Verified Study Answers</div>
-                                                <div className="text-[11px] text-slate-400">
-                                                    AI responses are cross-referenced with your uploaded materials and syllabus
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div className="flex items-start gap-2 text-slate-300">
-                                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 mt-0.5 shrink-0" />
-                                            <div>
-                                                <div className="font-semibold text-white">100% Private Workspace</div>
-                                                <div className="text-[11px] text-slate-400">
-                                                    Your notes, quizzes, and decks are completely private to your account
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div className="flex items-start gap-2 text-slate-300">
-                                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 mt-0.5 shrink-0" />
-                                            <div>
-                                                <div className="font-semibold text-white">Account Protection</div>
-                                                <div className="text-[11px] text-slate-400">
-                                                    Encrypted login sessions and continuous security safeguards
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div className="mt-3 pt-2 border-t border-emerald-500/20 flex justify-between items-center text-[11px] text-emerald-400">
-                                        <span>All systems operational</span>
-                                        <button onClick={() => setSecurityOpen(false)} className="hover:text-white underline">Close</button>
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-
-                    {/* Nav Links */}
-                    <nav className="hidden lg:flex items-center gap-1 bg-slate-900/60 p-1 rounded-xl border border-white/5">
-                        {navLinks.map((link) => {
-                            const isActive = location.pathname === link.path;
-                            return (
-                                <Link
-                                    key={link.path}
-                                    to={link.path}
-                                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                                        isActive
-                                            ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 shadow-[0_0_10px_rgba(16,185,129,0.2)]'
-                                            : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'
+                            {/* Study Tools Dropdown */}
+                            <div className="relative" ref={toolsRef}>
+                                <button
+                                    onClick={() => {
+                                        setToolsOpen(!toolsOpen);
+                                        setWorkspaceOpen(false);
+                                    }}
+                                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all ${
+                                        isToolsActive || toolsOpen
+                                            ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 font-semibold'
+                                            : 'text-slate-300 hover:text-emerald-300 hover:bg-slate-800/50'
                                     }`}
                                 >
-                                    {link.label}
-                                </Link>
-                            );
-                        })}
-                    </nav>
+                                    <GraduationCap className="w-4 h-4 text-emerald-400" />
+                                    <span>Study Tools</span>
+                                    <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform duration-200 ${toolsOpen ? 'rotate-180 text-emerald-400' : ''}`} />
+                                </button>
 
-                    {/* User & Actions */}
-                    <div className="flex items-center gap-2.5">
+                                {toolsOpen && (
+                                    <div className="absolute top-11 left-0 w-64 p-2 bg-[#0e1626] border border-emerald-500/20 rounded-2xl shadow-2xl z-50 backdrop-blur-xl animate-in fade-in zoom-in-95 duration-150">
+                                        <div className="px-3 py-1.5 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+                                            Practice & Memorize
+                                        </div>
+                                        <div className="space-y-1">
+                                            {studyTools.map((tool) => {
+                                                const Icon = tool.icon;
+                                                const active = location.pathname === tool.path;
+                                                return (
+                                                    <Link
+                                                        key={tool.path}
+                                                        to={tool.path}
+                                                        className={`flex items-start gap-3 p-2 rounded-xl transition-all ${
+                                                            active 
+                                                                ? 'bg-emerald-500/20 text-emerald-300' 
+                                                                : 'hover:bg-slate-800/60 text-slate-200 hover:text-white'
+                                                        }`}
+                                                    >
+                                                        <div className={`p-1.5 rounded-lg shrink-0 ${active ? 'bg-emerald-500/30 text-emerald-300' : 'bg-slate-800 text-slate-400'}`}>
+                                                            <Icon className="w-4 h-4" />
+                                                        </div>
+                                                        <div>
+                                                            <div className="text-xs font-semibold">{tool.label}</div>
+                                                            <div className="text-[11px] text-slate-400 leading-tight">{tool.desc}</div>
+                                                        </div>
+                                                    </Link>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Workspace Dropdown */}
+                            <div className="relative" ref={workspaceRef}>
+                                <button
+                                    onClick={() => {
+                                        setWorkspaceOpen(!workspaceOpen);
+                                        setToolsOpen(false);
+                                    }}
+                                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all ${
+                                        isWorkspaceActive || workspaceOpen
+                                            ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 font-semibold'
+                                            : 'text-slate-300 hover:text-emerald-300 hover:bg-slate-800/50'
+                                    }`}
+                                >
+                                    <FolderKanban className="w-4 h-4 text-emerald-400" />
+                                    <span>Workspace</span>
+                                    <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform duration-200 ${workspaceOpen ? 'rotate-180 text-emerald-400' : ''}`} />
+                                </button>
+
+                                {workspaceOpen && (
+                                    <div className="absolute top-11 left-0 w-64 p-2 bg-[#0e1626] border border-emerald-500/20 rounded-2xl shadow-2xl z-50 backdrop-blur-xl animate-in fade-in zoom-in-95 duration-150">
+                                        <div className="px-3 py-1.5 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+                                            Content & Notes
+                                        </div>
+                                        <div className="space-y-1">
+                                            {workspaceItems.map((item) => {
+                                                const Icon = item.icon;
+                                                const active = location.pathname === item.path;
+                                                return (
+                                                    <Link
+                                                        key={item.path}
+                                                        to={item.path}
+                                                        className={`flex items-start gap-3 p-2 rounded-xl transition-all ${
+                                                            active 
+                                                                ? 'bg-emerald-500/20 text-emerald-300' 
+                                                                : 'hover:bg-slate-800/60 text-slate-200 hover:text-white'
+                                                        }`}
+                                                    >
+                                                        <div className={`p-1.5 rounded-lg shrink-0 ${active ? 'bg-emerald-500/30 text-emerald-300' : 'bg-slate-800 text-slate-400'}`}>
+                                                            <Icon className="w-4 h-4" />
+                                                        </div>
+                                                        <div>
+                                                            <div className="text-xs font-semibold">{item.label}</div>
+                                                            <div className="text-[11px] text-slate-400 leading-tight">{item.desc}</div>
+                                                        </div>
+                                                    </Link>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            <Link
+                                to="/progress"
+                                className={`px-3 py-1.5 rounded-lg transition-all ${
+                                    location.pathname === '/progress'
+                                        ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 font-semibold'
+                                        : 'text-slate-300 hover:text-emerald-300 hover:bg-slate-800/50'
+                                }`}
+                            >
+                                Analytics
+                            </Link>
+                        </nav>
+                    </div>
+
+                    {/* Right Side: Quick Search & Profile / Auth */}
+                    <div className="flex items-center gap-3">
                         {/* Command Palette Trigger */}
                         <button
                             onClick={() => window.dispatchEvent(new CustomEvent('study-buddy:open-palette'))}
-                            className="hidden sm:flex items-center gap-2 px-2.5 py-1.5 rounded-xl bg-slate-900 border border-slate-800 text-slate-400 hover:text-white hover:border-emerald-500/40 text-xs font-mono transition-all"
-                            title="Command Palette (Ctrl+K)"
+                            className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl bg-slate-900/80 border border-slate-800 text-slate-400 hover:text-slate-200 hover:border-emerald-500/30 text-xs transition-all"
+                            title="Quick Search (Ctrl+K)"
                         >
                             <Search className="w-3.5 h-3.5 text-emerald-400" />
-                            <span className="text-[11px]">Search</span>
-                            <kbd className="px-1.5 py-0.2 rounded bg-slate-800 text-[10px] text-slate-300 border border-white/10">⌘K</kbd>
+                            <span className="hidden sm:inline text-xs">Search</span>
+                            <kbd className="hidden sm:inline px-1.5 py-0.5 rounded bg-slate-800 text-[10px] text-slate-300 border border-white/10 font-mono">⌘K</kbd>
                         </button>
 
                         {user ? (
-                            <>
-                                <div className="hidden sm:flex items-center gap-2 pl-3 py-1 pr-1 bg-slate-900/80 border border-slate-800 rounded-xl">
+                            <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-2 pl-2.5 py-1 pr-1 bg-slate-900/80 border border-slate-800 rounded-xl">
                                     <div className="w-6 h-6 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold text-xs uppercase">
                                         {typeof user.username === 'string' && user.username ? user.username.slice(0, 2) : 'SB'}
                                     </div>
-                                    <span className="text-xs font-mono text-slate-300 max-w-[100px] truncate">
-                                        {typeof user.username === 'string' ? user.username : (typeof user.email === 'string' ? user.email.split('@')[0] : 'User')}
+                                    <span className="text-xs text-slate-300 max-w-[90px] truncate hidden sm:inline">
+                                        {typeof user.username === 'string' ? user.username : (typeof user.email === 'string' ? user.email.split('@')[0] : 'Student')}
                                     </span>
-                                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-mono font-bold border border-emerald-500/20">PRO</span>
                                 </div>
 
                                 <button
                                     onClick={handleLogout}
-                                    className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-rose-400 px-3 py-1.5 rounded-xl border border-transparent hover:border-rose-900/40 hover:bg-rose-950/20 transition-all font-medium"
-                                    title="Sign out of session"
+                                    className="p-2 rounded-xl text-slate-400 hover:text-rose-400 hover:bg-rose-950/20 border border-transparent hover:border-rose-900/30 transition-all"
+                                    title="Log out"
                                 >
-                                    <LogOut className="w-3.5 h-3.5" />
-                                    <span className="hidden sm:inline">Logout</span>
+                                    <LogOut className="w-4 h-4" />
                                 </button>
-                            </>
+                            </div>
                         ) : (
                             <div className="flex items-center gap-2">
                                 <Link
@@ -250,20 +278,12 @@ const Header = () => {
                                 </Link>
                                 <Link
                                     to="/signup"
-                                    className="hidden sm:inline-block text-xs font-medium text-emerald-400 hover:text-emerald-300 px-3 py-1.5 rounded-xl border border-emerald-500/30 hover:border-emerald-500/60 bg-emerald-500/10 transition-all"
+                                    className="text-xs font-semibold text-slate-950 px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-emerald-400 to-teal-400 hover:from-emerald-300 hover:to-teal-300 transition-all shadow-[0_0_12px_rgba(16,185,129,0.3)]"
                                 >
                                     Sign Up
                                 </Link>
                             </div>
                         )}
-
-                        <Link
-                            to="/chat"
-                            className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold bg-gradient-to-r from-emerald-500 to-teal-500 text-slate-950 hover:from-emerald-400 hover:to-teal-400 transition-all shadow-[0_0_20px_rgba(16,185,129,0.3)] active:scale-95"
-                        >
-                            <Terminal className="w-3.5 h-3.5" />
-                            <span>AI Session</span>
-                        </Link>
                     </div>
                 </div>
             </div>
