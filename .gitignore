@@ -8,7 +8,6 @@ env/
 venv/
 ENV/
 *.egg-info/
-dist/
 build/
 
 # Node
@@ -35,7 +34,6 @@ yarn-error.log*
 Thumbs.db
 
 # Build outputs
-dist/
 build/
 *.log
 

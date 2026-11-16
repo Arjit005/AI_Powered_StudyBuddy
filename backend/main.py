@@ -187,11 +187,21 @@ class FeedbackRequest(BaseModel):
 # Database dependency
 get_db = database.get_db
 
+_project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_dist_dir = os.path.join(_project_root, "dist")
+if not os.path.exists(_dist_dir):
+    _dist_dir = os.path.join(os.getcwd(), "dist")
+
 # ============================================================================
 # ROOT & SYSTEM HEALTH
 # ============================================================================
 @app.get("/")
 def read_root():
+    # If compiled production SPA frontend exists in dist, serve index.html directly!
+    index_file = os.path.join(_dist_dir, "index.html")
+    if os.path.exists(index_file):
+        from fastapi.responses import FileResponse
+        return FileResponse(index_file)
     return {
         "message": "Welcome to AI Study Buddy Backend! 🎓 (NotebookLM Grounded RAG Edition)",
         "docs": "/docs",
