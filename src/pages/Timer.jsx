@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Play, Pause, RotateCcw, Flame } from 'lucide-react';
+import { API_ENDPOINTS } from '../config/api';
 
 const FOCUS_DURATION_SECONDS = 25 * 60;
 const BREAK_DURATION_SECONDS = 5 * 60;
-const TRACK_ACTIVITY_ENDPOINT = '/api/track-activity';
+const TRACK_ACTIVITY_ENDPOINT = API_ENDPOINTS.TRACK_ACTIVITY;
 
 const StudyTimer = () => {
     const [timeLeft, setTimeLeft] = useState(FOCUS_DURATION_SECONDS);

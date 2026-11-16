@@ -308,7 +308,7 @@ export default function CanvasStudio() {
       const x = Number.isFinite(rawX) ? rawX : 100;
       const y = Number.isFinite(rawY) ? rawY : 100;
       const w = Number.isFinite(rawW) && rawW > 0 ? rawW : 190;
-      const h = Number.isFinite(rawH) && rawH > 0 ? rawH : 85;
+      const h = Number.isFinite(rawH) && rawH > 0 ? rawH : 75;
       const label = String(n.label || 'Node').replace(/[<>&"]/g, '');
       const sub = String(n.subtitle || '').replace(/[<>&"]/g, '');
       return `

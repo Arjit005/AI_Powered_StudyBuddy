@@ -11,6 +11,8 @@ const Voice = () => {
     const [browserSupported, setBrowserSupported] = useState(true);
     const [error, setError] = useState(null);
     const recognitionRef = useRef(null);
+    const recognitionSessionRef = useRef(0);
+    const aiAbortControllerRef = useRef(null);
     const isMountedRef = useRef(true);
 
     useEffect(() => {
@@ -59,6 +61,9 @@ const Voice = () => {
 
         return () => {
             isMountedRef.current = false;
+            if (aiAbortControllerRef.current) {
+                try { aiAbortControllerRef.current.abort(); } catch (_) {}
+            }
             if (recognitionRef.current) {
                 try { recognitionRef.current.stop(); } catch (_) {}
             }
@@ -72,11 +77,13 @@ const Voice = () => {
         if (!browserSupported) return;
 
         if (isListening) {
+            recognitionSessionRef.current += 1;
             recognitionRef.current?.stop();
             setIsListening(false);
         } else {
             setTranscript('');
             try {
+                recognitionSessionRef.current += 1;
                 recognitionRef.current?.start();
                 setIsListening(true);
             } catch (err) {
@@ -96,6 +103,12 @@ const Voice = () => {
             setIsListening(false);
         }
 
+        if (aiAbortControllerRef.current) {
+            aiAbortControllerRef.current.abort();
+        }
+        const abortCtrl = new AbortController();
+        aiAbortControllerRef.current = abortCtrl;
+
         setIsLoading(true);
         setAiResponse('');
 
@@ -107,10 +120,18 @@ const Voice = () => {
             const res = await fetch('/api/chat', {
                 method: 'POST',
                 headers,
+                signal: abortCtrl.signal,
                 body: JSON.stringify({ message: transcript }),
             });
 
-            if (!res.ok) throw new Error('AI consultation failed');
+            if (!res.ok) {
+                let errDetail = 'AI consultation failed';
+                try {
+                    const errData = await res.json();
+                    errDetail = errData.detail || errDetail;
+                } catch (_) {}
+                throw new Error(errDetail);
+            }
             let data = null;
             try {
                 data = await res.json();
@@ -133,13 +154,18 @@ const Voice = () => {
                 utterance.rate = 1.0;
                 utterance.onend = () => { if (isMountedRef.current) setIsSpeaking(false); };
                 utterance.onerror = () => { if (isMountedRef.current) setIsSpeaking(false); };
-                window.speechSynthesis.speak(utterance);
-                setIsSpeaking(true);
+                try {
+                    window.speechSynthesis.speak(utterance);
+                    setIsSpeaking(true);
+                } catch (_) {
+                    setIsSpeaking(false);
+                }
             }
         } catch (err) {
+            if (err.name === 'AbortError') return;
             console.error("Voice response error:", err);
             if (isMountedRef.current) {
-                setAiResponse('⚠️ Unable to connect to the AI tutor right now. Please check your connection and try again.');
+                setAiResponse(`⚠️ ${err.message || 'Unable to connect to the AI tutor right now. Please check your connection and try again.'}`);
             }
         } finally {
             if (isMountedRef.current) {

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { Zap, CheckCircle2, XCircle, Award, RotateCcw, Save, Check } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
@@ -12,6 +12,8 @@ const Quiz = () => {
     const [saving, setSaving] = useState(false);
     const [activityLogged, setActivityLogged] = useState(false);
     const [error, setError] = useState('');
+    const quizStartTimeRef = useRef(null);
+    const quizInstanceRef = useRef(null);
 
     const generateQuiz = async () => {
         if (!topic.trim() || saving || loading) return;
@@ -42,7 +44,7 @@ const Quiz = () => {
                 throw new Error('AI engine returned no questions. Please try another topic.');
             }
             const validQuestions = data.questions
-                .filter(q => q && typeof q.question === 'string' && Array.isArray(q.options) && q.options.length >= 2)
+                .filter(q => q && typeof q.question === 'string' && q.question.trim().length > 0 && Array.isArray(q.options) && q.options.length >= 2)
                 .map(q => {
                     const rawAnswer = String(q.correct_answer || q.answer || '').trim();
                     if (!rawAnswer) return null;
@@ -65,18 +67,10 @@ const Quiz = () => {
             if (validQuestions.length === 0) {
                 throw new Error('Received malformed quiz questions. Please regenerate.');
             }
-            setQuiz({ ...data, questions: validQuestions, instanceId: Date.now() });
-
-            // Track activity non-blocking in background
-            fetch('/api/track-activity', {
-                method: 'POST',
-                headers,
-                body: JSON.stringify({ activity_type: 'quiz', duration_seconds: 120 })
-            }).then(actRes => {
-                setActivityLogged(actRes.ok);
-            }).catch(() => {
-                setActivityLogged(false);
-            });
+            const newInstanceId = Date.now();
+            quizStartTimeRef.current = Date.now();
+            quizInstanceRef.current = newInstanceId;
+            setQuiz({ ...data, questions: validQuestions, instanceId: newInstanceId });
         } catch (err) {
             setError(err.message || 'Error creating quiz.');
         } finally {
@@ -116,6 +110,30 @@ const Quiz = () => {
                 });
             } catch (_) {}
         }
+
+        // Track activity non-blocking with true measured elapsed time
+        const thisInstance = quiz?.instanceId;
+        const elapsedSecs = quizStartTimeRef.current 
+            ? Math.max(10, Math.round((Date.now() - quizStartTimeRef.current) / 1000))
+            : 60;
+        
+        const token = localStorage.getItem('auth_token');
+        const headers = { 'Content-Type': 'application/json' };
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+
+        fetch('/api/track-activity', {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({ activity_type: 'quiz', duration_seconds: elapsedSecs })
+        }).then(actRes => {
+            if (quizInstanceRef.current === thisInstance) {
+                setActivityLogged(actRes.ok);
+            }
+        }).catch(() => {
+            if (quizInstanceRef.current === thisInstance) {
+                setActivityLogged(false);
+            }
+        });
     };
 
     const handleSaveQuiz = async () => {

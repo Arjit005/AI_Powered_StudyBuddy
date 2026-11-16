@@ -19,7 +19,7 @@ const Progress = () => {
 
         const thisGen = ++progressRequestGenRef.current;
         try {
-            const [progRes, heatRes, dashRes, sessRes] = await Promise.all([
+            const [progResult, heatResult, dashResult, sessResult] = await Promise.allSettled([
                 fetch('/api/progress', { headers }),
                 fetch('/api/analytics/activity-heatmap', { headers }),
                 fetch('/api/analytics/dashboard', { headers }),
@@ -27,6 +27,11 @@ const Progress = () => {
             ]);
 
             if (thisGen !== progressRequestGenRef.current) return;
+
+            const progRes = progResult.status === 'fulfilled' ? progResult.value : { ok: false };
+            const heatRes = heatResult.status === 'fulfilled' ? heatResult.value : { ok: false };
+            const dashRes = dashResult.status === 'fulfilled' ? dashResult.value : { ok: false };
+            const sessRes = sessResult.status === 'fulfilled' ? sessResult.value : { ok: false };
 
             let hasErrors = false;
             if (progRes.ok) {
@@ -131,7 +136,7 @@ const Progress = () => {
                 setStats({ study_hours: 0, quizzes_taken: 0, streak_days: 0 });
                 setChartImage(null);
                 setSessions([]);
-                setHeatmapData(null);
+                setHeatmapData([]);
                 fetchAnalytics();
             } else {
                 fetchAnalytics();
@@ -274,7 +279,7 @@ const Progress = () => {
                     {/* Real Database-Aggregated 16-Week Grid */}
                     <div className="flex gap-1.5 overflow-x-auto pb-2">
                         {Array.from({ length: 16 }).map((_, weekIdx) => {
-                            const weekDays = heatmapData.slice(weekIdx * 7, (weekIdx + 1) * 7);
+                            const weekDays = (heatmapData || []).slice(weekIdx * 7, (weekIdx + 1) * 7);
                             return (
                                 <div key={weekIdx} className="flex flex-col gap-1.5">
                                     {(weekDays.length > 0 ? weekDays : Array.from({ length: 7 })).map((day, dayIdx) => {

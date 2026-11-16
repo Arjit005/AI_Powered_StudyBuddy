@@ -159,20 +159,20 @@ const Header = () => {
                                         <div className="flex items-start gap-2 text-slate-300">
                                             <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 mt-0.5 shrink-0" />
                                             <div>
-                                                <div className="font-semibold text-white">Private & Secure Notes</div>
-                                                <div className="text-[11px] text-slate-400">Encrypted personal learning workspace</div>
+                                                <div className="font-semibold text-white">Private Study Notes</div>
+                                                <div className="text-[11px] text-slate-400">Tenant-isolated personal learning space</div>
                                             </div>
                                         </div>
                                         <div className="flex items-start gap-2 text-slate-300">
                                             <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 mt-0.5 shrink-0" />
                                             <div>
                                                 <div className="font-semibold text-white">Protected Account</div>
-                                                <div className="text-[11px] text-slate-400">Rate limit & brute-force protection</div>
+                                                <div className="text-[11px] text-slate-400">Rate limit & brute-force defense</div>
                                             </div>
                                         </div>
                                     </div>
                                     <div className="mt-3 pt-2 border-t border-emerald-500/20 flex justify-between items-center text-[11px] font-mono text-emerald-400">
-                                        <span>Status: {securityData?.shield_active ? 'Active & Secure' : (securityData ? 'Degraded' : 'Offline')}</span>
+                                        <span>Status: {securityData?.shield_active ? 'Active & Secure' : (securityData ? 'Degraded' : 'Offline')} ({apiLatency})</span>
                                         <button onClick={() => setSecurityOpen(false)} className="hover:text-white underline">Close</button>
                                     </div>
                                 </div>

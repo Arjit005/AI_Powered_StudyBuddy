@@ -285,7 +285,7 @@ const Maps = () => {
                         className="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex items-center justify-center p-4"
                         onClick={() => setIsZoomed(false)}
                     >
-                        <div className="relative max-w-5xl max-h-[90vh]">
+                        <div className="relative max-w-5xl max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
                             <button
                                 onClick={() => setIsZoomed(false)}
                                 className="absolute -top-12 right-0 p-2 text-white hover:text-emerald-400"

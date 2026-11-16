@@ -24,6 +24,7 @@ const Summarize = () => {
     const [isSaving, setIsSaving] = useState(false);
     const [error, setError] = useState('');
     const [isSpeaking, setIsSpeaking] = useState(false);
+    const currentSummaryRef = useRef('');
 
     // Audio Speech Synthesis & timeout cleanup on unmount
     const summarizeGenRef = useRef(0);
@@ -77,7 +78,10 @@ const Summarize = () => {
                 throw new Error('Received an invalid or empty summary from AI service.');
             }
             setSummary(data.summary);
+            currentSummaryRef.current = data.summary;
             setSummaryTopic(topic.trim());
+            setSaved(false);
+            if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
         } catch (err) {
             if (thisGen === summarizeGenRef.current) {
                 setError(err.message || 'Error occurred while generating summary.');
@@ -127,6 +131,7 @@ const Summarize = () => {
     // Save to Library
     const handleSaveToLibrary = async () => {
         if (!summary || isSaving) return;
+        const contentToSave = summary;
         const activeTopic = (summaryTopic && summaryTopic.trim()) ? summaryTopic.trim() : (topic && topic.trim()) ? topic.trim() : 'Study Summary';
         setIsSaving(true);
         try {
@@ -141,20 +146,27 @@ const Summarize = () => {
                     material_type: 'summary',
                     title: `Summary: ${activeTopic.slice(0, 45)}...`,
                     topic: activeTopic.slice(0, 40),
-                    content_json: summary,
+                    content_json: contentToSave,
                     tags: 'summary,takeaways,study_guide'
                 })
             });
             if (res.ok) {
-                setSaved(true);
-                if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
-                saveTimeoutRef.current = setTimeout(() => setSaved(false), 3000);
+                if (currentSummaryRef.current === contentToSave) {
+                    setSaved(true);
+                    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+                    saveTimeoutRef.current = setTimeout(() => setSaved(false), 3000);
+                }
             } else {
-                alert("Failed to save summary to library.");
+                let errDetail = 'Failed to save summary to library.';
+                try {
+                    const errData = await res.json();
+                    errDetail = errData.detail || errDetail;
+                } catch (_) {}
+                alert(errDetail);
             }
         } catch (err) {
             console.error("Save error:", err);
-            alert("Network error saving summary.");
+            alert("Network error saving summary: " + err.message);
         } finally {
             setIsSaving(false);
         }

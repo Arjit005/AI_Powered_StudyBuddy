@@ -493,14 +493,18 @@ class MCPService:
                 end_y = tgt["y"] + (tgt["h"] / 2)
                 dx = end_x - start_x
                 dy = end_y - start_y
+                min_x = min(start_x, end_x)
+                min_y = min(start_y, end_y)
+                p1 = [start_x - min_x, start_y - min_y]
+                p2 = [end_x - min_x, end_y - min_y]
 
                 elements.append({
                     "id": f"arrow_{idx}",
                     "type": "arrow",
-                    "x": start_x,
-                    "y": start_y,
-                    "width": dx,
-                    "height": dy,
+                    "x": min_x,
+                    "y": min_y,
+                    "width": max(1, abs(dx)),
+                    "height": max(1, abs(dy)),
                     "angle": 0,
                     "strokeColor": "#34d399",
                     "backgroundColor": "transparent",
@@ -509,7 +513,7 @@ class MCPService:
                     "strokeStyle": "solid" if edge.get("style") != "dashed" else "dashed",
                     "roughness": 1,
                     "opacity": 90,
-                    "points": [[0, 0], [dx, dy]],
+                    "points": [p1, p2],
                     "endArrowhead": "arrow"
                 })
 
@@ -522,7 +526,8 @@ class MCPService:
         """
         if not text:
             return ""
-        clean = str(text).replace('"', "'").replace('[', '(').replace(']', ')').replace(';', ',')
+        clean = str(text).replace('\\', '/').replace('"', "'").replace('[', '(').replace(']', ')')
+        clean = clean.replace('{', '(').replace('}', ')').replace('|', '/').replace(';', ',')
         clean = clean.replace('<', '&lt;').replace('>', '&gt;').replace('\n', ' ')
         return clean[:120].strip()
 

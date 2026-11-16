@@ -42,6 +42,8 @@ const isTokenValid = (token) => {
 // Protected Route Component checking token presence, structure, and server verification (Fails Closed)
 const ProtectedRoute = ({ children }) => {
   const [currentToken, setCurrentToken] = useState(() => localStorage.getItem('auth_token'));
+  const [retryCount, setRetryCount] = useState(0);
+  const verificationGenRef = useRef(0);
   const [authStatus, setAuthStatus] = useState(() => {
     if (!currentToken || !isTokenValid(currentToken)) return 'unauthorized';
     return 'checking';
@@ -51,6 +53,7 @@ const ProtectedRoute = ({ children }) => {
   useEffect(() => {
     const handleAuthChange = () => {
       const freshToken = localStorage.getItem('auth_token');
+      verificationGenRef.current += 1;
       setCurrentToken(freshToken);
     };
     window.addEventListener('storage', handleAuthChange);
@@ -63,6 +66,7 @@ const ProtectedRoute = ({ children }) => {
 
   useEffect(() => {
     let isMounted = true;
+    const thisGen = ++verificationGenRef.current;
     const abortCtrl = new AbortController();
 
     if (!currentToken || !isTokenValid(currentToken)) {
@@ -78,10 +82,10 @@ const ProtectedRoute = ({ children }) => {
       signal: abortCtrl.signal
     })
       .then(async res => {
-        if (!isMounted) return;
+        if (!isMounted || thisGen !== verificationGenRef.current) return;
         if (res.ok) {
           const data = await res.json().catch(() => null);
-          if (!isMounted) return;
+          if (!isMounted || thisGen !== verificationGenRef.current) return;
           if (data && (data.id || data.email || data.username)) {
             setAuthStatus('authorized');
           } else {
@@ -94,7 +98,7 @@ const ProtectedRoute = ({ children }) => {
         }
       })
       .catch((err) => {
-        if (err.name === 'AbortError') return;
+        if (err.name === 'AbortError' || thisGen !== verificationGenRef.current) return;
         if (isMounted) {
           setNetworkError(true);
         }
@@ -104,16 +108,19 @@ const ProtectedRoute = ({ children }) => {
       isMounted = false;
       abortCtrl.abort();
     };
-  }, [currentToken]);
+  }, [currentToken, retryCount]);
 
-  // Clean up credentials inside an effect when unauthorized, never during render
+  // Clean up credentials inside an effect when unauthorized, ensuring token matches current session
   useEffect(() => {
     if (authStatus === 'unauthorized') {
-      localStorage.removeItem('auth_token');
-      localStorage.removeItem('isAuthenticated');
-      localStorage.removeItem('user');
+      const storedToken = localStorage.getItem('auth_token');
+      if (!storedToken || storedToken === currentToken) {
+        localStorage.removeItem('auth_token');
+        localStorage.removeItem('isAuthenticated');
+        localStorage.removeItem('user');
+      }
     }
-  }, [authStatus]);
+  }, [authStatus, currentToken]);
 
   if (networkError) {
     return (
@@ -122,7 +129,10 @@ const ProtectedRoute = ({ children }) => {
           <div className="text-amber-400 font-bold text-base">Connection Interrupted</div>
           <p className="text-slate-400 text-xs">Unable to verify session with server. Please check your connection and try again.</p>
           <button 
-            onClick={() => setCurrentToken(localStorage.getItem('auth_token'))} 
+            onClick={() => {
+              setRetryCount(c => c + 1);
+              setCurrentToken(localStorage.getItem('auth_token'));
+            }} 
             className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold"
           >
             Retry Connection

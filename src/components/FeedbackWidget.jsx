@@ -83,6 +83,11 @@ const FeedbackWidget = () => {
             if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
             closeTimerRef.current = setTimeout(() => {
                 if (thisSession === submissionSessionRef.current) {
+                    submissionSessionRef.current += 1;
+                    if (abortControllerRef.current === controller) {
+                        abortControllerRef.current = null;
+                    }
+                    setSubmitting(false);
                     setSubmitted(false);
                     setIsOpen(false);
                     isOpenRef.current = false;
@@ -99,6 +104,9 @@ const FeedbackWidget = () => {
         } finally {
             if (thisSession === submissionSessionRef.current) {
                 setSubmitting(false);
+                if (abortControllerRef.current === controller) {
+                    abortControllerRef.current = null;
+                }
             }
         }
     };

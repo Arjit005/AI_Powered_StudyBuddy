@@ -12,6 +12,12 @@ const sanitizeSvg = (svgStr) => {
         const doc = parser.parseFromString(svgStr, 'image/svg+xml');
         // Strip active executable elements including script, foreignObject, iframe, embed, object
         doc.querySelectorAll('script, foreignObject, iframe, embed, object').forEach(s => s.remove());
+        // Remove disallowed tags
+        const disallowedTags = ['script', 'iframe', 'object', 'embed', 'foreignObject', 'image', 'base'];
+        disallowedTags.forEach(tag => {
+            doc.querySelectorAll(tag).forEach(el => el.remove());
+        });
+
         // Strip event handler attributes, javascript/vbscript/data URLs, and active CSS url()
         doc.querySelectorAll('*').forEach(el => {
             for (let i = el.attributes.length - 1; i >= 0; i--) {
@@ -27,8 +33,8 @@ const sanitizeSvg = (svgStr) => {
                 ) {
                     el.removeAttribute(attr.name);
                 }
-                // Strip url(...) from style attributes to prevent css data exfiltration
-                if (name === 'style' && /url\s*\(/i.test(attr.value)) {
+                // Strip url(...) if not fragment-local url(#...)
+                if (/url\s*\((?!['"]?#)/i.test(attr.value)) {
                     el.removeAttribute(attr.name);
                 }
             }
@@ -224,10 +230,13 @@ const MermaidViewer = ({ chart, title = "Architecture Diagram" }) => {
                     <button
                         onClick={handleCopy}
                         className="p-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-400 hover:text-emerald-400"
-                        title="Copy Mermaid Code"
+                        title={copyError ? "Copy failed" : copied ? "Copied" : "Copy Mermaid Code"}
                     >
                         {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
                     </button>
+                    {copyError && (
+                        <span role="alert" className="text-[10px] text-rose-400 font-mono">Copy failed</span>
+                    )}
                     <button
                         onClick={handleDownloadSvg}
                         className="p-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-400 hover:text-emerald-400"
@@ -287,7 +296,9 @@ const MermaidViewer = ({ chart, title = "Architecture Diagram" }) => {
                     aria-label={`${title} Fullscreen View`}
                     tabIndex={-1}
                     className="fixed inset-0 z-50 bg-black/95 backdrop-blur-md flex flex-col p-6 animate-in fade-in duration-200"
-                    onClick={() => setIsFullscreen(false)}
+                    onClick={(e) => {
+                        if (e.target === e.currentTarget) setIsFullscreen(false);
+                    }}
                     onKeyDown={(e) => {
                         if (e.key === 'Escape') {
                             e.stopPropagation();
@@ -309,6 +320,9 @@ const MermaidViewer = ({ chart, title = "Architecture Diagram" }) => {
                                     e.preventDefault();
                                     first.focus();
                                 }
+                            } else {
+                                e.preventDefault();
+                                modalRef.current.focus();
                             }
                         }
                     }}

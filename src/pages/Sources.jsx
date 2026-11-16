@@ -527,7 +527,12 @@ const Sources = () => {
 
                         <div className="mt-8 pt-4 border-t border-emerald-500/20 flex justify-end">
                             <button
-                                onClick={() => { setSelectedSource(null); setSourceGuide(null); }}
+                                onClick={() => {
+                                    guideRequestGenRef.current += 1;
+                                    setSelectedSource(null);
+                                    setSourceGuide(null);
+                                    setLoadingGuide(false);
+                                }}
                                 className="px-5 py-2.5 rounded-xl bg-emerald-500 text-slate-950 font-bold text-xs hover:bg-emerald-400 transition-all shadow-[0_0_15px_rgba(16,185,129,0.3)]"
                             >
                                 Done

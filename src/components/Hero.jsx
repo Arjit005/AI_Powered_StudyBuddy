@@ -1,10 +1,34 @@
 import React, { useState } from 'react';
-import { Sparkles, ArrowRight, Terminal, Cpu, Database, Layers, Flame, Bot, BookOpen, Share2 } from 'lucide-react';
+import { Sparkles, ArrowRight, Cpu, Database, Layers, Flame, Bot, BookOpen, Share2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import SpotlightCard from './ui/SpotlightCard';
 
 const Hero = () => {
     const [activeTab, setActiveTab] = useState('chat');
+    const tabs = ['chat', 'flashcards', 'maps'];
+
+    const handleTabKeyDown = (e) => {
+        const currIndex = tabs.indexOf(activeTab);
+        if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+            e.preventDefault();
+            const next = tabs[(currIndex + 1) % tabs.length];
+            setActiveTab(next);
+            document.getElementById(`tab-${next}`)?.focus();
+        } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+            e.preventDefault();
+            const prev = tabs[(currIndex - 1 + tabs.length) % tabs.length];
+            setActiveTab(prev);
+            document.getElementById(`tab-${prev}`)?.focus();
+        } else if (e.key === 'Home') {
+            e.preventDefault();
+            setActiveTab(tabs[0]);
+            document.getElementById(`tab-${tabs[0]}`)?.focus();
+        } else if (e.key === 'End') {
+            e.preventDefault();
+            setActiveTab(tabs[tabs.length - 1]);
+            document.getElementById(`tab-${tabs[tabs.length - 1]}`)?.focus();
+        }
+    };
 
     return (
         <section className="relative overflow-hidden pt-12 pb-24 lg:pt-20 lg:pb-32 bg-[#07090E]">
@@ -70,11 +94,12 @@ const Hero = () => {
                             </div>
 
                             {/* Live Demo Tabs */}
-                            <div className="flex flex-wrap items-center gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800" role="tablist" aria-label="Feature showcase tabs">
+                            <div className="flex flex-wrap items-center gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800" role="tablist" aria-label="Feature showcase tabs" onKeyDown={handleTabKeyDown}>
                                 <button
                                     type="button"
                                     role="tab"
                                     id="tab-chat"
+                                    tabIndex={activeTab === 'chat' ? 0 : -1}
                                     aria-selected={activeTab === 'chat'}
                                     aria-controls="panel-chat"
                                     onClick={() => setActiveTab('chat')}
@@ -89,6 +114,7 @@ const Hero = () => {
                                     type="button"
                                     role="tab"
                                     id="tab-flashcards"
+                                    tabIndex={activeTab === 'flashcards' ? 0 : -1}
                                     aria-selected={activeTab === 'flashcards'}
                                     aria-controls="panel-flashcards"
                                     onClick={() => setActiveTab('flashcards')}
@@ -103,6 +129,7 @@ const Hero = () => {
                                     type="button"
                                     role="tab"
                                     id="tab-maps"
+                                    tabIndex={activeTab === 'maps' ? 0 : -1}
                                     aria-selected={activeTab === 'maps'}
                                     aria-controls="panel-maps"
                                     onClick={() => setActiveTab('maps')}

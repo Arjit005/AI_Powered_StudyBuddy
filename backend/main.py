@@ -519,6 +519,15 @@ def get_source_detail(
     source = query.first()
     if not source:
         raise HTTPException(status_code=404, detail="Source not found or unauthorized.")
+    def _safe_json_list(raw_val):
+        if not raw_val:
+            return []
+        try:
+            val = json.loads(raw_val)
+            return val if isinstance(val, list) else [val]
+        except Exception:
+            return []
+
     return {
         "id": source.id,
         "title": source.title,
@@ -527,7 +536,7 @@ def get_source_detail(
         "domain": source.domain,
         "url": source.url,
         "summary": source.summary,
-        "key_topics": json.loads(source.key_topics) if source.key_topics else [],
+        "key_topics": _safe_json_list(source.key_topics),
         "raw_text_preview": source.raw_text[:2000],
         "starred": bool(source.starred),
         "created_at": source.created_at.isoformat() if source.created_at else None
@@ -852,7 +861,7 @@ def chat_endpoint(
     }
 
 @app.post("/api/chat/stream", tags=["AI Learning"])
-async def chat_with_ai_stream(
+def chat_with_ai_stream(
     req: ChatRequest,
     request: Request,
     db: Session = Depends(get_db),
@@ -895,6 +904,8 @@ async def chat_with_ai_stream(
         db.commit()
         db.refresh(conv)
 
+    conv_id = conv.id
+
     # Check RAG sources
     sources_query = db.query(models.Source)
     if user_id:
@@ -917,6 +928,14 @@ async def chat_with_ai_stream(
                     "quote": chunk.text[:250],
                     "source_title": src.title
                 })
+        else:
+            # Decline ungrounded answer when sources exist but no matches found
+            def no_source_stream():
+                msg = "I couldn't find any relevant information in your uploaded study materials to answer this question. Please ensure your query aligns with your uploaded materials or upload additional source documents."
+                yield f"data: {json.dumps({'conversation_id': conv_id, 'citations': []})}\n\n"
+                yield f"data: {json.dumps({'chunk': msg})}\n\n"
+                yield "data: [DONE]\n\n"
+            return StreamingResponse(no_source_stream(), media_type="text/event-stream")
 
     # Prepare prompt with strict source-grounding and untrusted delimiters
     if has_sources:
@@ -930,8 +949,6 @@ async def chat_with_ai_stream(
         )
     else:
         prompt = clean_message
-
-    conv_id = conv.id
 
     def event_generator():
         # First send metadata (conversation_id & citations)

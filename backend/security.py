@@ -60,23 +60,19 @@ class RateLimiter:
             ]
             for k in keys_to_delete:
                 del self.history[k]
-            # Safety ceiling: evict oldest half of entries rather than wiping all active clients
+            # Safety ceiling: evict only inactive entries whose last request is older than active window (15 minutes)
             if len(self.history) > 10000:
-                sorted_keys = sorted(
-                    self.history.keys(),
-                    key=lambda k: self.history[k][-1] if self.history[k] else 0
-                )
-                for k in sorted_keys[:5000]:
+                inactive_keys = [
+                    k for k, v in self.history.items()
+                    if not v or (current_time - v[-1] > 900)
+                ]
+                for k in inactive_keys:
                     del self.history[k]
 
-            # Periodic cleanup of expired lockouts
+            # Periodic cleanup of expired lockouts only (never evict active lockouts)
             expired_locks = [ip for ip, exp in self.lockouts.items() if exp < current_time]
             for ip in expired_locks:
                 del self.lockouts[ip]
-            if len(self.lockouts) > 5000:
-                sorted_locks = sorted(self.lockouts.keys(), key=lambda ip: self.lockouts[ip])
-                for ip in sorted_locks[:2500]:
-                    del self.lockouts[ip]
 
     def _get_client_ip(self, request: Request) -> str:
         immediate_host = request.client.host if request.client else "unknown"
@@ -93,12 +89,15 @@ class RateLimiter:
         if trust_proxy and is_trusted_peer:
             forwarded = request.headers.get("X-Forwarded-For")
             if forwarded:
-                raw_ip = forwarded.split(",")[0].strip()
-                try:
-                    import ipaddress
-                    return str(ipaddress.ip_address(raw_ip))
-                except ValueError:
-                    pass
+                ips = [p.strip() for p in forwarded.split(",") if p.strip()]
+                # Traverse right-to-left: pick the first IP before the trusted proxy hops
+                for candidate in reversed(ips):
+                    if candidate not in trusted_proxy_set and candidate not in ("127.0.0.1", "::1", "localhost"):
+                        try:
+                            import ipaddress
+                            return str(ipaddress.ip_address(candidate))
+                        except ValueError:
+                            continue
             real_ip = request.headers.get("X-Real-IP")
             if real_ip:
                 try:

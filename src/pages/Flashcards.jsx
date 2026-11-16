@@ -80,7 +80,11 @@ const Flashcards = () => {
                         setCards(validCards);
                         setCurrentCard(0);
                         setMastery({});
+                    } else {
+                        alert("No valid flashcards found in the generated response. Please try another topic.");
                     }
+                } else {
+                    alert("No flashcards could be generated for this topic. Please try another topic.");
                 }
             } else {
                 alert("Failed to generate flashcards. Please try another topic.");
@@ -209,7 +213,7 @@ const Flashcards = () => {
     // Keyboard navigation
     useEffect(() => {
         const handleKeyDown = (e) => {
-            if (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA') return;
+            if (['INPUT', 'TEXTAREA', 'BUTTON', 'SELECT'].includes(document.activeElement.tagName) || document.activeElement.isContentEditable) return;
             if (e.code === 'Space') {
                 e.preventDefault();
                 setIsFlipped(prev => !prev);

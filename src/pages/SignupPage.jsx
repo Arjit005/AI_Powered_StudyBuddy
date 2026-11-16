@@ -44,9 +44,11 @@ const SignupPage = () => {
                 localStorage.setItem('user', JSON.stringify(data.user));
             } catch (storageErr) {
                 console.warn("Storage write failed:", storageErr);
-                localStorage.removeItem('auth_token');
-                localStorage.removeItem('isAuthenticated');
-                localStorage.removeItem('user');
+                try {
+                    localStorage.removeItem('auth_token');
+                    localStorage.removeItem('isAuthenticated');
+                    localStorage.removeItem('user');
+                } catch (_) {}
                 throw new Error("Unable to save login session. Please ensure local storage is enabled.");
             }
             navigate('/');
@@ -153,9 +155,11 @@ const SignupPage = () => {
                 localStorage.setItem('user', JSON.stringify(data.user));
             } catch (storageErr) {
                 console.warn("Storage write failed:", storageErr);
-                localStorage.removeItem('auth_token');
-                localStorage.removeItem('isAuthenticated');
-                localStorage.removeItem('user');
+                try {
+                    localStorage.removeItem('auth_token');
+                    localStorage.removeItem('isAuthenticated');
+                    localStorage.removeItem('user');
+                } catch (_) {}
                 throw new Error("Unable to save login session. Please ensure local storage is enabled.");
             }
 

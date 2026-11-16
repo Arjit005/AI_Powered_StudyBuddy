@@ -68,7 +68,7 @@ const FlipCard3D = ({
                 className="relative w-full h-full transition-transform duration-700 ease-out"
                 style={{
                     transformStyle: 'preserve-3d',
-                    transform: `rotateY(${isFlipped ? 180 : 0}deg) rotateX(${tilt.x}deg) rotateY(${tilt.y}deg)`,
+                    transform: `rotateY(${isFlipped ? 180 : 0}deg) rotateX(${tilt.x}deg)`,
                 }}
             >
                 {/* ================= FRONT FACE (Prompt) ================= */}

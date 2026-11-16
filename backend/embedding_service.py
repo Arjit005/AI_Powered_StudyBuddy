@@ -107,7 +107,11 @@ class EmbeddingService:
 
         cls._ensure_configured()
 
-        cleaned_texts = [t.strip() if t and t.strip() else "[Empty Chunk]" for t in texts]
+        cleaned_texts = []
+        for i, t in enumerate(texts):
+            if not t or not str(t).strip():
+                raise ValueError(f"Cannot embed empty or blank text at batch index {i}.")
+            cleaned_texts.append(str(t).strip())
 
         # Use batch processing or robust per-item fallback with correct validation
         last_error = None

@@ -185,17 +185,14 @@ const ChatInterface = () => {
             if (res.ok) {
                 setConversations(prev => {
                     const remaining = prev.filter(c => c.id !== convId);
+                    setActiveConvId(currentId => {
+                        if (currentId !== convId) return currentId;
+                        if (remaining.length > 0) return remaining[0].id;
+                        setMessages([DEFAULT_GREETING]);
+                        return null;
+                    });
                     return remaining;
                 });
-                if (activeConvId === convId) {
-                    const remaining = conversations.filter(c => c.id !== convId);
-                    if (remaining.length > 0) {
-                        setActiveConvId(remaining[0].id);
-                    } else {
-                        setActiveConvId(null);
-                        setMessages([DEFAULT_GREETING]);
-                    }
-                }
             }
         } catch (err) {
             console.error("Error deleting session:", err);
@@ -299,6 +296,7 @@ const ChatInterface = () => {
                     }
 
                     let doneReading = false;
+                    let receivedDone = false;
                     let buffer = '';
 
                     const isStillCurrentConv = () => (
@@ -323,6 +321,7 @@ const ChatInterface = () => {
                             if (!trimmed.startsWith('data:')) continue;
                             const dataStr = trimmed.replace(/^data:\s*/, '');
                             if (dataStr === '[DONE]') {
+                                receivedDone = true;
                                 doneReading = true;
                                 break;
                             }
@@ -354,12 +353,12 @@ const ChatInterface = () => {
                         }
                     }
 
-                    if (!doneReading && accumulatedText.length === 0) {
+                    if (!receivedDone && accumulatedText.length === 0) {
                         if (isStillCurrentConv()) {
                             setMessages(prev => prev.filter(m => m.id !== streamMsgId));
                         }
                         throw new Error('Streaming connection closed unexpectedly before response was received.');
-                    } else if (!doneReading) {
+                    } else if (!receivedDone) {
                         // Truncated stream EOF without [DONE]: indicate interrupted state
                         if (isStillCurrentConv()) {
                             setMessages(prev => prev.map(m => m.id === streamMsgId ? { ...m, isStreaming: false, content: accumulatedText + "\n\n*(Generation interrupted)*" } : m));

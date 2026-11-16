@@ -82,13 +82,31 @@ class RAGService:
         return text.strip()
 
     @staticmethod
+    def _is_safe_ip(ip_str: str) -> bool:
+        """
+        Validates that an IP address is public and not reserved, private, loopback, or metadata service.
+        """
+        import ipaddress
+        try:
+            ip_obj = ipaddress.ip_address(ip_str)
+            return not (
+                ip_obj.is_private
+                or ip_obj.is_loopback
+                or ip_obj.is_link_local
+                or ip_obj.is_reserved
+                or ip_obj.is_multicast
+                or str(ip_str).startswith("169.254.")
+            )
+        except Exception:
+            return False
+
+    @staticmethod
     def _is_safe_url(url: str) -> bool:
         """
         SSRF Defense: Validates URL schemes and ensures IP does not resolve to private,
         loopback, link-local, or cloud metadata ranges.
         """
         import socket
-        import ipaddress
         from urllib.parse import urlparse
 
         try:
@@ -107,15 +125,7 @@ class RAGService:
             addr_info = socket.getaddrinfo(hostname, None)
             for item in addr_info:
                 ip_str = item[4][0]
-                ip_obj = ipaddress.ip_address(ip_str)
-                if (
-                    ip_obj.is_private
-                    or ip_obj.is_loopback
-                    or ip_obj.is_link_local
-                    or ip_obj.is_reserved
-                    or ip_obj.is_multicast
-                    or ip_str.startswith("169.254.") # AWS / GCP / Azure metadata endpoint
-                ):
+                if not RAGService._is_safe_ip(ip_str):
                     return False
             return True
         except Exception as e:
@@ -125,63 +135,85 @@ class RAGService:
     @staticmethod
     def extract_text_from_url(url: str) -> str:
         """
-        Fetches and cleans webpage text strictly enforcing SSRF safety with bounded redirect validation.
+        Fetches and cleans webpage text strictly enforcing SSRF safety with bounded redirect validation,
+        DNS rebinding defense, connection closure, and streaming size limits.
         """
         import requests
         from urllib.parse import urljoin
 
         current_url = url
         max_redirects = 3
+        session = requests.Session()
         resp = None
 
-        for redirect_hop in range(max_redirects + 1):
-            if not RAGService._is_safe_url(current_url):
-                print(f"SSRF Alert: Blocked unsafe or internal URL during hop {redirect_hop}: {current_url}")
-                return ""
-            try:
-                resp = requests.get(
-                    current_url,
-                    timeout=10,
-                    allow_redirects=False,
-                    stream=True,
-                    headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AIStudyBuddy/1.0"}
-                )
-                if resp.is_redirect or resp.status_code in (301, 302, 303, 307, 308):
-                    loc = resp.headers.get("location")
-                    if not loc:
-                        return ""
-                    current_url = urljoin(current_url, loc)
-                    continue
-                break
-            except Exception as req_err:
-                print(f"URL extraction network error at hop {redirect_hop}: {req_err}")
-                return ""
-
-        if resp and resp.status_code == 200:
-            content_chunks = []
-            total_bytes = 0
-            MAX_BYTES = 2 * 1024 * 1024  # 2MB cap to prevent memory exhaustion
-            for chunk in resp.iter_content(chunk_size=16384):
-                if chunk:
-                    content_chunks.append(chunk)
-                    total_bytes += len(chunk)
-                    if total_bytes >= MAX_BYTES:
-                        break
-            encoding = resp.encoding or 'utf-8'
-            html_text = b"".join(content_chunks).decode(encoding, errors="replace")
-            if trafilatura:
+        try:
+            for redirect_hop in range(max_redirects + 1):
+                if not RAGService._is_safe_url(current_url):
+                    print(f"SSRF Alert: Blocked unsafe or internal URL during hop {redirect_hop}: {current_url}")
+                    return ""
                 try:
-                    extracted = trafilatura.extract(html_text)
-                    if extracted:
-                        return extracted.strip()
-                except Exception:
-                    pass
-            # Strip HTML fallback
-            clean = re.sub(r'<[^>]+>', ' ', html_text)
-            clean = re.sub(r'\s+', ' ', clean)
-            return clean[:30000].strip()
+                    if resp:
+                        resp.close()
+                    resp = session.get(
+                        current_url,
+                        timeout=10,
+                        allow_redirects=False,
+                        stream=True,
+                        headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AIStudyBuddy/1.0"}
+                    )
+                    # Verify actual connected socket peer to mitigate DNS rebinding TOCTOU
+                    try:
+                        sock = getattr(getattr(resp.raw, '_connection', None), 'sock', None)
+                        if sock:
+                            peer_ip = sock.getpeername()[0]
+                            if not RAGService._is_safe_ip(peer_ip):
+                                print(f"SSRF Alert: DNS rebinding blocked; peer IP {peer_ip} is disallowed.")
+                                resp.close()
+                                return ""
+                    except Exception:
+                        pass
 
-        return ""
+                    if resp.is_redirect or resp.status_code in (301, 302, 303, 307, 308):
+                        loc = resp.headers.get("location")
+                        resp.close()
+                        resp = None
+                        if not loc:
+                            return ""
+                        current_url = urljoin(current_url, loc)
+                        continue
+                    break
+                except Exception as req_err:
+                    print(f"URL extraction network error at hop {redirect_hop}: {req_err}")
+                    return ""
+
+            if resp and resp.status_code == 200:
+                content_chunks = []
+                total_bytes = 0
+                MAX_BYTES = 2 * 1024 * 1024  # 2MB cap to prevent memory exhaustion
+                for chunk in resp.iter_content(chunk_size=16384):
+                    if chunk:
+                        content_chunks.append(chunk)
+                        total_bytes += len(chunk)
+                        if total_bytes >= MAX_BYTES:
+                            break
+                encoding = resp.encoding or 'utf-8'
+                html_text = b"".join(content_chunks).decode(encoding, errors="replace")
+                if trafilatura:
+                    try:
+                        extracted = trafilatura.extract(html_text)
+                        if extracted:
+                            return extracted.strip()
+                    except Exception:
+                        pass
+                # Strip HTML fallback
+                clean = re.sub(r'<[^>]+>', ' ', html_text)
+                clean = re.sub(r'\s+', ' ', clean)
+                return clean[:30000].strip()
+            return ""
+        finally:
+            if resp:
+                resp.close()
+            session.close()
 
     @staticmethod
     def ingest_source(
@@ -559,31 +591,7 @@ class RAGService:
 
                     if chunk:
                         scored_results.append((chunk, score))
-                    elif meta.get("text"):
-                        # Strict tenant boundary check: verify metadata user_id matches or is global
-                        meta_user = meta.get("user_id")
-                        is_allowed = (
-                            (user_id and (meta_user == str(user_id) or meta_user == "global")) or
-                            (not user_id and meta_user in ("global", None))
-                        )
-                        if source_ids:
-                            try:
-                                if not src_id or int(src_id) not in source_ids:
-                                    is_allowed = False
-                            except (ValueError, TypeError):
-                                is_allowed = False
-
-                        if not src_id or c_idx is None:
-                            is_allowed = False
-
-                        if is_allowed:
-                            mock_chunk = SourceChunk(
-                                source_id=int(src_id),
-                                chunk_index=int(c_idx),
-                                text=meta.get("text", ""),
-                                token_count=len(meta.get("text", "").split())
-                            )
-                            scored_results.append((mock_chunk, score))
+                    # Stale vectors in Pinecone without matching SQL database chunks are omitted to prevent data desync
 
                 if scored_results:
                     return scored_results

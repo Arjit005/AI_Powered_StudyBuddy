@@ -233,7 +233,7 @@ export default function CommandPalette({ isOpen, onClose }) {
             aria-autocomplete="list"
             aria-expanded={isOpen}
             aria-controls="command-listbox"
-            aria-activedescendant={filtered[selectedIndex] ? `cmd-option-${filtered[selectedIndex].id}` : undefined}
+            aria-activedescendant={filtered[activeIndex] ? `cmd-option-${filtered[activeIndex].id}` : undefined}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Type a command, subject, or tool (e.g. Flashcards, Quiz, Chat)..."
@@ -258,7 +258,7 @@ export default function CommandPalette({ isOpen, onClose }) {
           ) : (
             filtered.map((cmd, idx) => {
               const Icon = cmd.icon;
-              const isSelected = idx === selectedIndex;
+              const isSelected = idx === activeIndex;
               return (
                 <div
                   key={cmd.id}
