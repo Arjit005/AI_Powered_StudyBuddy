@@ -262,7 +262,7 @@ const MermaidViewer = ({ chart, title = "Architecture Diagram" }) => {
                     <button
                         onClick={handleCopy}
                         className="p-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-400 hover:text-emerald-400"
-                        title={copyError ? "Copy failed" : copied ? "Copied" : "Copy Mermaid Code"}
+                        title={copyError ? "Copy failed" : copied ? "Copied" : "Copy Diagram Code"}
                     >
                         {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
                     </button>
@@ -272,7 +272,7 @@ const MermaidViewer = ({ chart, title = "Architecture Diagram" }) => {
                     <button
                         onClick={handleDownloadSvg}
                         className="p-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-400 hover:text-emerald-400"
-                        title="Download SVG"
+                        title="Download Vector Graphic"
                     >
                         <Download className="w-3.5 h-3.5" />
                     </button>
@@ -293,7 +293,7 @@ const MermaidViewer = ({ chart, title = "Architecture Diagram" }) => {
                     <div className="p-4 rounded-xl bg-rose-950/40 border border-rose-800/60 text-xs text-rose-300 font-mono space-y-2 max-w-md">
                         <div className="flex items-center gap-2 font-bold text-rose-400">
                             <AlertCircle className="w-4 h-4 shrink-0" />
-                            <span>Mermaid Syntax Warning</span>
+                            <span>Diagram Display Notice</span>
                         </div>
                         <p className="text-[11px] text-slate-400">Raw source code is displayed below:</p>
                         <pre className="p-2.5 rounded bg-black/60 overflow-x-auto text-[11px] text-emerald-400">

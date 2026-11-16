@@ -579,25 +579,25 @@ export default function CanvasStudio() {
           <button
             onClick={handleCopyExcalidraw}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium border border-white/10 transition-all"
-            title="Copy Excalidraw Compatible JSON"
+            title="Copy board to clipboard for whiteboard apps"
           >
             {copiedExcalidraw ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-            {copiedExcalidraw ? 'Copied Excalidraw!' : 'Excalidraw'}
+            {copiedExcalidraw ? 'Board Copied!' : 'Copy Board'}
           </button>
 
           <button
             onClick={() => setShowMermaidModal(true)}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium border border-white/10 transition-all"
-            title="View Mermaid Code"
+            title="View Structured Flowchart"
           >
             <Code className="w-3.5 h-3.5" />
-            Mermaid
+            Flowchart View
           </button>
 
           <button
             onClick={handleDownloadSvg}
             className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs border border-white/10 transition-all"
-            title="Download SVG"
+            title="Download Vector Graphic (SVG)"
           >
             <Download className="w-3.5 h-3.5" />
           </button>

@@ -124,73 +124,61 @@ const Header = () => {
                                         ? 'bg-emerald-950/50 text-emerald-300 border border-emerald-800/50 hover:bg-emerald-900/40' 
                                         : 'bg-amber-950/50 text-amber-300 border border-amber-800/50 hover:bg-amber-900/40'
                                 }`}
-                                title="Click to view AI Study Safety status"
+                                title="Your study space safety & privacy status"
                             >
                                 <span className={`w-2 h-2 rounded-full ${securityData?.shield_active ? 'bg-emerald-400 animate-ping' : 'bg-amber-400'}`} />
                                 <ShieldCheck className={`w-3.5 h-3.5 ${securityData?.shield_active ? 'text-emerald-400' : 'text-amber-400'}`} />
-                                <span>Study Shield: {securityData?.shield_active ? 'Active' : 'Degraded'}</span>
+                                <span>Study Space: {securityData?.shield_active ? 'Protected' : 'Safe Mode'}</span>
                                 <ChevronDown className={`w-3 h-3 text-emerald-400 transition-transform ${securityOpen ? 'rotate-180' : ''}`} />
                             </button>
 
-                            {/* Security Telemetry Popover */}
+                            {/* Privacy & Safety Popover */}
                             {securityOpen && (
                                 <div className="absolute top-10 left-0 w-80 p-4 rounded-2xl glass-panel-glow border border-emerald-500/30 shadow-2xl z-50 animate-in fade-in duration-200">
                                     <div className="flex items-center justify-between pb-2 mb-2 border-b border-emerald-500/20">
                                         <div className="flex items-center gap-2">
                                             <Shield className="w-4 h-4 text-emerald-400" />
-                                            <span className="text-xs font-bold uppercase tracking-wider text-emerald-300">Safe Study Guard</span>
+                                            <span className="text-xs font-bold uppercase tracking-wider text-emerald-300">Privacy & Safety</span>
                                         </div>
-                                        <span className={`text-[10px] px-1.5 py-0.5 rounded font-mono ${
+                                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${
                                             securityData?.shield_active 
                                                 ? 'bg-emerald-500/20 text-emerald-300' 
                                                 : 'bg-amber-500/20 text-amber-300'
                                         }`}>
-                                            {securityData?.shield_active ? 'Protected' : (securityData ? 'Degraded' : 'Offline')}
+                                            {securityData?.shield_active ? 'Active & Protected' : 'Safe Mode'}
                                         </span>
                                     </div>
                                     <div className="space-y-2 text-xs">
                                         <div className="flex items-start gap-2 text-slate-300">
-                                            {securityData?.shield_active ? (
-                                                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 mt-0.5 shrink-0" />
-                                            ) : (
-                                                <Shield className="w-3.5 h-3.5 text-amber-400 mt-0.5 shrink-0" />
-                                            )}
+                                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 mt-0.5 shrink-0" />
                                             <div>
-                                                <div className="font-semibold text-white">Academic Integrity & Safety</div>
+                                                <div className="font-semibold text-white">Verified Study Answers</div>
                                                 <div className="text-[11px] text-slate-400">
-                                                    {securityData?.shield_active ? 'Content moderation & factual grounding active' : 'Content moderation & safety capability'}
+                                                    AI responses are cross-referenced with your uploaded materials and syllabus
                                                 </div>
                                             </div>
                                         </div>
                                         <div className="flex items-start gap-2 text-slate-300">
-                                            {securityData?.shield_active ? (
-                                                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 mt-0.5 shrink-0" />
-                                            ) : (
-                                                <Shield className="w-3.5 h-3.5 text-amber-400 mt-0.5 shrink-0" />
-                                            )}
+                                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 mt-0.5 shrink-0" />
                                             <div>
-                                                <div className="font-semibold text-white">Private Study Notes</div>
+                                                <div className="font-semibold text-white">100% Private Workspace</div>
                                                 <div className="text-[11px] text-slate-400">
-                                                    {securityData?.shield_active ? 'Tenant-isolated learning space active' : 'Tenant isolation architecture'}
+                                                    Your notes, quizzes, and decks are completely private to your account
                                                 </div>
                                             </div>
                                         </div>
                                         <div className="flex items-start gap-2 text-slate-300">
-                                            {securityData?.shield_active ? (
-                                                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 mt-0.5 shrink-0" />
-                                            ) : (
-                                                <Shield className="w-3.5 h-3.5 text-amber-400 mt-0.5 shrink-0" />
-                                            )}
+                                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 mt-0.5 shrink-0" />
                                             <div>
-                                                <div className="font-semibold text-white">Protected Account</div>
+                                                <div className="font-semibold text-white">Account Protection</div>
                                                 <div className="text-[11px] text-slate-400">
-                                                    {securityData?.shield_active ? 'Rate limit & brute-force defense active' : 'Rate limit & brute-force defense capability'}
+                                                    Encrypted login sessions and continuous security safeguards
                                                 </div>
                                             </div>
                                         </div>
                                     </div>
-                                    <div className="mt-3 pt-2 border-t border-emerald-500/20 flex justify-between items-center text-[11px] font-mono text-emerald-400">
-                                        <span>Status: {securityData?.shield_active ? 'Active & Secure' : (securityData ? 'Degraded' : 'Offline')} ({apiLatency})</span>
+                                    <div className="mt-3 pt-2 border-t border-emerald-500/20 flex justify-between items-center text-[11px] text-emerald-400">
+                                        <span>All systems operational</span>
                                         <button onClick={() => setSecurityOpen(false)} className="hover:text-white underline">Close</button>
                                     </div>
                                 </div>

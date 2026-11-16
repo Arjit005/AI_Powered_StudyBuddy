@@ -156,7 +156,7 @@ const Maps = () => {
                         ) : (
                             <Sparkles className="w-4 h-4" />
                         )}
-                        <span>Architect</span>
+                        <span>Create Map</span>
                     </button>
                 </div>
 
@@ -197,7 +197,7 @@ const Maps = () => {
                                     }`}
                                 >
                                     <Cpu className="w-3.5 h-3.5" />
-                                    <span>Interactive Architecture (Mermaid SVG)</span>
+                                    <span>Interactive Flowchart</span>
                                 </button>
                             )}
                             {mapImage && (
@@ -210,7 +210,7 @@ const Maps = () => {
                                     }`}
                                 >
                                     <Network className="w-3.5 h-3.5" />
-                                    <span>Topology Graph (NetworkX)</span>
+                                    <span>Visual Topic Map</span>
                                 </button>
                             )}
                         </div>
@@ -289,8 +289,8 @@ const Maps = () => {
                     {!loading && !diagramData && !mapImage && !error && (
                         <div className="text-center text-slate-600 font-mono text-xs py-20">
                             <Network className="w-12 h-12 text-slate-700 mx-auto mb-3" />
-                            <p className="text-slate-400">Diagram synthesis canvas is ready.</p>
-                            <p className="text-slate-600 mt-1">Enter a topic above or pick a sample to generate an architecture diagram.</p>
+                            <p className="text-slate-400">Concept canvas is ready.</p>
+                            <p className="text-slate-600 mt-1">Enter a topic above or pick a suggestion to visualize your study material.</p>
                         </div>
                     )}
                 </div>

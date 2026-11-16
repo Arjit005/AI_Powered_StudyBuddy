@@ -562,10 +562,10 @@ const ChatInterface = () => {
                                                     <div className="font-semibold truncate max-w-[170px] text-slate-100">
                                                         {conv.title || "Study Session"}
                                                     </div>
-                                                    <div className="text-[10px] font-mono text-slate-500 flex items-center gap-1.5 mt-0.5">
+                                                    <div className="text-[10px] text-slate-500 flex items-center gap-1.5 mt-0.5">
                                                         <span>{conv.message_count} msgs</span>
                                                         {conv.long_term_summary && (
-                                                            <span className="text-[9px] px-1 rounded bg-teal-500/20 text-teal-300">Hybrid</span>
+                                                            <span className="text-[9px] px-1.5 py-0.2 rounded bg-teal-500/20 text-teal-300 font-medium">Key Takeaways</span>
                                                         )}
                                                     </div>
                                                 </div>
