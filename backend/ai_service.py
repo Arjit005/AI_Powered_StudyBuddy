@@ -8,18 +8,20 @@ warnings.filterwarnings("ignore", category=FutureWarning)
 import google.generativeai as genai
 from dotenv import load_dotenv
 
-# Try importing AI Gateways (LiteLLM & Portkey)
-try:
-    import litellm
-    # Suppress verbose litellm logs
-    litellm.suppress_debug_info = True
-except ImportError:
-    litellm = None
+# Try importing AI Gateways (LiteLLM & Portkey) lazily or conditionally
+litellm = None
+def _get_litellm():
+    global litellm
+    if litellm is None:
+        try:
+            import litellm as _llm
+            _llm.suppress_debug_info = True
+            litellm = _llm
+        except ImportError:
+            litellm = False
+    return litellm if litellm is not False else None
 
-try:
-    from portkey_ai import Portkey
-except ImportError:
-    Portkey = None
+Portkey = None
 
 try:
     from .guardrails import sanitize_output
@@ -34,7 +36,8 @@ except ImportError:
 
 load_dotenv()
 
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
+GOOGLE_API_KEY = GEMINI_API_KEY
 HUGGINGFACE_API_KEY = os.getenv("HUGGINGFACE_API_KEY")
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY") or os.getenv("OPEN_ROUTER_API_KEY")
 NVIDIA_API_KEY = os.getenv("NVIDIA_API_KEY")
@@ -44,6 +47,7 @@ PORTKEY_VIRTUAL_KEY = os.getenv("PORTKEY_VIRTUAL_KEY")
 if GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
     os.environ["GEMINI_API_KEY"] = GEMINI_API_KEY
+    os.environ["GOOGLE_API_KEY"] = GEMINI_API_KEY
 
 if OPENROUTER_API_KEY:
     os.environ["OPENROUTER_API_KEY"] = OPENROUTER_API_KEY
@@ -101,16 +105,20 @@ class AIService:
 
         try:
             all_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-            all_models = [m for m in all_models if 'gemini' in m.lower() and 'gemma' not in m.lower()]
+            # Exclude non-text, preview, audio, image, and discontinued models
+            excluded_keywords = ['image', 'tts', 'transcribe', 'computer-use', 'robotics', 'preview', 'gemma']
+            all_models = [m for m in all_models if not any(x in m.lower() for x in excluded_keywords)]
             
             if not all_models:
-                return ['models/gemini-2.5-flash', 'models/gemini-flash-latest']
+                return ['models/gemini-2.5-flash-lite', 'models/gemini-flash-lite-latest', 'models/gemini-2.5-flash']
 
             preference = [
+                'gemini-flash-lite-latest',
+                'gemini-3.5-flash-lite',
+                'gemini-4-hydrogen',
+                'gemini-2.5-flash-lite',
                 'gemini-2.5-flash',
                 'gemini-flash-latest',
-                'gemini-2.5-flash-lite',
-                'gemini-2.5-pro',
                 'gemini-pro-latest'
             ]
             
@@ -295,8 +303,44 @@ class AIService:
             if generation_config.get("response_mime_type") == "application/json":
                 is_json = True
 
-        # 1. Primary Route: LiteLLM AI Gateway (Multi-model failover)
-        if litellm and circuit_breaker.is_available("litellm"):
+        # 1. Primary Route: Direct Gemini API (Sub-second response time)
+        if GEMINI_API_KEY and circuit_breaker.is_available("gemini"):
+            gemini_succeeded = False
+            try:
+                valid_models = AIService._get_valid_models()
+                for model_name in valid_models:
+                    try:
+                        model = genai.GenerativeModel(model_name)
+                        # Disable aggressive grpc retry on 429 quota exhaustion so failover executes immediately
+                        response = model.generate_content(
+                            prompt,
+                            generation_config=generation_config,
+                            request_options={"retry": None, "timeout": 10}
+                        )
+                        raw_text = response.text if hasattr(response, "text") else ""
+                        safe_text = sanitize_output(raw_text)
+                        class CleanResponse:
+                            def __init__(self, text, orig):
+                                self.text = text
+                                self.parts = [text]
+                                self._orig = orig
+                            def __getattr__(self, name):
+                                return getattr(self._orig, name)
+                        circuit_breaker.record_success("gemini")
+                        gemini_succeeded = True
+                        return CleanResponse(safe_text, response)
+                    except Exception as e:
+                        error_log.append(f"Gemini {model_name} failed: {e}")
+                        continue
+            except Exception as e:
+                error_log.append(f"Gemini Error: {e}")
+            
+            if not gemini_succeeded:
+                circuit_breaker.record_failure("gemini")
+
+        # 2. Secondary Route: LiteLLM AI Gateway (Multi-model failover)
+        llm_gateway = _get_litellm()
+        if llm_gateway and circuit_breaker.is_available("litellm"):
             try:
                 # Prioritize Gemini 2.5 Flash, automatically fall back to verified active free models
                 primary_model = "gemini/gemini-2.5-flash" if GEMINI_API_KEY else "openrouter/nvidia/nemotron-3.5-lightning:free"
@@ -331,7 +375,7 @@ class AIService:
                         portkey_headers["x-portkey-virtual-key"] = PORTKEY_VIRTUAL_KEY
                     kwargs["extra_headers"] = portkey_headers
 
-                response = litellm.completion(
+                response = llm_gateway.completion(
                     model=primary_model,
                     messages=[{"role": "user", "content": prompt}],
                     fallbacks=fallbacks if fallbacks else None,
@@ -352,29 +396,6 @@ class AIService:
             except Exception as e:
                 circuit_breaker.record_failure("litellm")
                 error_log.append(f"LiteLLM Gateway Note: {e}")
-
-        # 2. Secondary Route: Direct Gemini API
-        if GEMINI_API_KEY and circuit_breaker.is_available("gemini"):
-            gemini_succeeded = False
-            try:
-                valid_models = AIService._get_valid_models()
-                for model_name in valid_models:
-                    try:
-                        model = genai.GenerativeModel(model_name)
-                        response = model.generate_content(prompt, generation_config=generation_config)
-                        if hasattr(response, "text"):
-                            response.text = sanitize_output(response.text)
-                        circuit_breaker.record_success("gemini")
-                        gemini_succeeded = True
-                        return response
-                    except Exception as e:
-                        error_log.append(f"Gemini {model_name} failed: {e}")
-                        continue
-            except Exception as e:
-                error_log.append(f"Gemini Error: {e}")
-            
-            if not gemini_succeeded:
-                circuit_breaker.record_failure("gemini")
         
         # 3. Tertiary Route: Direct OpenRouter API
         if OPENROUTER_API_KEY and circuit_breaker.is_available("openrouter"):
@@ -425,9 +446,83 @@ class AIService:
         raise Exception(f"All AI Providers Failed. Details: {error_msg}")
 
     @staticmethod
+    def _generate_stream_with_openrouter(prompt: str):
+        if not OPENROUTER_API_KEY:
+            raise Exception("No OpenRouter API Key available for streaming fallback.")
+
+        models = [
+            "nvidia/nemotron-3.5-lightning:free",
+            "inclusionai/ling-3.2-flash:free",
+            "meta-llama/llama-3.3-70b-instruct:free",
+            "deepseek/deepseek-chat:free"
+        ]
+
+        headers = {
+            "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+            "HTTP-Referer": "https://ai-study-buddy.local",
+            "X-Title": "AI Study Buddy",
+            "Content-Type": "application/json"
+        }
+
+        for model in models:
+            try:
+                payload = {
+                    "model": model,
+                    "messages": [{"role": "user", "content": prompt}],
+                    "temperature": 0.6,
+                    "max_tokens": 1500,
+                    "stream": True
+                }
+                response = requests.post(
+                    "https://openrouter.ai/api/v1/chat/completions",
+                    headers=headers,
+                    json=payload,
+                    stream=True,
+                    timeout=15
+                )
+                if response.status_code == 200:
+                    overlap_buffer = ""
+                    has_emitted = False
+                    for line in response.iter_lines():
+                        if not line:
+                            continue
+                        decoded = line.decode("utf-8").strip()
+                        if not decoded.startswith("data:"):
+                            continue
+                        data_str = decoded.replace("data:", "").strip()
+                        if data_str == "[DONE]":
+                            break
+                        try:
+                            d = json.loads(data_str)
+                            delta = d.get("choices", [{}])[0].get("delta", {}).get("content", "")
+                            if delta:
+                                has_emitted = True
+                                combined = overlap_buffer + delta
+                                sanitized = sanitize_output(combined)
+                                if len(sanitized) > 60:
+                                    emit_len = len(sanitized) - 60
+                                    to_yield = sanitized[:emit_len]
+                                    overlap_buffer = sanitized[emit_len:]
+                                    yield to_yield
+                                else:
+                                    overlap_buffer = sanitized
+                        except Exception:
+                            continue
+                    if overlap_buffer:
+                        yield sanitize_output(overlap_buffer)
+                    if has_emitted:
+                        return
+            except Exception as e:
+                print(f"OpenRouter streaming model {model} note: {e}")
+                continue
+
+        raise Exception("All OpenRouter streaming models failed.")
+
+    @staticmethod
     def _generate_content_stream(prompt: str):
         """
-        Yields tokens in real-time using Gemini streaming API with fallback to non-streaming generators.
+        Yields tokens in real-time using Gemini streaming API with automatic failover
+        to OpenRouter free streaming models and standard generators.
         """
         has_yielded = False
         if GEMINI_API_KEY and circuit_breaker.is_available("gemini"):
@@ -439,7 +534,12 @@ class AIService:
                         break
                     try:
                         model = genai.GenerativeModel(model_name)
-                        response = model.generate_content(prompt, stream=True)
+                        # Disable internal grpc retry loop so quota exhaustion fails over instantly
+                        response = model.generate_content(
+                            prompt,
+                            stream=True,
+                            request_options={"retry": None, "timeout": 10}
+                        )
                         overlap_buffer = ""
                         for chunk in response:
                             if chunk.text:
@@ -468,6 +568,18 @@ class AIService:
             except Exception as ge:
                 circuit_breaker.record_failure("gemini")
                 print(f"Gemini Streaming error: {ge}")
+
+        # Secondary Route: OpenRouter Real-Time Token Streaming
+        if not has_yielded and OPENROUTER_API_KEY and circuit_breaker.is_available("openrouter"):
+            try:
+                for token in AIService._generate_stream_with_openrouter(prompt):
+                    has_yielded = True
+                    yield token
+                circuit_breaker.record_success("openrouter")
+                return
+            except Exception as or_stream_err:
+                circuit_breaker.record_failure("openrouter")
+                print(f"OpenRouter Streaming error: {or_stream_err}")
 
         # Fallback to standard safe generation only if no tokens were emitted yet
         if not has_yielded:

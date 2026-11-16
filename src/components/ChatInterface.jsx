@@ -316,7 +316,7 @@ const ChatInterface = () => {
                         if (streamConvId && invalidatedConvsRef.current.has(streamConvId)) return false;
                         return (
                             originatingConvId === activeConvIdRef.current || 
-                            (originatingConvId === null && streamConvId && activeConvIdRef.current === streamConvId)
+                            (originatingConvId === null && (activeConvIdRef.current === null || activeConvIdRef.current === streamConvId))
                         );
                     };
 
@@ -364,6 +364,7 @@ const ChatInterface = () => {
                             if (parsed.conversation_id) {
                                 streamConvId = parsed.conversation_id;
                                 if (originatingConvId === activeConvIdRef.current || (originatingConvId === null && activeConvIdRef.current === null)) {
+                                    activeConvIdRef.current = parsed.conversation_id;
                                     setActiveConvId(parsed.conversation_id);
                                     fetchConversations();
                                 }
@@ -741,7 +742,7 @@ const ChatInterface = () => {
                                         <span className="w-2 h-2 rounded-full bg-emerald-400 animate-bounce" />
                                         <span className="w-2 h-2 rounded-full bg-emerald-400 animate-bounce" style={{ animationDelay: '0.2s' }} />
                                         <span className="w-2 h-2 rounded-full bg-emerald-400 animate-bounce" style={{ animationDelay: '0.4s' }} />
-                                        <span className="text-xs font-mono text-slate-400 ml-2">Reasoning with Hybrid Memory...</span>
+                                        <span className="text-xs font-mono text-slate-400 ml-2">AI Tutor is thinking...</span>
                                     </div>
                                 </div>
                             )}
@@ -779,7 +780,7 @@ const ChatInterface = () => {
                                     type="text"
                                     value={input}
                                     onChange={(e) => setInput(e.target.value)}
-                                    placeholder="Ask a question in this session... (Hybrid Memory automatically retains context)"
+                                    placeholder="Ask a question in this session... (Context automatically retained)"
                                     maxLength={3000}
                                     disabled={isLoading}
                                     className="w-full pl-4 pr-24 py-3.5 rounded-2xl glass-input text-sm font-sans placeholder:text-slate-500 text-slate-100"
