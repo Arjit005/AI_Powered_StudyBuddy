@@ -1,15 +1,25 @@
-# 🎓 AI Study Buddy (Developer & MCP Edition)
-> **Your Intelligent, Model Context Protocol (MCP) Powered Learning Companion & Visual Architecture Studio.**
-> *A full-stack modern learning platform featuring Hybrid Memory Architecture, interactive Canvas Whiteboard modeling with Excalidraw export, high-fidelity Mermaid vector diagrams, spaced repetition, audio synthesis, and an enterprise safety suite.*
+# 🎓 AI Study Buddy (NotebookLM RAG & MCP Edition)
+> **Your Intelligent, Model Context Protocol (MCP) Powered Learning Companion, Document Grounded RAG Research Hub & Visual Architecture Studio.**
+> *A full-stack, enterprise-grade learning platform featuring Grounded RAG with NotebookLM-style citations, Tiered Hybrid Memory Architecture, interactive Canvas Whiteboard modeling with Excalidraw export, high-fidelity Mermaid vector diagrams, spaced repetition, audio synthesis, and an enterprise safety suite.*
 
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.128-009688?style=flat&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
 [![React 19](https://img.shields.io/badge/React-19.0-61DAFB?style=flat&logo=react&logoColor=black)](https://react.dev/)
 [![Tailwind CSS v4](https://img.shields.io/badge/TailwindCSS-v4.0-38B2AC?style=flat&logo=tailwind-css&logoColor=white)](https://tailwindcss.com/)
-[![MCP](https://img.shields.io/badge/Model_Context_Protocol-JSON--RPC_2.0-8A2BE2?style=flat)](https://modelcontextprotocol.io/)
+[![RAG Engine](https://img.shields.io/badge/RAG-NotebookLM_Citations-orange?style=flat&logo=openai)](https://github.com/Arjit005/AI_Powered_StudyBuddy)
+[![Model Context Protocol](https://img.shields.io/badge/Model_Context_Protocol-JSON--RPC_2.0-8A2BE2?style=flat)](https://modelcontextprotocol.io/)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Neon_%2F_Render-4169E1?style=flat&logo=postgresql&logoColor=white)](https://neon.tech/)
 [![Mermaid](https://img.shields.io/badge/Mermaid.js-Vector_SVG-FF69B4?style=flat)](https://mermaid.js.org/)
 [![Excalidraw](https://img.shields.io/badge/Excalidraw-Compatible-6965DB?style=flat)](https://excalidraw.com/)
-[![JWT Auth](https://img.shields.io/badge/Auth-JWT_%2B_Bcrypt-blue?style=flat)](https://pyjwt.readthedocs.io/)
+[![JWT Auth](https://img.shields.io/badge/Auth-Server--Validated_JWT_%2B_Bcrypt-blue?style=flat)](https://pyjwt.readthedocs.io/)
+[![Deploy on Render](https://img.shields.io/badge/Render-Live_Deployment-success?style=flat&logo=render&logoColor=white)](https://studybuddy-poweredby-ai.onrender.com)
 [![License](https://img.shields.io/badge/License-MIT-green?style=flat)](LICENSE)
+
+---
+
+## 🌐 Live Production Demo
+- **Production Web Application**: [https://studybuddy-poweredby-ai.onrender.com](https://studybuddy-poweredby-ai.onrender.com)
+- **Interactive Swagger API Docs**: [https://studybuddy-poweredby-ai.onrender.com/docs](https://studybuddy-poweredby-ai.onrender.com/docs)
+- **MCP Endpoint**: [https://studybuddy-poweredby-ai.onrender.com/api/mcp](https://studybuddy-poweredby-ai.onrender.com/api/mcp)
 
 ---
 
@@ -20,88 +30,107 @@ flowchart TD
     subgraph Client ["Frontend Client (React 19 + Tailwind CSS v4)"]
         UI["🖥️ Modern Emerald Glassmorphic UI"]
         CanvasStudio["🎨 Visual Canvas Studio\n(Draggable Nodes + SVG Connectors)"]
+        RAGHub["📚 Grounded Sources Hub\n(PDF/Web Upload + NotebookLM Badges)"]
         LibraryHub["🗂️ Persistent Study Library"]
+        Flashcards["🗃️ Spaced Repetition (Anki/Leitner)"]
         CmdPalette["⚡ Command Palette (Ctrl+K)"]
+    end
+
+    subgraph Gateway ["Production Gateway & Security Shield (FastAPI)"]
+        SecHeaders["🛡️ SecurityHeadersMiddleware\n(nosniff, DENY clickjack, Server masking)"]
+        RateLimiter["⏱️ Sliding-Window Rate Limiter & Brute-Force Lockout"]
+        AuthGuard["🔐 Server-Side JWT Validation (/api/auth/me)"]
+        UploadGuard["📦 20MB Streaming File Size Guard"]
+        SPAServer["📦 Static SPA Server\n(Dist directory-traversal safe fallback)"]
+    end
+
+    subgraph RAGCore ["NotebookLM Grounded RAG Engine"]
+        Extractor["📄 PDF / Web Text Extractor (PyMuPDF, trafilatura)"]
+        Chunker["✂️ Semantic Recursive Chunker (500 tokens, 10% overlap)"]
+        VectorDB["🌲 Pinecone Vector DB / Local Dense Embeddings"]
+        CitationEngine["📌 Citation Indexer & Source Attribution Linker"]
     end
 
     subgraph MCPBus ["Model Context Protocol (MCP) Layer"]
         MCPEndpoint["🔌 HTTP JSON-RPC 2.0 (/api/mcp)"]
         MCPStdio["💻 Standalone STDIO Server\n(Claude Desktop / Cursor)"]
-        ToolsRegistry["🛠️ 5 Registered MCP Tools\n(generate_canvas_diagram, memory, etc.)"]
+        ToolsRegistry["🛠️ Registered MCP Tools\n(generate_canvas, query_sources, hybrid_memory)"]
     end
 
-    subgraph Backend ["Backend Gateway (FastAPI)"]
-        SecHeaders["🛡️ SecurityHeadersMiddleware\n(nosniff, DENY clickjack, Server masking)"]
-        RateLimiter["⏱️ Sliding-Window Rate Limiter & Brute-Force Lockout"]
-        PromptGuard["🔒 PromptGuard Anti-Jailbreak Filter"]
+    subgraph AIOrchestrator ["Multi-Model Failover Pipeline"]
+        Gemini["🥇 Primary: Google Gemini 2.5 Flash / Pro"]
+        HF["🥈 Secondary: Hugging Face Mistral-7B"]
+        Fallback["🥉 Tertiary: Deterministic Academic Engine"]
         HybridMem["🧠 Tiered Hybrid Memory\n(Tier-1 Working Buffer + Tier-2 Episodic Summary)"]
     end
 
-    subgraph Storage ["Persistence Layer (SQLite / SQLAlchemy)"]
-        DB[("study_buddy.db\nUsers, Conversations, ChatHistory,\nSavedMaterials, StudySessions")]
+    subgraph Persistence ["Persistence Layer (SQLAlchemy 2.0)"]
+        DB[("PostgreSQL (Neon / Render) or SQLite\nUsers, Conversations, ChatHistory,\nSources, Chunks, Citations, Quizzes")]
     end
 
-    subgraph AIService ["Multi-Model Failover Pipeline"]
-        Gemini["🥇 Primary: Google Gemini Pro"]
-        HF["🥈 Secondary: Hugging Face Mistral-7B"]
-        Pollinations["🥉 Tertiary: Pollinations / Academic Fallback"]
-    end
-
-    UI -->|"REST / JSON"| Backend
+    UI -->|"REST / SSE Stream"| Gateway
+    Gateway --> SecHeaders --> RateLimiter --> AuthGuard
+    AuthGuard --> SPAServer
+    AuthGuard --> RAGCore
+    AuthGuard --> AIOrchestrator
+    
+    RAGHub -->|"Upload Docs"| UploadGuard --> Extractor --> Chunker --> VectorDB
+    VectorDB --> CitationEngine --> DB
+    
+    UI -->|"Query + Sources"| AIOrchestrator
+    AIOrchestrator --> HybridMem <--> DB
+    RAGCore -->|"Grounded Context"| AIOrchestrator
+    
     CanvasStudio -->|"Generate Graph"| MCPEndpoint
     MCPStdio --> ToolsRegistry
     MCPEndpoint --> ToolsRegistry
-    ToolsRegistry --> AIService
-    Backend --> SecHeaders --> RateLimiter --> PromptGuard
-    PromptGuard --> HybridMem --> AIService
-    HybridMem <--> DB
-    LibraryHub <--> DB
+    ToolsRegistry --> AIOrchestrator
 ```
 
 ---
 
 ## 💎 Key Features & Capabilities
 
-### 1. 🔌 Model Context Protocol (MCP) Integration
-- **Standards Compliant JSON-RPC 2.0**: Connects external AI tools (Claude Desktop, Cursor IDE, Obsidian Canvas, Antigravity) to Study Buddy.
-- **5 Registered MCP Tools**:
+### 1. 📚 NotebookLM-Style Grounded RAG (`/sources`)
+- **Document & Web Ingestion**: Upload academic PDFs, lecture slides, research papers, or paste web URLs.
+- **Semantic Chunking**: Automatically slices documents into coherent 500-token chunks with 10% contextual overlap.
+- **Dense Vector Search**: Powered by Pinecone vector index with automatic user namespace isolation (`user_{id}`) or local mathematical fallbacks.
+- **In-Text Citation Badges**: AI responses automatically insert verifiable `[1]`, `[2]` citation pills that reveal the exact source excerpt and page number on hover.
+- **Grounded Chat**: Toggle source grounding on or off per conversation with deterministic attribution.
+
+### 2. 🔌 Model Context Protocol (MCP) Integration
+- **Full JSON-RPC 2.0 Standard Compliance**: Allows external agents (Claude Desktop, Cursor IDE, Obsidian, Antigravity) to access Study Buddy capabilities.
+- **Registered MCP Tools**:
   1. `generate_canvas_diagram`: Produces multi-tier visual nodes, geometry, and Excalidraw-compatible element arrays.
   2. `export_to_canvas_json`: Converts raw notes and concept hierarchies into visual canvas elements.
   3. `generate_mermaid_spec`: Generates validated Mermaid flowchart and sequence definitions.
-  4. `query_study_memory`: Exposes SQLite hybrid memory context to external tools.
+  4. `query_study_memory`: Exposes SQLite/PostgreSQL hybrid memory context to external tools.
   5. `create_study_flashcards`: Generates active recall study cards.
 - **Standalone STDIO Runner**: Launch `python backend/mcp_server.py` to hook into any local MCP client configuration.
 
-### 2. 🎨 Visual Canvas Studio (`/canvas`)
-- **Infinite Interactive Canvas**: Smooth pan, zoom (40% to 220%), fit view, and draggable nodes.
-- **Dynamic Bezier Curves**: Real-time curved SVG arrows connecting components that automatically re-route when nodes are moved.
+### 3. 🎨 Visual Canvas Studio (`/canvas`)
+- **Infinite Interactive Canvas**: Smooth pan, zoom (40% to 220%), fit-to-view, and drag-and-drop nodes.
+- **Dynamic Bezier Curves**: Real-time curved SVG arrows connecting concept nodes that dynamically re-route when moved.
 - **Excalidraw Integration**: 1-click **"Copy Excalidraw"** exports ready-to-paste JSON compatible with [excalidraw.com](https://excalidraw.com).
 - **Mermaid Vector Synchronizer**: View and copy synchronized Mermaid.js code for any canvas graph.
-- **Export to SVG**: Download high-resolution vector diagrams.
+- **Export to SVG / PNG**: High-resolution vector and image exports for assignments and documentation.
 
-### 3. 🧠 Tiered Hybrid Memory Architecture
+### 4. 🧠 Tiered Hybrid Memory Architecture
 - **Tier-1 (Short-Term Working Buffer)**: Retains recent verbatim dialogue turns for sharp immediate conversational context.
-- **Tier-2 (Episodic Long-Term Summary)**: Automatically condenses earlier turns when discussions exceed 10 messages, preserving conceptual points without token bloat.
+- **Tier-2 (Episodic Long-Term Summary)**: Automatically condenses earlier turns when discussions exceed 10 messages, preserving conceptual knowledge without token bloat.
 - **Live Memory Inspector**: Real-time modal in chat showing active buffer counts and long-term summary status.
 
-### 4. 🗂️ Persistent Study Library (`/library`)
-- **Central Knowledge Hub**: Save summaries, canvas models, quizzes, and flashcard decks into SQLite.
-- **Filtering & Search**: Filter by category (`Summaries`, `Canvas Diagrams`, `Flashcards`, `Quizzes`), search by title/topic, and star favorites.
-- **Full-Note Inspection Modal**: Re-open saved study guides and diagrams anytime.
+### 5. 🗂️ Spaced Repetition & Focus Studio
+- **Active Recall Flashcards (`/flashcards`)**: Anki/Leitner-style 3D flip cards with self-grading (🔴 Hard, 🟡 Good, 🟢 Mastered) and keyboard hotkeys (Space/1/2/3).
+- **Pomodoro Focus Timer (`/timer`)**: Drift-free web worker timer with customizable work/break intervals, ambient audio, and session persistence.
+- **Persistent Study Library (`/library`)**: Centralized repository for saved summaries, flashcard decks, diagrams, and quizzes with search and starring.
 
-### 5. ⚡ Global Command Palette (`Ctrl+K` / `⌘K`)
-- Spotlight overlay accessible anywhere in the app via `Ctrl+K` or header search button.
-- Instant keyboard navigation to any study tool or quick action (`+ New Chat`, `Open Canvas Studio`, `Inspect MCP Server`).
-
-### 6. 🔊 Audio Speech Synthesis (TTS) & Spaced Repetition
-- **Summarizer TTS**: Web Speech API audio player reads summaries aloud with live audio controls.
-- **Spaced Repetition Flashcards**: Anki/Leitner-style self-grading (🔴 Hard, 🟡 Good, 🟢 Mastered) with deck mastery metrics and keyboard hotkeys.
-
-### 7. 🛡️ Enterprise Safety & Security Suite
-- **Sliding-Window Rate Limiter**: 60 req/min per client IP with automatic brute-force lockout on repeated login failures.
+### 6. 🛡️ Enterprise Safety & Security Suite
+- **Server-Side Protected Routes**: React routes verify JWT validity with `/api/auth/me` on mount, preventing token tampering or spoofed localStorage.
+- **Sliding-Window Rate Limiter**: 60 req/min per client IP with bounded LRU eviction and brute-force lockout on repeated login failures.
 - **PromptGuard Jailbreak Defense**: Regex heuristic filter intercepting prompt injection, role confusion, and system prompt leakage attempts.
 - **Security Headers Middleware**: Enforces `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy`, and server technology masking (`Server: StudyBuddy-Gateway`).
-- **5-Checkpoint Password Meter**: Enforces enterprise password complexity.
+- **20MB Streaming File Upload Limits**: Strict payload bounds on file and document ingestion with `HTTP 413` protection.
 
 ---
 
@@ -110,48 +139,76 @@ flowchart TD
 ```
 Internship_project_study_buddy/
 ├── backend/
-│   ├── ai_service.py         # Multi-model inference (Gemini, HF, fallback templates)
-│   ├── analytics.py          # Session charting & progress calculation
-│   ├── auth.py               # Bcrypt password hashing & JWT token verification
-│   ├── database.py           # SQLAlchemy SQLite engine & session factory
-│   ├── main.py               # FastAPI gateway, REST routes, and MCP endpoints
-│   ├── maps.py               # Concept graph network analysis
-│   ├── mcp_server.py         # Standalone STDIO Model Context Protocol server
-│   ├── mcp_service.py        # MCP JSON-RPC 2.0 processor & tool registry
-│   ├── models.py             # SQLite ORM models (Conversations, Materials, Users)
-│   ├── requirements.txt      # Python dependencies (FastAPI, MCP, SQLAlchemy, etc.)
-│   └── security.py           # Rate limiting, PromptGuard, and security middleware
+│   ├── ai_service.py              # Multi-model inference (Gemini, HF, fallback)
+│   ├── analytics.py               # Session analytics & progress metrics
+│   ├── auth.py                    # Bcrypt password hashing & JWT token verification
+│   ├── database.py                # Universal SQLAlchemy pool (PostgreSQL / SQLite)
+│   ├── embedding_service.py      # Pinecone & Gemini vector embeddings
+│   ├── guardrails.py             # Input / output safety filters
+│   ├── main.py                    # FastAPI gateway, RAG endpoints, & SPA server
+│   ├── maps.py                    # Concept graph network analysis
+│   ├── mcp_server.py              # Standalone STDIO Model Context Protocol server
+│   ├── mcp_service.py             # MCP JSON-RPC 2.0 processor & tool registry
+│   ├── models.py                  # SQLAlchemy ORM schemas & migrations
+│   ├── rag_service.py             # NotebookLM RAG engine (chunking, retrieval, citations)
+│   ├── requirements.txt           # Python dependencies
+│   └── security.py                # Rate limiting, PromptGuard, & security middleware
+├── dist/                          # Production-compiled React SPA assets (served by FastAPI)
+├── docs/                          # Architectural audits, evaluation benchmarks, checklists
+├── public/                        # Static public assets
 ├── src/
 │   ├── components/
-│   │   ├── ChatInterface.jsx     # Multi-session chat with hybrid memory inspector
-│   │   ├── CommandPalette.jsx    # Global Ctrl+K spotlight navigation
-│   │   ├── FeatureGrid.jsx       # Landing page feature matrix
-│   │   ├── Header.jsx            # Glassmorphic navbar with telemetry badge
-│   │   ├── Hero.jsx              # Landing page hero section
-│   │   ├── Layout.jsx            # Base app container
-│   │   ├── MermaidViewer.jsx     # Interactive vector SVG diagram renderer
-│   │   └── StructuredMessage.jsx # Parser for embedded code and Mermaid diagrams
+│   │   ├── ui/
+│   │   │   ├── FlipCard3D.jsx     # 3D interactive flashcard with CSS perspective
+│   │   │   └── SpotlightCard.jsx  # Glassmorphic spotlight hover card
+│   │   ├── ChatInterface.jsx      # Multi-session chat with hybrid memory inspector
+│   │   ├── CommandPalette.jsx     # Global Ctrl+K spotlight navigation
+│   │   ├── FeatureGrid.jsx        # Landing page feature matrix
+│   │   ├── FeedbackWidget.jsx     # In-app user rating & feedback modal
+│   │   ├── Header.jsx             # Glassmorphic navbar with telemetry badge
+│   │   ├── Hero.jsx               # Landing page hero section
+│   │   ├── Layout.jsx             # Base app container
+│   │   ├── MermaidViewer.jsx      # Interactive vector SVG diagram renderer
+│   │   └── StructuredMessage.jsx  # Markdown parser with code copy & citations
 │   ├── pages/
-│   │   ├── CanvasStudio.jsx      # Visual Canvas whiteboard with Excalidraw export
-│   │   ├── Chat.jsx              # AI tutor chat page
-│   │   ├── Flashcards.jsx        # Spaced repetition active recall cards
-│   │   ├── Home.jsx              # Dashboard entrypoint
-│   │   ├── Library.jsx           # Unified Study Library & saved notes
-│   │   ├── LoginPage.jsx         # Secure login with lockout handling
-│   │   ├── Maps.jsx              # Concept & architecture diagrams
-│   │   ├── Pricing.jsx           # Glassmorphic subscription plans
-│   │   ├── Progress.jsx          # Analytics & learning milestones
-│   │   ├── Quiz.jsx              # Interactive MCQ quiz generator
-│   │   ├── SignupPage.jsx        # Registration with 5-checkpoint password meter
-│   │   ├── Summarize.jsx         # Topic summarizer with TTS audio playback
-│   │   └── Timer.jsx             # Pomodoro focus timer
-│   ├── App.jsx               # Route definitions & global palette listener
-│   ├── index.css             # Emerald dark glassmorphic styling & scrollbars
-│   └── main.jsx              # React 19 root entrypoint
-├── package.json              # Frontend npm dependencies (React 19, Mermaid, Lucide)
-├── study_buddy.db            # Persistent SQLite database
-└── vite.config.js            # Vite configuration with proxy to port 8000
+│   │   ├── CanvasStudio.jsx       # Visual Canvas whiteboard with Excalidraw export
+│   │   ├── Chat.jsx               # AI tutor chat page
+│   │   ├── Flashcards.jsx         # Spaced repetition active recall cards
+│   │   ├── Home.jsx               # Dashboard entrypoint
+│   │   ├── Library.jsx            # Unified Study Library & saved notes
+│   │   ├── LoginPage.jsx          # Secure login with lockout handling
+│   │   ├── Maps.jsx               # Concept & architecture diagrams
+│   │   ├── Pricing.jsx            # Glassmorphic subscription plans
+│   │   ├── Progress.jsx           # Analytics & learning milestones
+│   │   ├── Quiz.jsx               # Interactive MCQ quiz generator
+│   │   ├── SignupPage.jsx         # Registration with 5-checkpoint password meter
+│   │   ├── Sources.jsx            # NotebookLM RAG document upload & management
+│   │   ├── Summarize.jsx          # Topic summarizer with TTS audio playback
+│   │   ├── Timer.jsx              # Pomodoro focus timer with drift elimination
+│   │   └── Voice.jsx              # Speech-to-text / voice study companion
+│   ├── App.jsx                    # Route definitions with server-validated ProtectedRoute
+│   ├── index.css                  # Emerald dark glassmorphic styling & scrollbars
+│   └── main.jsx                   # React 19 root entrypoint
+├── package.json                   # Frontend npm dependencies (React 19, Mermaid, Lucide)
+├── render.yaml                    # Infrastructure-as-code blueprint for Render
+└── vite.config.js                 # Vite configuration with proxy to port 8000
 ```
+
+---
+
+## ⚙️ Environment Variables
+
+Create a `.env` file in the project root or configure these variables in your cloud hosting dashboard (Render / Railway / Fly.io):
+
+| Variable | Required | Description | Example |
+| :--- | :---: | :--- | :--- |
+| `GEMINI_API_KEY` | Optional | Google Gemini Pro / Flash API key for primary AI reasoning | `AIzaSy...` |
+| `HUGGINGFACE_API_KEY` | Optional | Hugging Face token for secondary LLM failover | `hf_...` |
+| `PINECONE_API_KEY` | Optional | Pinecone key for fast dense vector RAG retrieval | `pcsk_...` |
+| `PINECONE_INDEX_NAME` | Optional | Name of Pinecone vector index (1536/768 dim) | `study-buddy-rag` |
+| `DATABASE_URL` | Optional | PostgreSQL connection string (defaults to local SQLite) | `postgresql://user:pass@ep-xyz.neon.tech/neondb` |
+| `SECRET_KEY` | Recommended | Cryptographic salt for JWT session tokens | `super-secret-hex-key-here` |
+| `CORS_ORIGINS` | Optional | Comma-separated list of allowed web origins | `https://my-domain.com,http://localhost:5173` |
 
 ---
 
@@ -161,7 +218,7 @@ Internship_project_study_buddy/
 - Python 3.11+
 - Node.js 18+
 
-### 2. Backend Setup
+### 2. Local Backend Setup
 ```bash
 # Navigate to project directory
 cd Internship_project_study_buddy
@@ -179,31 +236,62 @@ pip install -r backend/requirements.txt
 uvicorn backend.main:app --host 127.0.0.1 --port 8000 --reload
 ```
 
-Backend will be running at `http://127.0.0.1:8000`  
-Swagger API Documentation: `http://127.0.0.1:8000/docs`
+- **Backend API**: `http://127.0.0.1:8000`  
+- **Interactive Swagger Docs**: `http://127.0.0.1:8000/docs`
 
-### 3. Frontend Setup
+### 3. Local Frontend Setup
 ```bash
 # In a new terminal window
 npm install
 npm run dev
 ```
 
-Frontend application will be accessible at `http://localhost:5173`
+- **Frontend Application**: `http://localhost:5173`
 
-### 4. Hooking MCP into Claude Desktop
-Add this to your `claude_desktop_config.json`:
+---
+
+## ☁️ Cloud Deployment (Render Unified Full-Stack)
+
+AI Study Buddy is configured for seamless single-service full-stack deployment on [Render](https://render.com).
+
+1. Push your repository to GitHub.
+2. In Render, create a new **Web Service** pointing to your repository.
+3. Configure settings:
+   - **Environment**: `Python`
+   - **Build Command**: `pip install -r backend/requirements.txt`
+   - **Start Command**: `uvicorn backend.main:app --host 0.0.0.0 --port $PORT`
+4. Add environment variables (`GEMINI_API_KEY`, `DATABASE_URL`, `SECRET_KEY`).
+5. **Done!** FastAPI will automatically serve the compiled React SPA from `dist/` at the root domain while handling all `/api/...` endpoints and WebSocket/SSE streams.
+
+---
+
+## 🔌 Hooking MCP into Claude Desktop / Cursor
+
+To connect AI Study Buddy's visual studio and memory tools into Claude Desktop, add the following to your `claude_desktop_config.json`:
+
 ```json
 {
   "mcpServers": {
     "ai-study-buddy": {
       "command": "python",
-      "args": ["backend/mcp_server.py"]
+      "args": ["c:/absolute/path/to/Internship_project_study_buddy/backend/mcp_server.py"]
     }
   }
 }
 ```
-Now Claude or Cursor can generate study canvas diagrams, query hybrid memory, and inspect saved student notes directly!
+
+Now Claude can generate study canvas diagrams, query hybrid memory, search grounded sources, and inspect student notes directly inside your chat sessions.
+
+---
+
+## 🧪 Testing & Quality Assurance
+
+Run the comprehensive test suite locally:
+
+```bash
+# Run production integrity and safety evaluations
+pytest tests/ -v
+```
 
 ---
 
