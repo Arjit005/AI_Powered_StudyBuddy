@@ -14,9 +14,11 @@ const Quiz = () => {
     const [error, setError] = useState('');
     const quizStartTimeRef = useRef(null);
     const quizInstanceRef = useRef(null);
+    const submitGuardRef = useRef(false);
 
     const generateQuiz = async () => {
         if (!topic.trim() || saving || loading) return;
+        submitGuardRef.current = false;
         setLoading(true);
         setQuiz(null);
         setAnswers({});
@@ -48,7 +50,8 @@ const Quiz = () => {
                 .map(q => {
                     const rawAnswer = String(q.correct_answer || q.answer || '').trim();
                     if (!rawAnswer) return null;
-                    const normalizedOptions = q.options.map(opt => String(opt).trim());
+                    if (!q.options.every(opt => typeof opt === 'string' && opt.trim().length > 0)) return null;
+                    const normalizedOptions = q.options.map(opt => opt.trim());
                     // Reject questions with duplicate options (case-insensitive check)
                     if (new Set(normalizedOptions.map(opt => opt.toLowerCase())).size !== normalizedOptions.length) return null;
                     // Find option matching rawAnswer strictly (exact match case-insensitively)
@@ -97,6 +100,8 @@ const Quiz = () => {
     };
 
     const handleSubmitQuiz = () => {
+        if (submitGuardRef.current || submitted) return;
+        submitGuardRef.current = true;
         setSubmitted(true);
         const score = calculateScore();
         const total = quiz?.questions?.length || 0;
@@ -360,6 +365,7 @@ const Quiz = () => {
                                         </button>
                                         <button
                                             onClick={() => {
+                                                submitGuardRef.current = false;
                                                 quizInstanceRef.current = null;
                                                 setQuiz(null);
                                                 setAnswers({});

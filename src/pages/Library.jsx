@@ -28,6 +28,7 @@ export default function Library() {
   const requestGenRef = useRef(0);
   const detailRequestGenRef = useRef(0);
   const pendingFavoritesRef = useRef(new Set());
+  const itemFavoriteEpochRef = useRef(new Map());
 
   useEffect(() => {
     fetchLibrary();
@@ -61,11 +62,15 @@ export default function Library() {
         const data = await res.json();
         if (thisGen !== requestGenRef.current) return;
         const serverItems = Array.isArray(data) 
-          ? data.filter(item => item && typeof item === 'object' && item.id != null) 
+          ? data.filter(item => item && typeof item === 'object' && item.id !== null && item.id !== undefined) 
           : [];
         setItems(prev => {
           const currentFavMap = new Map(prev.map(p => [p.id, p.is_favorite]));
           return serverItems.map(item => {
+            const override = itemFavoriteEpochRef.current.get(item.id);
+            if (override && thisGen <= override.minGen) {
+              return { ...item, is_favorite: override.is_favorite };
+            }
             if (pendingFavoritesRef.current.has(item.id) && currentFavMap.has(item.id)) {
               return { ...item, is_favorite: currentFavMap.get(item.id) };
             }
@@ -91,15 +96,24 @@ export default function Library() {
     e.stopPropagation();
     if (pendingFavoritesRef.current.has(id)) return;
     pendingFavoritesRef.current.add(id);
+
+    const targetItem = items.find(i => i.id === id);
+    const newFav = targetItem ? !targetItem.is_favorite : true;
+    const mutationGen = requestGenRef.current;
+    itemFavoriteEpochRef.current.set(id, { is_favorite: newFav, minGen: mutationGen });
+    setItems(prev => prev.map(item => item.id === id ? { ...item, is_favorite: newFav } : item));
+
     try {
       const res = await fetch(`/api/library/${id}/favorite`, { method: 'PUT', headers: getAuthHeaders() });
-      if (res.ok) {
-        setItems(prev => prev.map(item => item.id === id ? { ...item, is_favorite: !item.is_favorite } : item));
-      } else {
+      if (!res.ok) {
+        itemFavoriteEpochRef.current.delete(id);
+        setItems(prev => prev.map(item => item.id === id ? { ...item, is_favorite: !newFav } : item));
         alert("Could not update favorite status.");
       }
     } catch (err) {
       console.error("Favorite toggle error:", err);
+      itemFavoriteEpochRef.current.delete(id);
+      setItems(prev => prev.map(item => item.id === id ? { ...item, is_favorite: !newFav } : item));
       alert("Network error updating favorite.");
     } finally {
       pendingFavoritesRef.current.delete(id);

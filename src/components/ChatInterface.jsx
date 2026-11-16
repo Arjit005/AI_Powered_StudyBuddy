@@ -51,6 +51,8 @@ const ChatInterface = () => {
     }, [location.state]);
 
     const activeSendCountRef = useRef(0);
+    const sendGenerationRef = useRef(0);
+    const invalidatedConvsRef = useRef(new Set());
 
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -173,6 +175,8 @@ const ChatInterface = () => {
     const handleDeleteSession = async (convId, e) => {
         e.stopPropagation();
         if (!confirm("Delete this entire study session?")) return;
+        invalidatedConvsRef.current.add(convId);
+        sendGenerationRef.current += 1;
 
         try {
             const token = localStorage.getItem('auth_token');
@@ -222,6 +226,9 @@ const ChatInterface = () => {
 
     const clearCurrentChat = async () => {
         if (!confirm("Clear messages in this current study session?")) return;
+        const targetConv = activeConvId;
+        invalidatedConvsRef.current.add(targetConv || 'current');
+        sendGenerationRef.current += 1;
         try {
             const token = localStorage.getItem('auth_token');
             const headers = {};
@@ -249,6 +256,7 @@ const ChatInterface = () => {
         if (!textToSend.trim() || isLoading) return;
 
         const originatingConvId = activeConvId;
+        const thisSendGen = ++sendGenerationRef.current;
         const currentTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
         const userMessage = { role: 'user', content: textToSend, timestamp: currentTime };
         setMessages(prev => [...prev, userMessage]);
@@ -302,13 +310,22 @@ const ChatInterface = () => {
                     let receivedDone = false;
                     let buffer = '';
 
-                    const isStillCurrentConv = () => (
-                        originatingConvId === activeConvIdRef.current || 
-                        (originatingConvId === null && streamConvId && activeConvIdRef.current === streamConvId)
-                    );
+                    const isStillCurrentConv = () => {
+                        if (thisSendGen !== sendGenerationRef.current) return false;
+                        if (invalidatedConvsRef.current.has(originatingConvId)) return false;
+                        if (streamConvId && invalidatedConvsRef.current.has(streamConvId)) return false;
+                        return (
+                            originatingConvId === activeConvIdRef.current || 
+                            (originatingConvId === null && streamConvId && activeConvIdRef.current === streamConvId)
+                        );
+                    };
 
                     while (!doneReading) {
                         const { value, done } = await reader.read();
+                        if (!isStillCurrentConv()) {
+                            reader.cancel().catch(() => {});
+                            return;
+                        }
                         if (done) {
                             buffer += decoder.decode();
                             doneReading = true;
@@ -385,25 +402,40 @@ const ChatInterface = () => {
                 }
             } catch (streamErr) {
                 console.warn('SSE Streaming connection failed:', streamErr);
-                const isStillCurrentConv = () => (
-                    originatingConvId === activeConvIdRef.current || 
-                    (streamConvId && activeConvIdRef.current === streamConvId)
+                const isStillValidConv = () => (
+                    thisSendGen === sendGenerationRef.current &&
+                    !invalidatedConvsRef.current.has(originatingConvId) &&
+                    (!streamConvId || !invalidatedConvsRef.current.has(streamConvId)) &&
+                    (originatingConvId === activeConvIdRef.current || (streamConvId && activeConvIdRef.current === streamConvId))
                 );
                 if (accumulatedText.length > 0) {
-                    if (isStillCurrentConv()) {
-                        setMessages(prev => prev.map(m => m.id === streamMsgId ? { ...m, isStreaming: false } : m));
+                    if (isStillValidConv()) {
+                        setMessages(prev => prev.map(m => m.id === streamMsgId ? { 
+                            ...m, 
+                            content: m.content + '\n\n*(Response interrupted due to network issue)*',
+                            isStreaming: false,
+                            isInterrupted: true 
+                        } : m));
+                        fetchConversations();
                     }
                     return;
                 }
-                if (isStillCurrentConv()) {
+                if (isStillValidConv()) {
                     setMessages(prev => prev.filter(m => m.id !== streamMsgId));
                 }
             }
 
             if (!streamSuccess) {
+                const isStillValidConv = () => (
+                    thisSendGen === sendGenerationRef.current &&
+                    !invalidatedConvsRef.current.has(originatingConvId) &&
+                    (!streamConvId || !invalidatedConvsRef.current.has(streamConvId)) &&
+                    (originatingConvId === activeConvIdRef.current || (streamConvId && activeConvIdRef.current === streamConvId))
+                );
+
                 if (streamAccepted) {
                     // Avoid double-posting to /api/chat since the stream request was already accepted by the server
-                    if (accumulatedText.length === 0 && originatingConvId === activeConvIdRef.current) {
+                    if (accumulatedText.length === 0 && isStillValidConv()) {
                         setMessages(prev => [
                             ...prev,
                             {
@@ -433,13 +465,9 @@ const ChatInterface = () => {
 
                 const data = await response.json();
                 
-                // If user switched conversation during in-flight generation, do not append to new room
-                if (originatingConvId !== activeConvIdRef.current) {
-                    if (originatingConvId === null && activeConvIdRef.current !== null) {
-                        return;
-                    } else if (originatingConvId !== null) {
-                        return;
-                    }
+                // If user switched or deleted conversation during in-flight generation, do not append
+                if (!isStillValidConv()) {
+                    return;
                 }
 
                 if (data.conversation_id && data.conversation_id !== activeConvId) {

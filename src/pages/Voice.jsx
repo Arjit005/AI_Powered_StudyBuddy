@@ -13,6 +13,7 @@ const Voice = () => {
     const recognitionRef = useRef(null);
     const recognitionSessionRef = useRef(0);
     const playbackGenRef = useRef(0);
+    const aiRequestGenRef = useRef(0);
     const aiAbortControllerRef = useRef(null);
     const isMountedRef = useRef(true);
 
@@ -98,7 +99,7 @@ const Voice = () => {
             } catch (err) {
                 console.error('Failed to start speech recognition:', err);
                 setIsListening(false);
-                setAiResponse('⚠️ Microphone capture could not be started. Please check microphone permissions and try again.');
+                setError('Microphone capture could not be started. Please check microphone permissions and try again.');
             }
         }
     };
@@ -115,6 +116,7 @@ const Voice = () => {
         if (aiAbortControllerRef.current) {
             aiAbortControllerRef.current.abort();
         }
+        const thisAiGen = ++aiRequestGenRef.current;
         const abortCtrl = new AbortController();
         aiAbortControllerRef.current = abortCtrl;
 
@@ -133,6 +135,8 @@ const Voice = () => {
                 body: JSON.stringify({ message: transcript }),
             });
 
+            if (thisAiGen !== aiRequestGenRef.current) return;
+
             if (!res.ok) {
                 let errDetail = 'AI consultation failed';
                 try {
@@ -147,7 +151,7 @@ const Voice = () => {
             } catch (_) {
                 throw new Error('Invalid response received from server.');
             }
-            if (!isMountedRef.current) return;
+            if (!isMountedRef.current || thisAiGen !== aiRequestGenRef.current) return;
             if (!data || typeof data !== 'object') {
                 throw new Error('Unexpected response format from AI tutor.');
             }
@@ -182,11 +186,11 @@ const Voice = () => {
         } catch (err) {
             if (err.name === 'AbortError') return;
             console.error("Voice response error:", err);
-            if (isMountedRef.current) {
+            if (isMountedRef.current && thisAiGen === aiRequestGenRef.current) {
                 setAiResponse(`⚠️ ${err.message || 'Unable to connect to the AI tutor right now. Please check your connection and try again.'}`);
             }
         } finally {
-            if (isMountedRef.current) {
+            if (isMountedRef.current && thisAiGen === aiRequestGenRef.current) {
                 setIsLoading(false);
             }
         }

@@ -38,7 +38,15 @@ const Progress = () => {
                 try {
                     const data = await progRes.json();
                     if (thisGen !== progressRequestGenRef.current) return;
-                    setStats(data);
+                    if (data && typeof data === 'object') {
+                        setStats({
+                            study_hours: typeof data.study_hours === 'number' && !isNaN(data.study_hours) ? data.study_hours : 0,
+                            quizzes_taken: typeof data.quizzes_taken === 'number' && !isNaN(data.quizzes_taken) ? data.quizzes_taken : 0,
+                            streak_days: typeof data.streak_days === 'number' && !isNaN(data.streak_days) ? data.streak_days : 0
+                        });
+                    } else {
+                        setStats({ study_hours: 0, quizzes_taken: 0, streak_days: 0 });
+                    }
                 } catch {
                     setStats({ study_hours: 0, quizzes_taken: 0, streak_days: 0 });
                     hasErrors = true;
@@ -89,7 +97,8 @@ const Progress = () => {
                     const data = await sessRes.json();
                     if (thisGen !== progressRequestGenRef.current) return;
                     if (Array.isArray(data)) {
-                        setSessions(data);
+                        const validSessions = data.filter(s => s && typeof s === 'object' && s.id !== null && s.id !== undefined);
+                        setSessions(validSessions);
                     } else {
                         setSessions([]);
                     }
@@ -124,14 +133,18 @@ const Progress = () => {
         };
     }, []);
 
+    const [isResetting, setIsResetting] = useState(false);
     const resetStats = async () => {
+        if (isResetting) return;
         if (!confirm("Are you sure you want to reset all recorded study progress?")) return;
-        progressRequestGenRef.current++;
+        setIsResetting(true);
+        const thisResetGen = ++progressRequestGenRef.current;
         const token = localStorage.getItem('auth_token');
         const headers = {};
         if (token) headers['Authorization'] = `Bearer ${token}`;
         try {
             const res = await fetch('/api/progress', { method: 'DELETE', headers });
+            if (thisResetGen !== progressRequestGenRef.current) return;
             if (res.ok) {
                 setStats({ study_hours: 0, quizzes_taken: 0, streak_days: 0 });
                 setChartImage(null);
@@ -139,13 +152,17 @@ const Progress = () => {
                 setHeatmapData([]);
                 fetchAnalytics();
             } else {
-                fetchAnalytics();
                 alert("Failed to reset progress on server.");
+                fetchAnalytics();
             }
         } catch (err) {
-            fetchAnalytics();
             console.error("Reset error:", err);
             alert("Network error resetting progress.");
+            if (thisResetGen === progressRequestGenRef.current) {
+                fetchAnalytics();
+            }
+        } finally {
+            setIsResetting(false);
         }
     };
 

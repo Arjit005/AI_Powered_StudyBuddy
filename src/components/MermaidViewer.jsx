@@ -30,20 +30,28 @@ const sanitizeSvg = (svgStr) => {
             // Strip event handler attributes, javascript/vbscript/data URLs, and active CSS url()
             for (let i = el.attributes.length - 1; i >= 0; i--) {
                 const attr = el.attributes[i];
-                const name = (attr.localName || attr.name).toLowerCase();
-                const val = attr.value.trim().toLowerCase();
-                if (
-                    name.startsWith('on') || 
-                    val.startsWith('javascript:') || 
-                    val.startsWith('vbscript:') ||
-                    val.startsWith('data:') ||
-                    ((name === 'href' || name.endsWith(':href')) && !val.startsWith('#'))
-                ) {
+                const rawName = (attr.localName || attr.name).toLowerCase();
+                const rawVal = attr.value;
+                // De-obfuscate control chars and CSS escapes
+                const normalizedVal = rawVal
+                    .replace(/[\x00-\x1f\x7f\s]+/g, '')
+                    .replace(/\\([0-9a-fA-F]{1,6}\s?|.)/g, '$1')
+                    .toLowerCase();
+
+                const isUriAttr = rawName.includes('href') || rawName.includes('src') || rawName === 'action';
+                const hasExecutableScheme = /^(javascript|vbscript|data):/i.test(normalizedVal);
+                const isNonFragmentUri = isUriAttr && !normalizedVal.startsWith('#') && (normalizedVal.includes(':') || normalizedVal.startsWith('//'));
+
+                if (rawName.startsWith('on') || hasExecutableScheme || isNonFragmentUri) {
                     el.removeAttribute(attr.name);
+                    continue;
                 }
-                // Strip url(...) if not fragment-local url(#...)
-                if (/url\s*\((?!['"]?#)/i.test(attr.value)) {
-                    el.removeAttribute(attr.name);
+
+                // Check for CSS url(...) in attributes: only allow safe local fragments like url(#gradient-1)
+                if (/url\s*\(/i.test(rawVal)) {
+                    if (!/url\s*\(\s*['"]?#[a-zA-Z0-9_\-\.:]+\s*['"]?\s*\)/i.test(rawVal)) {
+                        el.removeAttribute(attr.name);
+                    }
                 }
             }
         });
@@ -102,7 +110,7 @@ const MermaidViewer = ({ chart, title = "Architecture Diagram" }) => {
         };
     }, []);
 
-    // Focus management for fullscreen modal (only restore focus if actually opened)
+    // Focus management for fullscreen modal with unmount recovery
     const hasOpenedFullscreenRef = useRef(false);
     useEffect(() => {
         if (isFullscreen) {
@@ -112,6 +120,14 @@ const MermaidViewer = ({ chart, title = "Architecture Diagram" }) => {
             triggerButtonRef.current?.focus();
         }
     }, [isFullscreen]);
+
+    useEffect(() => {
+        return () => {
+            if (hasOpenedFullscreenRef.current) {
+                triggerButtonRef.current?.focus?.();
+            }
+        };
+    }, []);
 
     useEffect(() => {
         if (!chart || typeof chart !== 'string' || !chart.trim()) {
@@ -158,6 +174,12 @@ const MermaidViewer = ({ chart, title = "Architecture Diagram" }) => {
                         setError(err.message || "Failed to render diagram syntax.");
                         setSvgContent('');
                     }
+                }
+            }).catch(queueErr => {
+                console.error("Mermaid Queue Failure:", queueErr);
+                if (!isCancelled) {
+                    setError("Diagram rendering queue encountered an error.");
+                    setSvgContent('');
                 }
             });
         };

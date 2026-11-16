@@ -150,24 +150,42 @@ const Header = () => {
                                     </div>
                                     <div className="space-y-2 text-xs">
                                         <div className="flex items-start gap-2 text-slate-300">
-                                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 mt-0.5 shrink-0" />
+                                            {securityData?.shield_active ? (
+                                                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 mt-0.5 shrink-0" />
+                                            ) : (
+                                                <Shield className="w-3.5 h-3.5 text-amber-400 mt-0.5 shrink-0" />
+                                            )}
                                             <div>
                                                 <div className="font-semibold text-white">Academic Integrity & Safety</div>
-                                                <div className="text-[11px] text-slate-400">Content moderation & factual grounding</div>
+                                                <div className="text-[11px] text-slate-400">
+                                                    {securityData?.shield_active ? 'Content moderation & factual grounding active' : 'Content moderation & safety capability'}
+                                                </div>
                                             </div>
                                         </div>
                                         <div className="flex items-start gap-2 text-slate-300">
-                                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 mt-0.5 shrink-0" />
+                                            {securityData?.shield_active ? (
+                                                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 mt-0.5 shrink-0" />
+                                            ) : (
+                                                <Shield className="w-3.5 h-3.5 text-amber-400 mt-0.5 shrink-0" />
+                                            )}
                                             <div>
                                                 <div className="font-semibold text-white">Private Study Notes</div>
-                                                <div className="text-[11px] text-slate-400">Tenant-isolated personal learning space</div>
+                                                <div className="text-[11px] text-slate-400">
+                                                    {securityData?.shield_active ? 'Tenant-isolated learning space active' : 'Tenant isolation architecture'}
+                                                </div>
                                             </div>
                                         </div>
                                         <div className="flex items-start gap-2 text-slate-300">
-                                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 mt-0.5 shrink-0" />
+                                            {securityData?.shield_active ? (
+                                                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 mt-0.5 shrink-0" />
+                                            ) : (
+                                                <Shield className="w-3.5 h-3.5 text-amber-400 mt-0.5 shrink-0" />
+                                            )}
                                             <div>
                                                 <div className="font-semibold text-white">Protected Account</div>
-                                                <div className="text-[11px] text-slate-400">Rate limit & brute-force defense</div>
+                                                <div className="text-[11px] text-slate-400">
+                                                    {securityData?.shield_active ? 'Rate limit & brute-force defense active' : 'Rate limit & brute-force defense capability'}
+                                                </div>
                                             </div>
                                         </div>
                                     </div>

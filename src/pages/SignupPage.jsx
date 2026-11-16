@@ -33,7 +33,15 @@ const SignupPage = () => {
                 data = { detail: res.statusText || 'Google sign-up server error' };
             }
             if (!res.ok) {
-                throw new Error(data.detail || 'Google sign-up failed');
+                const rawDetail = data?.detail;
+                const errMessage = typeof rawDetail === 'string' 
+                    ? rawDetail 
+                    : Array.isArray(rawDetail)
+                        ? rawDetail.map(d => d.msg || JSON.stringify(d)).join(', ')
+                        : (rawDetail && typeof rawDetail === 'object')
+                            ? JSON.stringify(rawDetail)
+                            : 'Google sign-up failed';
+                throw new Error(errMessage);
             }
             if (!data.access_token || !data.user) {
                 throw new Error('Account setup failed. Please try again.');
@@ -239,10 +247,11 @@ const SignupPage = () => {
                     <form onSubmit={handleSignup} className="space-y-5">
                         {/* Username */}
                         <div>
-                            <label className="block text-xs font-mono uppercase tracking-wider text-slate-400 mb-1.5 ml-1">Username</label>
+                            <label htmlFor="signup-username" className="block text-xs font-mono uppercase tracking-wider text-slate-400 mb-1.5 ml-1">Username</label>
                             <div className="relative">
                                 <User className="w-4 h-4 text-slate-500 absolute left-3.5 top-3.5" />
                                 <input
+                                    id="signup-username"
                                     type="text"
                                     required
                                     placeholder="e.g. arjit_dev"
@@ -255,10 +264,11 @@ const SignupPage = () => {
 
                         {/* Email */}
                         <div>
-                            <label className="block text-xs font-mono uppercase tracking-wider text-slate-400 mb-1.5 ml-1">Email Address</label>
+                            <label htmlFor="signup-email" className="block text-xs font-mono uppercase tracking-wider text-slate-400 mb-1.5 ml-1">Email Address</label>
                             <div className="relative">
                                 <Mail className="w-4 h-4 text-slate-500 absolute left-3.5 top-3.5" />
                                 <input
+                                    id="signup-email"
                                     type="email"
                                     required
                                     placeholder="student@example.com"
@@ -272,12 +282,13 @@ const SignupPage = () => {
                         {/* Password */}
                         <div>
                             <div className="flex justify-between items-center mb-1.5 ml-1">
-                                <label className="text-xs font-mono uppercase tracking-wider text-slate-400">Password</label>
+                                <label htmlFor="signup-password" className="text-xs font-mono uppercase tracking-wider text-slate-400">Password</label>
                                 <span className={`text-[11px] font-mono font-medium ${strengthLabel.textClass}`}>{strengthLabel.text}</span>
                             </div>
                             <div className="relative">
                                 <Lock className="w-4 h-4 text-slate-500 absolute left-3.5 top-3.5" />
                                 <input
+                                    id="signup-password"
                                     type={showPassword ? "text" : "password"}
                                     required
                                     placeholder="Enter secure password"
@@ -287,6 +298,8 @@ const SignupPage = () => {
                                 />
                                 <button
                                     type="button"
+                                    aria-label={showPassword ? "Hide password" : "Show password"}
+                                    aria-pressed={showPassword}
                                     onClick={() => setShowPassword(!showPassword)}
                                     className="absolute right-3 top-3 text-slate-500 hover:text-slate-300"
                                 >
@@ -330,10 +343,11 @@ const SignupPage = () => {
 
                         {/* Confirm Password */}
                         <div>
-                            <label className="block text-xs font-mono uppercase tracking-wider text-slate-400 mb-1.5 ml-1">Confirm Password</label>
+                            <label htmlFor="signup-confirm-password" className="block text-xs font-mono uppercase tracking-wider text-slate-400 mb-1.5 ml-1">Confirm Password</label>
                             <div className="relative">
                                 <Lock className="w-4 h-4 text-slate-500 absolute left-3.5 top-3.5" />
                                 <input
+                                    id="signup-confirm-password"
                                     type={showPassword ? "text" : "password"}
                                     required
                                     placeholder="Re-enter password"

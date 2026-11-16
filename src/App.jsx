@@ -56,6 +56,8 @@ const ProtectedRoute = ({ children }) => {
       const freshToken = localStorage.getItem('auth_token');
       verificationGenRef.current += 1;
       setFailedToken(null);
+      setAuthStatus('checking');
+      setNetworkError(false);
       setCurrentToken(freshToken);
     };
     window.addEventListener('storage', handleAuthChange);

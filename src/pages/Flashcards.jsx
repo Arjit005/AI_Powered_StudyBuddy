@@ -134,8 +134,9 @@ const Flashcards = () => {
         setCurrentCard((prev) => (prev - 1 + cards.length) % cards.length);
     };
 
-    // Rate mastery for active recall
+    // Rate mastery for active recall (requires flipped card)
     const handleRateMastery = (rating) => {
+        if (!isFlipped) return;
         const activeCard = cards[currentCard];
         if (!activeCard) return;
         setMastery(prev => ({
@@ -252,7 +253,7 @@ const Flashcards = () => {
 
     const activeCardData = cards[currentCard] || { front: '', back: '' };
     const currentRating = mastery[activeCardData.id || currentCard];
-    const masteredCount = cards.filter(c => mastery[c.id] === 'mastered').length;
+    const masteredCount = cards.filter((c, idx) => mastery[c.id || idx] === 'mastered').length;
 
     return (
         <div className="py-12 min-h-screen">
@@ -266,7 +267,7 @@ const Flashcards = () => {
                         Spaced Repetition Flashcards
                     </h1>
                     <p className="text-slate-400 text-sm max-w-lg mx-auto">
-                        Practice active recall with self-grading mastery intervals (Anki / Leitner style).
+                        Practice active recall and track your self-rated mastery.
                     </p>
                 </div>
 
@@ -330,24 +331,35 @@ const Flashcards = () => {
                     />
 
                     {/* Active Recall Self-Rating Buttons */}
-                    <div className="grid grid-cols-3 gap-2 mt-4">
+                    {!isFlipped && (
+                        <div className="text-[11px] font-mono text-slate-500 text-center mt-3">
+                            Flip card to reveal answer before rating recall
+                        </div>
+                    )}
+                    <div className="grid grid-cols-3 gap-2 mt-3">
                         <button
+                            disabled={!isFlipped}
                             onClick={() => handleRateMastery('hard')}
-                            className="py-2.5 px-3 rounded-xl bg-slate-900/90 border border-rose-500/30 hover:border-rose-400 hover:bg-rose-950/30 text-rose-300 font-mono text-xs transition-all active:scale-95 flex items-center justify-center gap-1.5"
+                            className="py-2.5 px-3 rounded-xl bg-slate-900/90 border border-rose-500/30 hover:border-rose-400 hover:bg-rose-950/30 text-rose-300 font-mono text-xs transition-all active:scale-95 flex items-center justify-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
+                            title={!isFlipped ? "Flip card to reveal answer before rating" : "Rate Hard"}
                         >
                             <span>🔴 Hard</span>
                             <kbd className="text-[10px] opacity-60">(1)</kbd>
                         </button>
                         <button
+                            disabled={!isFlipped}
                             onClick={() => handleRateMastery('good')}
-                            className="py-2.5 px-3 rounded-xl bg-slate-900/90 border border-amber-500/30 hover:border-amber-400 hover:bg-amber-950/30 text-amber-300 font-mono text-xs transition-all active:scale-95 flex items-center justify-center gap-1.5"
+                            className="py-2.5 px-3 rounded-xl bg-slate-900/90 border border-amber-500/30 hover:border-amber-400 hover:bg-amber-950/30 text-amber-300 font-mono text-xs transition-all active:scale-95 flex items-center justify-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
+                            title={!isFlipped ? "Flip card to reveal answer before rating" : "Rate Good"}
                         >
                             <span>🟡 Good</span>
                             <kbd className="text-[10px] opacity-60">(2)</kbd>
                         </button>
                         <button
+                            disabled={!isFlipped}
                             onClick={() => handleRateMastery('mastered')}
-                            className="py-2.5 px-3 rounded-xl bg-slate-900/90 border border-emerald-500/30 hover:border-emerald-400 hover:bg-emerald-950/30 text-emerald-300 font-mono text-xs transition-all active:scale-95 flex items-center justify-center gap-1.5"
+                            className="py-2.5 px-3 rounded-xl bg-slate-900/90 border border-emerald-500/30 hover:border-emerald-400 hover:bg-emerald-950/30 text-emerald-300 font-mono text-xs transition-all active:scale-95 flex items-center justify-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
+                            title={!isFlipped ? "Flip card to reveal answer before rating" : "Rate Mastered"}
                         >
                             <span>🟢 Mastered</span>
                             <kbd className="text-[10px] opacity-60">(3)</kbd>

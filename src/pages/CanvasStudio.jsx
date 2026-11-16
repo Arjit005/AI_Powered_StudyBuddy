@@ -35,6 +35,8 @@ export default function CanvasStudio() {
   const [showMcpModal, setShowMcpModal] = useState(false);
   const [showMermaidModal, setShowMermaidModal] = useState(false);
   const [mcpConfig, setMcpConfig] = useState(null);
+  const [mcpConfigLoading, setMcpConfigLoading] = useState(false);
+  const [mcpConfigError, setMcpConfigError] = useState(null);
   const [telemetry, setTelemetry] = useState(null);
   const [error, setError] = useState(null);
 
@@ -42,6 +44,7 @@ export default function CanvasStudio() {
   const copyTimeoutRef = useRef(null);
   const saveTimeoutRef = useRef(null);
   const requestGenRef = useRef(0);
+  const mcpRequestGenRef = useRef(0);
 
   // Initial load
   useEffect(() => {
@@ -102,14 +105,27 @@ export default function CanvasStudio() {
   };
 
   const fetchMcpConfig = async () => {
+    setMcpConfigLoading(true);
+    setMcpConfigError(null);
+    const thisGen = ++mcpRequestGenRef.current;
     try {
       const res = await fetch('/api/mcp/config', { headers: getAuthHeaders() });
+      if (thisGen !== mcpRequestGenRef.current) return;
       if (res.ok) {
         const data = await res.json();
         setMcpConfig(data);
+      } else {
+        setMcpConfigError("Unable to retrieve MCP configuration.");
       }
     } catch (err) {
       console.error("MCP config fetch error:", err);
+      if (thisGen === mcpRequestGenRef.current) {
+        setMcpConfigError("Network error fetching MCP configuration.");
+      }
+    } finally {
+      if (thisGen === mcpRequestGenRef.current) {
+        setMcpConfigLoading(false);
+      }
     }
   };
 
@@ -293,13 +309,68 @@ export default function CanvasStudio() {
     }
   };
 
+  const escapeXml = (str) => String(str || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+
+  // Adaptive geometry calculation for edges based on relative node positioning
+  const getEdgeGeometry = (srcNode, tgtNode) => {
+    const srcW = Number(srcNode.width) || 190;
+    const srcH = Number(srcNode.height) || 70;
+    const tgtW = Number(tgtNode.width) || 190;
+    const tgtH = Number(tgtNode.height) || 70;
+
+    const srcCenterX = srcNode.x + srcW / 2;
+    const srcCenterY = srcNode.y + srcH / 2;
+    const tgtCenterX = tgtNode.x + tgtW / 2;
+    const tgtCenterY = tgtNode.y + tgtH / 2;
+
+    const diffX = tgtCenterX - srcCenterX;
+    const diffY = tgtCenterY - srcCenterY;
+
+    let x1, y1, x2, y2, pathD;
+
+    if (Math.abs(diffX) >= Math.abs(diffY)) {
+      if (diffX >= 0) {
+        x1 = srcNode.x + srcW;
+        y1 = srcCenterY;
+        x2 = tgtNode.x;
+        y2 = tgtCenterY;
+      } else {
+        x1 = srcNode.x;
+        y1 = srcCenterY;
+        x2 = tgtNode.x + tgtW;
+        y2 = tgtCenterY;
+      }
+      const dx = Math.max(Math.abs(x2 - x1) * 0.5, 30);
+      pathD = `M ${x1} ${y1} C ${x1 + (diffX >= 0 ? dx : -dx)} ${y1}, ${x2 + (diffX >= 0 ? -dx : dx)} ${y2}, ${x2} ${y2}`;
+    } else {
+      if (diffY >= 0) {
+        x1 = srcCenterX;
+        y1 = srcNode.y + srcH;
+        x2 = tgtCenterX;
+        y2 = tgtNode.y;
+      } else {
+        x1 = srcCenterX;
+        y1 = srcNode.y;
+        x2 = tgtCenterX;
+        y2 = tgtNode.y + tgtH;
+      }
+      const dy = Math.max(Math.abs(y2 - y1) * 0.5, 30);
+      pathD = `M ${x1} ${y1} C ${x1} ${y1 + (diffY >= 0 ? dy : -dy)}, ${x2} ${y2 + (diffY >= 0 ? -dy : dy)}, ${x2} ${y2}`;
+    }
+
+    return { x1, y1, x2, y2, pathD, midX: (x1 + x2) / 2, midY: (y1 + y2) / 2 };
+  };
+
   // Download complete standalone SVG containing both edges and node rectangles with labels
   const handleDownloadSvg = () => {
     if (!canvasData?.nodes?.length) return;
-    const svgEl = canvasRef.current?.querySelector('svg');
-    const edgePaths = svgEl ? svgEl.innerHTML : '';
     
-    // Construct complete standalone SVG with both nodes and connectors
+    // Construct complete standalone SVG with safely escaped nodes and connectors
     const nodesSvg = canvasData.nodes.map(n => {
       const rawX = Number(n.x);
       const rawY = Number(n.y);
@@ -309,14 +380,32 @@ export default function CanvasStudio() {
       const y = Number.isFinite(rawY) ? rawY : 100;
       const w = Number.isFinite(rawW) && rawW > 0 ? rawW : 190;
       const h = Number.isFinite(rawH) && rawH > 0 ? rawH : 75;
-      const label = String(n.label || 'Node').replace(/[<>&"]/g, '');
-      const sub = String(n.subtitle || '').replace(/[<>&"]/g, '');
+      const label = escapeXml(n.label || 'Node');
+      const sub = escapeXml(n.subtitle || '');
       return `
         <g transform="translate(${x}, ${y})">
           <rect width="${w}" height="${h}" rx="12" fill="#0f172a" stroke="#10b981" stroke-width="2" />
           <text x="${w/2}" y="32" fill="#f8fafc" font-family="monospace" font-size="12" font-weight="bold" text-anchor="middle">${label}</text>
           <text x="${w/2}" y="52" fill="#94a3b8" font-family="sans-serif" font-size="10" text-anchor="middle">${sub}</text>
         </g>
+      `;
+    }).join('\n');
+
+    const edgesSvg = (canvasData.edges || []).map(edge => {
+      const srcNode = canvasData.nodes.find(n => n.id === edge.source);
+      const tgtNode = canvasData.nodes.find(n => n.id === edge.target);
+      if (!srcNode || !tgtNode) return '';
+      const { pathD, midX, midY } = getEdgeGeometry(srcNode, tgtNode);
+      const strokeColor = edge.style === 'dashed' ? '#94a3b8' : '#10b981';
+      const dash = edge.style === 'dashed' ? ' stroke-dasharray="5,5"' : '';
+      const label = edge.label ? `
+        <g transform="translate(${midX}, ${midY})">
+          <rect x="-45" y="-12" width="90" height="20" rx="4" fill="#0f172a" stroke="#334155" stroke-width="1" />
+          <text text-anchor="middle" y="3" fill="#cbd5e1" font-family="monospace" font-size="9">${escapeXml(edge.label)}</text>
+        </g>` : '';
+      return `
+        <path d="${pathD}" fill="none" stroke="${strokeColor}" stroke-width="2.5"${dash} marker-end="url(#arrowhead)" />
+        ${label}
       `;
     }).join('\n');
 
@@ -330,7 +419,7 @@ export default function CanvasStudio() {
             <path d="M 0 1 L 10 5 L 0 9 z" fill="#10b981" />
           </marker>
         </defs>
-        ${edgePaths}
+        ${edgesSvg}
         ${nodesSvg}
       </svg>
     `.trim();
@@ -366,22 +455,14 @@ export default function CanvasStudio() {
     }
   };
 
-  // Calculate curve for SVG edge lines
+  // Calculate adaptive curve for SVG edge lines
   const renderEdge = (edge) => {
     if (!canvasData?.nodes) return null;
     const srcNode = canvasData.nodes.find(n => n.id === edge.source);
     const tgtNode = canvasData.nodes.find(n => n.id === edge.target);
     if (!srcNode || !tgtNode) return null;
 
-    const x1 = srcNode.x + (srcNode.width || 190);
-    const y1 = srcNode.y + ((srcNode.height || 70) / 2);
-    const x2 = tgtNode.x;
-    const y2 = tgtNode.y + ((tgtNode.height || 70) / 2);
-
-    const dx = Math.abs(x2 - x1) * 0.5;
-    const pathD = `M ${x1} ${y1} C ${x1 + dx} ${y1}, ${x2 - dx} ${y2}, ${x2} ${y2}`;
-    const midX = (x1 + x2) / 2;
-    const midY = (y1 + y2) / 2;
+    const { pathD, midX, midY } = getEdgeGeometry(srcNode, tgtNode);
 
     return (
       <g key={edge.id} className="group">

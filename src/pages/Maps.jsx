@@ -32,7 +32,10 @@ const Maps = () => {
         setMapImage(null);
 
         const thisGen = ++mapRequestGenRef.current;
-        const token = localStorage.getItem('auth_token');
+        let token = null;
+        try {
+            token = localStorage.getItem('auth_token');
+        } catch (_) {}
         const headers = { 'Content-Type': 'application/json' };
         if (token) headers['Authorization'] = `Bearer ${token}`;
 
@@ -75,8 +78,17 @@ const Maps = () => {
                     if (thisGen !== mapRequestGenRef.current) return;
                     if (mapJson && typeof mapJson.map_image === 'string') {
                         const rawB64 = mapJson.map_image.trim();
-                        // Enforce reasonable response-size limit (max 5MB base64 string) and valid base64 format
-                        if (rawB64.length <= 5 * 1024 * 1024 && /^[A-Za-z0-9+/=]+$/.test(rawB64)) {
+                        // Validate Base64 length (<= 5MB) and decodability/padding format
+                        const isValidBase64 = (str) => {
+                            if (!str || str.length % 4 !== 0) return false;
+                            if (!/^[A-Za-z0-9+/]+={0,2}$/.test(str)) return false;
+                            try {
+                                return typeof atob === 'function' ? !!atob(str.slice(0, 100)) : true;
+                            } catch (_) {
+                                return false;
+                            }
+                        };
+                        if (rawB64.length <= 5 * 1024 * 1024 && isValidBase64(rawB64)) {
                             setMapImage(`data:image/png;base64,${rawB64}`);
                             hasMap = true;
                         }

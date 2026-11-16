@@ -318,15 +318,9 @@ class RAGService:
 
     @staticmethod
     def chunk_and_embed_source(db: Session, source: Source):
-        # 1. Fetch all existing chunk indices so we can clean up old Pinecone vectors
+        # 1. Fetch all existing chunk indices to delete only after new embeddings are ready
         existing_chunks = db.query(SourceChunk).filter(SourceChunk.source_id == source.id).all()
-        if existing_chunks:
-            old_chunk_indices = [c.chunk_index for c in existing_chunks]
-            RAGService.delete_source_vectors(source.id, source.user_id, chunk_ids=old_chunk_indices)
-
-        # Delete existing chunks for this source if reindexing
-        db.query(SourceChunk).filter(SourceChunk.source_id == source.id).delete()
-        db.commit()
+        old_chunk_indices = [c.chunk_index for c in existing_chunks] if existing_chunks else []
 
         # Chunking: ~400 tokens per chunk with 15% overlap
         words = source.raw_text.split()
@@ -345,11 +339,7 @@ class RAGService:
         if not chunks_data:
             chunks_data = [source.raw_text[:1500]]
 
-        # 1. Store in local SQL database chunks
-        created_chunks = []
-        vectors_to_upsert = []
-
-        # Generate genuine neural embeddings via EmbeddingService in batch
+        # Generate genuine neural embeddings via EmbeddingService in batch BEFORE deleting old data
         is_neural = True
         try:
             batch_embeddings = EmbeddingService.embed_batch(chunks_data, task_type="retrieval_document")
@@ -359,6 +349,13 @@ class RAGService:
             print(f"EmbeddingService Warning (falling back to deterministic projection): {e}")
             is_neural = False
             batch_embeddings = [RAGService._compute_semantic_embedding(t, dim=1536) for t in chunks_data]
+
+        # Only now delete existing SQL chunks for this source
+        if existing_chunks:
+            db.query(SourceChunk).filter(SourceChunk.source_id == source.id).delete()
+
+        created_chunks = []
+        vectors_to_upsert = []
 
         for idx, text in enumerate(chunks_data):
             emb = batch_embeddings[idx] if idx < len(batch_embeddings) else None
@@ -393,6 +390,10 @@ class RAGService:
             })
 
         db.commit()
+
+        # Delete old Pinecone vectors now that new DB commit succeeded
+        if old_chunk_indices:
+            RAGService.delete_source_vectors(source.id, source.user_id, chunk_ids=old_chunk_indices)
 
         # 2. Upsert to Pinecone Vector DB (Isolated User Namespace)
         RAGService._upsert_to_pinecone(
