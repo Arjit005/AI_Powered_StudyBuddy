@@ -17,10 +17,10 @@ const icons = {
 const features = [
     { icon: 'Chat', title: 'Contextual AI Chat', desc: 'Engage with a tutor that retains multi-turn session history and formats code gracefully.', link: '/chat', tag: 'AI Engine', color: 'rgba(16, 185, 129, 0.15)' },
     { icon: 'Summarize', title: 'Smart Summarization', desc: 'Synthesize research papers, textbook chapters, and topics into high-retention bullet points.', link: '/summarize', tag: 'Core', color: 'rgba(6, 182, 212, 0.15)' },
-    { icon: 'Flashcards', title: 'Recall Flashcards', desc: 'Auto-generate 3D digital flashcard decks optimized for spaced repetition learning.', link: '/flashcards', tag: '3D Physics', color: 'rgba(59, 130, 246, 0.15)' },
-    { icon: 'Quiz', title: 'Dynamic MCQ Quizzes', desc: 'Challenge yourself with AI-generated quizzes featuring instant grading and answer rationales.', link: '/quiz', tag: 'Testing', color: 'rgba(245, 158, 11, 0.15)' },
-    { icon: 'Timer', title: 'Pomodoro Focus Timer', desc: 'Track deep-work intervals and build persistent learning streaks with zero distractions.', link: '/timer', tag: 'Productivity', color: 'rgba(239, 68, 68, 0.15)' },
-    { icon: 'Progress', title: 'Learning Analytics', desc: 'Inspect study duration, total quizzes taken, and session metrics powered by SQLite.', link: '/progress', tag: 'Telemetry', color: 'rgba(168, 85, 247, 0.15)' },
+    { icon: 'Flashcards', title: 'Recall Flashcards', desc: 'Auto-generate 3D digital flashcard decks optimized for spaced repetition learning.', link: '/flashcards', tag: 'Interactive', color: 'rgba(59, 130, 246, 0.15)' },
+    { icon: 'Quiz', title: 'Dynamic MCQ Quizzes', desc: 'Challenge yourself with AI-generated quizzes featuring instant grading and answer rationales.', link: '/quiz', tag: 'Practice', color: 'rgba(245, 158, 11, 0.15)' },
+    { icon: 'Timer', title: 'Pomodoro Focus Timer', desc: 'Track deep-work intervals and build persistent learning streaks with zero distractions.', link: '/timer', tag: 'Focus', color: 'rgba(239, 68, 68, 0.15)' },
+    { icon: 'Progress', title: 'Learning Analytics', desc: 'Inspect study duration, total quizzes taken, and daily focus streaks.', link: '/progress', tag: 'Analytics', color: 'rgba(168, 85, 247, 0.15)' },
     { icon: 'Maps', title: 'Concept Graphs', desc: 'Generate visual knowledge maps depicting structural relationships between concepts.', link: '/maps', tag: 'Visuals', color: 'rgba(20, 184, 166, 0.15)' },
     { icon: 'Voice', title: 'Voice Study Room', desc: 'Speech-enabled study sessions for auditory learners and active recitation.', link: '/voice', tag: 'Audio', color: 'rgba(236, 72, 153, 0.15)' },
 ];
@@ -32,13 +32,13 @@ const FeatureGrid = () => {
                 <div className="text-center mb-16">
                     <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-900 border border-slate-800 text-slate-400 font-mono text-xs mb-3 shadow-inner">
                         <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
-                        Integrated Modules with ReactBits Illumination
+                        All-in-One Learning Suite
                     </div>
                     <h2 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight mb-4">
-                        Comprehensive Developer Study Ecosystem
+                        Everything You Need to Master Any Subject
                     </h2>
                     <p className="text-slate-400 max-w-2xl mx-auto text-sm sm:text-base">
-                        Every tool architected to maximize conceptual clarity, retention, and exam readiness.
+                        Every tool designed to maximize conceptual clarity, memory retention, and exam readiness.
                     </p>
                 </div>
 

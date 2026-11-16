@@ -132,7 +132,7 @@ const LoginPage = () => {
                             <Brain className="w-8 h-8 text-emerald-400" />
                         </div>
                         <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">Welcome Back</h1>
-                        <p className="text-slate-400 text-sm mt-1">Authenticate into your secure AI workspace</p>
+                        <p className="text-slate-400 text-sm mt-1">Sign in to continue your learning journey</p>
                     </div>
 
                     {error && (
@@ -145,7 +145,7 @@ const LoginPage = () => {
                     {lockoutSecs > 0 && (
                         <div className="mb-6 p-3 rounded-xl bg-amber-950/50 border border-amber-800/50 text-amber-300 text-xs flex items-center gap-2">
                             <ShieldCheck className="w-4 h-4 text-amber-400" />
-                            <span>Rate Limit Lockout active ({lockoutSecs}s remaining). Protected against brute-force attacks.</span>
+                            <span>Too many attempts. Please wait {lockoutSecs}s before trying again.</span>
                         </div>
                     )}
 

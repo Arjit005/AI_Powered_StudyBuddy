@@ -431,11 +431,11 @@ export default function CanvasStudio() {
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-lg font-bold text-white">Visual Canvas Studio</h1>
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-mono uppercase bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 flex items-center gap-1">
-                <Cpu className="w-3 h-3 text-emerald-400 animate-pulse" /> MCP Active
+              <span className="px-2 py-0.5 rounded-full text-[10px] uppercase bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 flex items-center gap-1">
+                <Sparkles className="w-3 h-3 text-emerald-400 animate-pulse" /> AI Visuals
               </span>
             </div>
-            <p className="text-xs text-slate-400">Model Context Protocol whiteboard for architecture and systems modeling</p>
+            <p className="text-xs text-slate-400">Interactive visual canvas for flowcharts, mind maps, and concept diagrams</p>
           </div>
         </div>
 
@@ -446,7 +446,7 @@ export default function CanvasStudio() {
               type="text"
               value={topic}
               onChange={(e) => setTopic(e.target.value)}
-              placeholder="e.g. Kubernetes Ingress Architecture, OAuth2 Flow, Kafka Event Stream..."
+              placeholder="e.g. Photosynthesis, How the Internet Works, Water Cycle, Cell Division..."
               className="glass-input w-full text-sm py-2 px-3 pl-9 rounded-xl border border-white/10 focus:border-emerald-500/50 text-white placeholder-slate-500"
             />
             <Sparkles className="w-4 h-4 text-emerald-400 absolute left-3 top-2.5" />
@@ -468,7 +468,7 @@ export default function CanvasStudio() {
             className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold shadow-lg shadow-emerald-950/40 transition-all disabled:opacity-50"
           >
             {loading ? <Activity className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
-            Generate via MCP
+            Generate Diagram
           </button>
         </form>
 
@@ -477,10 +477,10 @@ export default function CanvasStudio() {
           <button
             onClick={() => setShowMcpModal(true)}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 border border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/10 text-xs font-medium transition-all"
-            title="Model Context Protocol Connection"
+            title="App Integrations (Claude Desktop & Whiteboards)"
           >
             <Terminal className="w-3.5 h-3.5" />
-            MCP Hub
+            Integrations
           </button>
 
           <button

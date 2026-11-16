@@ -3,11 +3,11 @@ import { Sparkles, X, ZoomIn, Download, Network, Layers, Cpu, CheckCircle2 } fro
 import MermaidViewer from '../components/MermaidViewer';
 
 const SUGGESTIONS = [
-    "Microservices & API Gateway Architecture",
-    "OAuth 2.0 Authorization Code Flow",
-    "Kafka Event-Driven Architecture",
-    "Database Sharding & Read Replicas",
-    "Kubernetes Pod Lifecycle & Ingress"
+    "Photosynthesis & Plant Biology",
+    "Computer Science: How the Internet Works",
+    "Human Circulatory System & Heart Anatomy",
+    "Causes and Timeline of World War I",
+    "Newton's Laws of Motion & Classical Mechanics"
 ];
 
 const Maps = () => {
@@ -111,10 +111,10 @@ const Maps = () => {
                         <Network className="w-7 h-7" />
                     </div>
                     <h1 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight mb-2">
-                        Interactive Architecture & Concept Diagrams
+                        Interactive Concept Mind Maps
                     </h1>
                     <p className="text-slate-400 text-sm max-w-xl mx-auto">
-                        Generate production-grade Mermaid.js system architectures, data flows, and NetworkX knowledge graphs with deep technical breakdown.
+                        Generate visual concept maps, flowcharts, and topic breakdowns to understand complex subjects at a glance.
                     </p>
                 </div>
 

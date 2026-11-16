@@ -20,22 +20,22 @@ const Hero = () => {
                     <span className="flex h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
                     <span className="text-emerald-400 font-semibold">AI Study Buddy v2.1</span>
                     <span className="text-slate-600">•</span>
-                    <span className="text-slate-400">LiteLLM + Portkey Ready</span>
+                    <span className="text-slate-400">Smart AI Tutor</span>
                     <span className="text-slate-600">•</span>
-                    <span className="text-cyan-400">ReactBits 3D Micro-interactions</span>
+                    <span className="text-cyan-400">Interactive 3D Study Tools</span>
                 </div>
 
                 {/* Main Heading with Kinetic Typography */}
                 <h1 className="text-4xl sm:text-6xl lg:text-7xl font-extrabold tracking-tight text-white mb-6 leading-[1.12]">
                     Learn Smarter with <br />
                     <span className="bg-gradient-to-r from-emerald-400 via-teal-300 to-cyan-400 bg-clip-text text-transparent">
-                        Cognitive AI Tutoring
+                        Your Personal AI Tutor
                     </span>
                 </h1>
 
                 <p className="text-base sm:text-xl text-slate-400 max-w-3xl mx-auto mb-10 leading-relaxed font-sans font-normal">
-                    Experience zero-downtime multi-model intelligence. Master complex subjects through 
-                    Socratic dialogues, active recall 3D flashcards, deterministic quizzes, and interactive mind maps.
+                    Master any subject faster through conversational AI tutoring, active-recall 3D flashcards,
+                    practice quizzes, and interactive visual concept maps.
                 </p>
 
                 {/* CTAs */}
@@ -44,8 +44,8 @@ const Hero = () => {
                         to="/chat"
                         className="w-full sm:w-auto px-8 py-4 bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 text-slate-950 font-bold text-sm sm:text-base rounded-2xl hover:brightness-110 active:scale-95 transition-all shadow-[0_0_30px_rgba(16,185,129,0.3)] flex items-center justify-center gap-2.5 group"
                     >
-                        <Terminal className="w-4 h-4" />
-                        <span>Launch Study Console</span>
+                        <Bot className="w-4 h-4" />
+                        <span>Start Studying Free</span>
                         <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                     </Link>
                     <Link
@@ -174,42 +174,42 @@ const Hero = () => {
                     </div>
                 </div>
 
-                {/* Developer Architecture Spec Pills */}
+                {/* Student Feature Highlights */}
                 <div className="pt-8 border-t border-slate-800/80 max-w-4xl mx-auto grid grid-cols-2 sm:grid-cols-4 gap-4 text-left">
                     <SpotlightCard className="p-4">
                         <div className="flex items-center gap-2 text-emerald-400 mb-1">
                             <Cpu className="w-4 h-4" />
-                            <span className="text-xs font-mono font-semibold">AI Gateway</span>
+                            <span className="text-xs font-mono font-semibold">AI Tutor</span>
                         </div>
-                        <div className="text-sm font-bold text-white">LiteLLM + Portkey</div>
-                        <div className="text-[11px] text-slate-400 font-mono mt-0.5">Unified failover waterfall</div>
+                        <div className="text-sm font-bold text-white">Smart Explanations</div>
+                        <div className="text-[11px] text-slate-400 mt-0.5">Step-by-step guidance on any topic</div>
                     </SpotlightCard>
 
                     <SpotlightCard className="p-4" spotlightColor="rgba(20, 184, 166, 0.15)">
                         <div className="flex items-center gap-2 text-teal-400 mb-1">
                             <Database className="w-4 h-4" />
-                            <span className="text-xs font-mono font-semibold">Persistence</span>
+                            <span className="text-xs font-mono font-semibold">Your Notes & PDFs</span>
                         </div>
-                        <div className="text-sm font-bold text-white">SQLite + WAL Mode</div>
-                        <div className="text-[11px] text-slate-400 font-mono mt-0.5">Strict foreign keys &amp; ACID</div>
+                        <div className="text-sm font-bold text-white">Source-Grounded</div>
+                        <div className="text-[11px] text-slate-400 mt-0.5">Chat directly with your study materials</div>
                     </SpotlightCard>
 
                     <SpotlightCard className="p-4" spotlightColor="rgba(59, 130, 246, 0.15)">
                         <div className="flex items-center gap-2 text-cyan-400 mb-1">
                             <Layers className="w-4 h-4" />
-                            <span className="text-xs font-mono font-semibold">Vector &amp; RAG</span>
+                            <span className="text-xs font-mono font-semibold">Active Recall</span>
                         </div>
-                        <div className="text-sm font-bold text-white">Hybrid Retrieval</div>
-                        <div className="text-[11px] text-slate-400 font-mono mt-0.5">Cosine similarity + BM25</div>
+                        <div className="text-sm font-bold text-white">3D Flashcards</div>
+                        <div className="text-[11px] text-slate-400 mt-0.5">Spaced repetition for exam retention</div>
                     </SpotlightCard>
 
                     <SpotlightCard className="p-4" spotlightColor="rgba(245, 158, 11, 0.15)">
                         <div className="flex items-center gap-2 text-amber-400 mb-1">
                             <Flame className="w-4 h-4" />
-                            <span className="text-xs font-mono font-semibold">UI Engineering</span>
+                            <span className="text-xs font-mono font-semibold">Deep Focus</span>
                         </div>
-                        <div className="text-sm font-bold text-white">ReactBits + Motion</div>
-                        <div className="text-[11px] text-slate-400 font-mono mt-0.5">3D perspective &amp; Spotlight</div>
+                        <div className="text-sm font-bold text-white">Study Analytics</div>
+                        <div className="text-[11px] text-slate-400 mt-0.5">Focus timer & streak tracking</div>
                     </SpotlightCard>
                 </div>
             </div>

@@ -190,10 +190,10 @@ const Sources = () => {
                 <div>
                     <h1 className="text-3xl font-extrabold bg-gradient-to-r from-emerald-400 via-teal-300 to-cyan-400 bg-clip-text text-transparent flex items-center gap-3">
                         <BookOpen className="w-8 h-8 text-emerald-400" />
-                        Source Corpus & Grounded RAG
+                        Study Sources & Reference Notes
                     </h1>
                     <p className="text-slate-400 text-sm mt-1">
-                        Upload PDFs, web articles, and study notes. AI Tutor answers strictly from your grounded sources with inline citations.
+                        Upload PDFs, articles, and study notes. Your AI Tutor will answer questions directly from your materials with citations.
                     </p>
                 </div>
                 <div className="flex items-center gap-2 bg-slate-900/80 p-1.5 rounded-xl border border-emerald-500/20">
@@ -205,7 +205,7 @@ const Sources = () => {
                                 : 'text-slate-400 hover:text-white'
                         }`}
                     >
-                        Source Library ({sources.length})
+                        Study Materials ({sources.length})
                     </button>
                     <button
                         onClick={() => setActiveTab('upload')}
@@ -232,19 +232,19 @@ const Sources = () => {
             {activeTab === 'library' ? (
                 <div>
                     {loading ? (
-                        <div className="text-center py-20 text-slate-500 font-mono">Loading source corpus...</div>
+                        <div className="text-center py-20 text-slate-500">Loading study materials...</div>
                     ) : sources.length === 0 ? (
                         <div className="glass-panel p-12 text-center max-w-xl mx-auto border border-emerald-500/20 rounded-2xl">
                             <FileText className="w-16 h-16 text-emerald-400/50 mx-auto mb-4 animate-pulse" />
-                            <h3 className="text-lg font-bold text-white mb-2">No Sources in Corpus Yet</h3>
+                            <h3 className="text-lg font-bold text-white mb-2">No Study Materials Added Yet</h3>
                             <p className="text-slate-400 text-sm mb-6">
-                                Upload a PDF lecture, paste research notes, or ingest a web article to enable strict source-grounded RAG answers.
+                                Upload a PDF lecture, paste notes, or add an article so your AI Tutor can answer directly from your materials.
                             </p>
                             <button
                                 onClick={() => setActiveTab('upload')}
                                 className="px-6 py-2.5 rounded-xl bg-emerald-500 text-slate-950 font-bold text-sm hover:bg-emerald-400 transition-all shadow-[0_0_20px_rgba(16,185,129,0.4)]"
                             >
-                                Ingest First Source
+                                Add First Study Material
                             </button>
                         </div>
                     ) : (
@@ -419,12 +419,12 @@ const Sources = () => {
                                 {uploading ? (
                                     <>
                                         <RefreshCw className="w-4 h-4 animate-spin" />
-                                        Ingesting & Embedding...
+                                        Reading & Processing Notes...
                                     </>
                                 ) : (
                                     <>
                                         <Sparkles className="w-4 h-4" />
-                                        Ingest Source & Generate Guide
+                                        Add Material & Create Study Guide
                                     </>
                                 )}
                             </button>

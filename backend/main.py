@@ -1,4 +1,7 @@
 import os
+# Configure Matplotlib config dir to writable /tmp for containerized deployments with low memory limit
+os.environ.setdefault("MPLCONFIGDIR", "/tmp/matplotlib")
+
 import time
 import json
 from typing import List, Optional, Any

@@ -8,15 +8,15 @@ import {
 import StructuredMessage from './StructuredMessage';
 
 const SUGGESTED_PROMPTS = [
-    "Draw an Architecture Diagram of Microservices with API Gateway in Mermaid",
+    "Explain how Photosynthesis works with a simple step-by-step diagram",
+    "Help me understand Calculus derivatives and integrals with real-life examples",
     "Explain Database Indexing & B-Trees with a visual flowchart",
-    "Sequence diagram of OAuth 2.0 Authorization Code Grant",
-    "Explain React 19 Server Components vs Client Components with a diagram",
+    "Summarize the key events and causes of World War II",
 ];
 
 const DEFAULT_GREETING = {
     role: 'ai',
-    content: "👋 Hello! I am your **AI Study Buddy (Developer Edition)**.\n\nI am equipped with a **Hybrid Memory Architecture** (Tier-1 Short-Term Buffer + Tier-2 Long-Term Episodic Memory) and support **Multi-Session Management**.\n\nYou can create new chat sessions or switch between past topics in the left drawer. What would you like to master today?",
+    content: "👋 Hello! I am your **AI Study Buddy**.\n\nI can help you understand complex concepts, create structured study notes, explain difficult topics step-by-step, and generate visual diagrams.\n\nYou can start a new study session or review past sessions in the left drawer. What would you like to learn today?",
     shield: 'Active'
 };
 
@@ -512,8 +512,8 @@ const ChatInterface = () => {
                                 <div className="flex items-center gap-2">
                                     <Brain className="w-4 h-4 text-emerald-400 group-hover:scale-110 transition-transform" />
                                     <div>
-                                        <div className="font-bold text-slate-200 text-[11px]">Hybrid Memory</div>
-                                        <div className="text-[10px] text-slate-500 font-mono">Tier-1 + Tier-2 Active</div>
+                                        <div className="font-bold text-slate-200 text-[11px]">Smart Memory</div>
+                                        <div className="text-[10px] text-slate-500">Context Saved Across Chats</div>
                                     </div>
                                 </div>
                                 <ChevronRight className="w-3.5 h-3.5 text-slate-500" />
@@ -537,19 +537,19 @@ const ChatInterface = () => {
                                 <div className="min-w-0">
                                     <div className="flex items-center gap-2">
                                         <h2 className="text-sm font-bold text-white tracking-wide truncate">
-                                            {activeConv ? activeConv.title : "AI Tutor Interactive Console"}
+                                            {activeConv ? activeConv.title : "AI Study Companion"}
                                         </h2>
                                         <button
                                             onClick={() => setMemoryModalOpen(true)}
                                             className="hidden sm:inline-flex items-center gap-1 text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/20 transition-colors"
-                                            title="View Hybrid Memory Architecture Telemetry"
+                                            title="View Smart Memory Details"
                                         >
                                             <Brain className="w-3 h-3 text-emerald-400" />
-                                            <span>Hybrid Memory: Online</span>
+                                            <span>Smart Memory: Active</span>
                                         </button>
                                     </div>
-                                    <p className="text-[11px] text-slate-400 font-mono truncate">
-                                        {loadingHistory ? 'Restoring study session...' : `${messages.length} messages in working state`}
+                                    <p className="text-[11px] text-slate-400 truncate">
+                                        {loadingHistory ? 'Restoring study session...' : `${messages.length} messages in this session`}
                                     </p>
                                 </div>
                             </div>

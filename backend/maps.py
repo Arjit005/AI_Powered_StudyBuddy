@@ -1,17 +1,19 @@
 
-import networkx as nx
-import matplotlib
-matplotlib.use('Agg')
-import matplotlib.pyplot as plt
+import os
 import io
 import base64
 import textwrap
+
+# Ensure headless matplotlib directory
+os.environ.setdefault('MPLCONFIGDIR', '/tmp/matplotlib')
 
 def hierarchy_pos(G, root=None, width=1., vert_gap = 0.2, vert_loc = 0, xcenter = 0.5):
     '''
     If the graph is a tree this will return the positions to plot this in a 
     hierarchical layout. If it contains cycles, it uses a BFS tree to force hierarchy.
     '''
+    import networkx as nx
+
     if len(G.nodes) == 0:
         return {}
     if root is None:
@@ -43,6 +45,7 @@ def hierarchy_pos(G, root=None, width=1., vert_gap = 0.2, vert_loc = 0, xcenter 
 
 def get_node_depths(G, root):
     """Calculate depth of each node from root using BFS."""
+    import networkx as nx
     depths = {root: 0}
     try:
         if root in G:
@@ -55,6 +58,12 @@ def get_node_depths(G, root):
 def generate_network_graph(edge_data):
     fig = None
     try:
+        # Lazy-import networkx and matplotlib only when visual map generation is requested
+        import networkx as nx
+        import matplotlib
+        matplotlib.use('Agg')
+        import matplotlib.pyplot as plt
+
         # 1. Create a Directed Graph
         G = nx.DiGraph()
 

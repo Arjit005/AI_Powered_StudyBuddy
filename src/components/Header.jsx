@@ -107,18 +107,16 @@ const Header = () => {
                         <div className="relative hidden md:block">
                             <button
                                 onClick={() => setSecurityOpen(!securityOpen)}
-                                className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-mono font-medium transition-all cursor-pointer shadow-sm ${
+                                className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium transition-all cursor-pointer shadow-sm ${
                                     securityData?.shield_active 
                                         ? 'bg-emerald-950/50 text-emerald-300 border border-emerald-800/50 hover:bg-emerald-900/40' 
                                         : 'bg-amber-950/50 text-amber-300 border border-amber-800/50 hover:bg-amber-900/40'
                                 }`}
-                                title="Click to view AI Safety Shield status"
+                                title="Click to view AI Study Safety status"
                             >
                                 <span className={`w-2 h-2 rounded-full ${securityData?.shield_active ? 'bg-emerald-400 animate-ping' : 'bg-amber-400'}`} />
                                 <ShieldCheck className={`w-3.5 h-3.5 ${securityData?.shield_active ? 'text-emerald-400' : 'text-amber-400'}`} />
-                                <span>Shield: {securityData?.shield_active ? 'Active' : 'Degraded'}</span>
-                                <span className="text-emerald-500/60">|</span>
-                                <span className="text-slate-400">{apiLatency}</span>
+                                <span>Study Shield: {securityData?.shield_active ? 'Active' : 'Degraded'}</span>
                                 <ChevronDown className={`w-3 h-3 text-emerald-400 transition-transform ${securityOpen ? 'rotate-180' : ''}`} />
                             </button>
 
@@ -128,37 +126,30 @@ const Header = () => {
                                     <div className="flex items-center justify-between pb-2 mb-2 border-b border-emerald-500/20">
                                         <div className="flex items-center gap-2">
                                             <Shield className="w-4 h-4 text-emerald-400" />
-                                            <span className="text-xs font-bold uppercase tracking-wider text-emerald-300">Security Guard Telemetry</span>
+                                            <span className="text-xs font-bold uppercase tracking-wider text-emerald-300">Safe Study Guard</span>
                                         </div>
-                                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-mono">v1.2.0</span>
+                                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-mono">Protected</span>
                                     </div>
                                     <div className="space-y-2 text-xs">
                                         <div className="flex items-start gap-2 text-slate-300">
                                             <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 mt-0.5 shrink-0" />
                                             <div>
-                                                <div className="font-semibold text-white">Rate Limiter & Brute-Force</div>
-                                                <div className="text-[11px] text-slate-400">IP sliding-window with auto-lockout</div>
+                                                <div className="font-semibold text-white">Academic Integrity & Safety</div>
+                                                <div className="text-[11px] text-slate-400">Content moderation & factual grounding</div>
                                             </div>
                                         </div>
                                         <div className="flex items-start gap-2 text-slate-300">
                                             <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 mt-0.5 shrink-0" />
                                             <div>
-                                                <div className="font-semibold text-white">Prompt Injection Guard</div>
-                                                <div className="text-[11px] text-slate-400">Heuristic jailbreak & system override filter</div>
+                                                <div className="font-semibold text-white">Private & Secure Notes</div>
+                                                <div className="text-[11px] text-slate-400">Encrypted personal learning workspace</div>
                                             </div>
                                         </div>
                                         <div className="flex items-start gap-2 text-slate-300">
                                             <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 mt-0.5 shrink-0" />
                                             <div>
-                                                <div className="font-semibold text-white">Academic Safety Filter</div>
-                                                <div className="text-[11px] text-slate-400">Content moderation & input sanitization</div>
-                                            </div>
-                                        </div>
-                                        <div className="flex items-start gap-2 text-slate-300">
-                                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 mt-0.5 shrink-0" />
-                                            <div>
-                                                <div className="font-semibold text-white">HTTP Security Headers</div>
-                                                <div className="text-[11px] text-slate-400">nosniff, DENY-clickjack, referrer-policy</div>
+                                                <div className="font-semibold text-white">Protected Account</div>
+                                                <div className="text-[11px] text-slate-400">Rate limit & brute-force protection</div>
                                             </div>
                                         </div>
                                     </div>

@@ -1,10 +1,12 @@
 
-import pandas as pd
-import matplotlib.pyplot as plt
+import os
 import io
 import base64
 from sqlalchemy.orm import Session
 from . import models
+
+# Ensure headless matplotlib directory
+os.environ.setdefault('MPLCONFIGDIR', '/tmp/matplotlib')
 
 def generate_study_chart(db: Session):
     # 1. Fetch data using SQLALchemy
@@ -13,6 +15,12 @@ def generate_study_chart(db: Session):
 
     if not data:
         return None
+
+    # Lazy-import pandas and matplotlib only when chart generation is requested
+    import pandas as pd
+    import matplotlib
+    matplotlib.use('Agg')
+    import matplotlib.pyplot as plt
 
     # 2. Convert to Pandas DataFrame
     df = pd.DataFrame(data, columns=['Activity', 'Seconds'])

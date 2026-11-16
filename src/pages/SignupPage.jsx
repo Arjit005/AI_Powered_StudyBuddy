@@ -157,7 +157,7 @@ const SignupPage = () => {
                         <CheckCircle2 className="w-10 h-10 text-emerald-400 animate-bounce" />
                     </div>
                     <h2 className="text-3xl font-extrabold text-white">Account Created!</h2>
-                    <p className="text-slate-400 text-sm">Security tokens issued. Redirecting you to your study workspace...</p>
+                    <p className="text-slate-400 text-sm">Welcome aboard! Redirecting you to your study dashboard...</p>
                 </div>
             </div>
         );
@@ -175,7 +175,7 @@ const SignupPage = () => {
                             <Brain className="w-8 h-8 text-emerald-400" />
                         </div>
                         <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">Create Account</h1>
-                        <p className="text-slate-400 text-sm mt-1">Join the developer-grade AI Study Buddy ecosystem</p>
+                        <p className="text-slate-400 text-sm mt-1">Join AI Study Buddy to learn faster and study smarter</p>
                     </div>
 
                     {error && (
