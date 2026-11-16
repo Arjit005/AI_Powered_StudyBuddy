@@ -316,7 +316,11 @@ const Sources = () => {
                     <div className="flex gap-3 mb-6">
                         <button
                             type="button"
-                            onClick={() => setUploadType('pdf')}
+                            onClick={() => {
+                                setUploadType('pdf');
+                                setSelectedFile(null);
+                                if (fileInputRef.current) fileInputRef.current.value = '';
+                            }}
                             className={`flex-py-2 px-4 rounded-xl text-xs font-semibold border transition-all flex-1 text-center py-2.5 ${
                                 uploadType === 'pdf'
                                     ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/50 shadow-[0_0_10px_rgba(16,185,129,0.2)]'
@@ -327,7 +331,11 @@ const Sources = () => {
                         </button>
                         <button
                             type="button"
-                            onClick={() => setUploadType('url')}
+                            onClick={() => {
+                                setUploadType('url');
+                                setSelectedFile(null);
+                                if (fileInputRef.current) fileInputRef.current.value = '';
+                            }}
                             className={`flex-py-2 px-4 rounded-xl text-xs font-semibold border transition-all flex-1 text-center py-2.5 ${
                                 uploadType === 'url'
                                     ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/50 shadow-[0_0_10px_rgba(16,185,129,0.2)]'
@@ -338,7 +346,11 @@ const Sources = () => {
                         </button>
                         <button
                             type="button"
-                            onClick={() => setUploadType('text')}
+                            onClick={() => {
+                                setUploadType('text');
+                                setSelectedFile(null);
+                                if (fileInputRef.current) fileInputRef.current.value = '';
+                            }}
                             className={`flex-py-2 px-4 rounded-xl text-xs font-semibold border transition-all flex-1 text-center py-2.5 ${
                                 uploadType === 'text'
                                     ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/50 shadow-[0_0_10px_rgba(16,185,129,0.2)]'
@@ -489,14 +501,18 @@ const Sources = () => {
                                         Key Technical Themes
                                     </h4>
                                     <div className="flex flex-wrap gap-2">
-                                        {sourceGuide.key_topics?.map((topic, idx) => (
-                                            <span
-                                                key={idx}
-                                                className="px-3 py-1 rounded-xl text-xs font-semibold bg-slate-900 text-emerald-300 border border-emerald-500/30 shadow-sm"
-                                            >
-                                                {topic}
-                                            </span>
-                                        ))}
+                                        {Array.isArray(sourceGuide.key_topics) && sourceGuide.key_topics.length > 0 ? (
+                                            sourceGuide.key_topics.map((topic, idx) => (
+                                                <span
+                                                    key={idx}
+                                                    className="px-3 py-1 rounded-xl text-xs font-semibold bg-slate-900 text-emerald-300 border border-emerald-500/30 shadow-sm"
+                                                >
+                                                    {topic}
+                                                </span>
+                                            ))
+                                        ) : (
+                                            <span className="text-xs text-slate-500">No key themes extracted.</span>
+                                        )}
                                     </div>
                                 </div>
 
@@ -506,14 +522,18 @@ const Sources = () => {
                                         Suggested Study Questions
                                     </h4>
                                     <ul className="space-y-2">
-                                        {sourceGuide.suggested_questions?.map((q, idx) => (
-                                            <li key={idx} className="flex items-start gap-2.5 text-xs text-slate-300 bg-slate-900/60 p-3 rounded-xl border border-slate-800">
-                                                <span className="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-mono font-bold shrink-0 text-[10px]">
-                                                    {idx + 1}
-                                                </span>
-                                                <span className="mt-0.5">{q}</span>
-                                            </li>
-                                        ))}
+                                        {Array.isArray(sourceGuide.suggested_questions) && sourceGuide.suggested_questions.length > 0 ? (
+                                            sourceGuide.suggested_questions.map((q, idx) => (
+                                                <li key={idx} className="flex items-start gap-2.5 text-xs text-slate-300 bg-slate-900/60 p-3 rounded-xl border border-slate-800">
+                                                    <span className="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-mono font-bold shrink-0 text-[10px]">
+                                                        {idx + 1}
+                                                    </span>
+                                                    <span className="mt-0.5">{q}</span>
+                                                </li>
+                                            ))
+                                        ) : (
+                                            <li className="text-xs text-slate-500">No suggested questions available.</li>
+                                        )}
                                     </ul>
                                 </div>
                             </div>

@@ -26,10 +26,11 @@ const StudyTimer = () => {
 
         const interval = setInterval(() => {
             const now = Date.now();
-            const remaining = Math.max(0, Math.round((targetEndTimeRef.current - now) / 1000));
+            const diff = targetEndTimeRef.current - now;
+            const remaining = Math.max(0, Math.ceil(diff / 1000));
             setTimeLeft(remaining);
 
-            if (remaining <= 0) {
+            if (diff <= 0) {
                 clearInterval(interval);
                 setIsActive(false);
                 targetEndTimeRef.current = null;

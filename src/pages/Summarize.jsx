@@ -98,9 +98,11 @@ const Summarize = () => {
 
     const handleCopy = async () => {
         if (!summary) return;
+        let success = false;
         try {
             if (navigator?.clipboard?.writeText) {
                 await navigator.clipboard.writeText(summary);
+                success = true;
             } else {
                 const ta = document.createElement('textarea');
                 ta.value = summary;
@@ -109,14 +111,18 @@ const Summarize = () => {
                 document.body.appendChild(ta);
                 ta.focus();
                 ta.select();
-                document.execCommand('copy');
+                success = document.execCommand('copy');
                 document.body.removeChild(ta);
             }
-            setCopied(true);
-            if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
-            copyTimeoutRef.current = setTimeout(() => setCopied(false), 2000);
         } catch (copyErr) {
             console.error("Clipboard copy failed:", copyErr);
+            success = false;
+        } finally {
+            if (success) {
+                setCopied(true);
+                if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
+                copyTimeoutRef.current = setTimeout(() => setCopied(false), 2000);
+            }
         }
     };
 

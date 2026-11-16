@@ -227,7 +227,8 @@ const ChatInterface = () => {
     const clearCurrentChat = async () => {
         if (!confirm("Clear messages in this current study session?")) return;
         const targetConv = activeConvId;
-        invalidatedConvsRef.current.add(targetConv || 'current');
+        const clearKey = targetConv || 'current';
+        invalidatedConvsRef.current.add(clearKey);
         sendGenerationRef.current += 1;
         try {
             const token = localStorage.getItem('auth_token');
@@ -237,6 +238,10 @@ const ChatInterface = () => {
             const url = activeConvId ? `/api/chat?conversation_id=${activeConvId}` : '/api/chat';
             const res = await fetch(url, { method: 'DELETE', headers });
             if (!res.ok) throw new Error('Unable to clear this session. Please try again.');
+            
+            // Allow this cleared conversation to accept new messages now that deletion succeeded
+            invalidatedConvsRef.current.delete(clearKey);
+
             setMessages([
                 {
                     role: 'ai',
@@ -247,6 +252,8 @@ const ChatInterface = () => {
             fetchConversations();
         } catch (err) {
             console.error(err);
+            // On failure, also un-invalidate so the user can retry sending
+            invalidatedConvsRef.current.delete(clearKey);
             alert("Error clearing session memory.");
         }
     };
@@ -488,7 +495,8 @@ const ChatInterface = () => {
             }
         } catch (error) {
             console.error('Error:', error);
-            if (originatingConvId === activeConvIdRef.current) {
+            // Only display error if this request was not superseded by newer sends or session clears
+            if (isStillCurrentConv()) {
                 setMessages(prev => [
                     ...prev,
                     {

@@ -5,6 +5,21 @@ import { ZoomIn, ZoomOut, RotateCcw, Download, Copy, Check, Maximize2, X, AlertC
 let mermaidInitialized = false;
 let globalRenderQueue = Promise.resolve();
 
+const decodeCssEscapes = (str) => {
+    if (!str || typeof str !== 'string') return '';
+    // Decode CSS hex escapes (\6a\61\76\61... or \75\72\6c) and generic backslash escapes (\:)
+    return str.replace(/\\([0-9a-fA-F]{1,6})\s?|\\(.)/g, (_, hex, char) => {
+        if (hex) {
+            try {
+                return String.fromCodePoint(parseInt(hex, 16));
+            } catch {
+                return '';
+            }
+        }
+        return char || '';
+    });
+};
+
 const sanitizeSvg = (svgStr) => {
     if (!svgStr || typeof svgStr !== 'string') return '';
     try {
@@ -32,15 +47,14 @@ const sanitizeSvg = (svgStr) => {
                 const attr = el.attributes[i];
                 const rawName = (attr.localName || attr.name).toLowerCase();
                 const rawVal = attr.value;
-                // De-obfuscate control chars and CSS escapes
-                const normalizedVal = rawVal
-                    .replace(/[\x00-\x1f\x7f\s]+/g, '')
-                    .replace(/\\([0-9a-fA-F]{1,6}\s?|.)/g, '$1')
-                    .toLowerCase();
+
+                // Fully decode CSS escapes and strip control characters to prevent evasion
+                const decodedVal = decodeCssEscapes(rawVal);
+                const compactVal = decodedVal.replace(/[\x00-\x1f\x7f\s]+/g, '').toLowerCase();
 
                 const isUriAttr = rawName.includes('href') || rawName.includes('src') || rawName === 'action';
-                const hasExecutableScheme = /^(javascript|vbscript|data):/i.test(normalizedVal);
-                const isNonFragmentUri = isUriAttr && !normalizedVal.startsWith('#') && (normalizedVal.includes(':') || normalizedVal.startsWith('//'));
+                const hasExecutableScheme = /^(javascript|vbscript|data):/i.test(compactVal);
+                const isNonFragmentUri = isUriAttr && !compactVal.startsWith('#') && (compactVal.includes(':') || compactVal.startsWith('//'));
 
                 if (rawName.startsWith('on') || hasExecutableScheme || isNonFragmentUri) {
                     el.removeAttribute(attr.name);
@@ -48,16 +62,19 @@ const sanitizeSvg = (svgStr) => {
                 }
 
                 // Check for CSS url(...) in attributes: only allow safe local fragments like url(#gradient-1)
-                if (/url\s*\(/i.test(rawVal)) {
-                    if (!/url\s*\(\s*['"]?#[a-zA-Z0-9_\-\.:]+\s*['"]?\s*\)/i.test(rawVal)) {
+                // Evaluate against both raw and decoded strings
+                if (/url\s*\(/i.test(decodedVal) || /url\s*\(/i.test(rawVal)) {
+                    const isSafeLocalFragment = /^url\s*\(\s*['"]?#[a-zA-Z0-9_\-\.:]+\s*['"]?\s*\)$/i.test(decodedVal.trim());
+                    if (!isSafeLocalFragment) {
                         el.removeAttribute(attr.name);
                     }
                 }
             }
         });
-        // Remove style elements containing @import or url()
+        // Remove style elements containing @import, behavior, or non-fragment url()
         doc.querySelectorAll('style').forEach(el => {
-            if (/@import|url\s*\(/i.test(el.textContent || '')) {
+            const cssText = decodeCssEscapes(el.textContent || '');
+            if (/@import|behavior|url\s*\(\s*['"]?(?!#[a-zA-Z0-9_\-\.:]+['"]?\s*\))/i.test(cssText)) {
                 el.remove();
             }
         });

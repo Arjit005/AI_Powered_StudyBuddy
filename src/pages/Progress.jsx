@@ -10,7 +10,11 @@ const Progress = () => {
     const [fetchError, setFetchError] = useState(null);
     const progressRequestGenRef = useRef(0);
 
+    const [isResetting, setIsResetting] = useState(false);
+    const resetInProgressRef = useRef(false);
+
     const fetchAnalytics = async () => {
+        if (resetInProgressRef.current) return;
         setLoading(true);
         setFetchError(null);
         const token = localStorage.getItem('auth_token');
@@ -26,7 +30,7 @@ const Progress = () => {
                 fetch('/api/sessions/history', { headers })
             ]);
 
-            if (thisGen !== progressRequestGenRef.current) return;
+            if (thisGen !== progressRequestGenRef.current || resetInProgressRef.current) return;
 
             const progRes = progResult.status === 'fulfilled' ? progResult.value : { ok: false };
             const heatRes = heatResult.status === 'fulfilled' ? heatResult.value : { ok: false };
@@ -37,12 +41,15 @@ const Progress = () => {
             if (progRes.ok) {
                 try {
                     const data = await progRes.json();
-                    if (thisGen !== progressRequestGenRef.current) return;
+                    if (thisGen !== progressRequestGenRef.current || resetInProgressRef.current) return;
                     if (data && typeof data === 'object') {
+                        const rawHours = Number(data.study_hours);
+                        const rawQuizzes = Number(data.quizzes_taken);
+                        const rawStreak = Number(data.streak_days);
                         setStats({
-                            study_hours: typeof data.study_hours === 'number' && !isNaN(data.study_hours) ? data.study_hours : 0,
-                            quizzes_taken: typeof data.quizzes_taken === 'number' && !isNaN(data.quizzes_taken) ? data.quizzes_taken : 0,
-                            streak_days: typeof data.streak_days === 'number' && !isNaN(data.streak_days) ? data.streak_days : 0
+                            study_hours: Number.isFinite(rawHours) && rawHours >= 0 ? rawHours : 0,
+                            quizzes_taken: Number.isFinite(rawQuizzes) && rawQuizzes >= 0 ? Math.floor(rawQuizzes) : 0,
+                            streak_days: Number.isFinite(rawStreak) && rawStreak >= 0 ? Math.floor(rawStreak) : 0
                         });
                     } else {
                         setStats({ study_hours: 0, quizzes_taken: 0, streak_days: 0 });
@@ -133,11 +140,11 @@ const Progress = () => {
         };
     }, []);
 
-    const [isResetting, setIsResetting] = useState(false);
     const resetStats = async () => {
-        if (isResetting) return;
+        if (isResetting || resetInProgressRef.current) return;
         if (!confirm("Are you sure you want to reset all recorded study progress?")) return;
         setIsResetting(true);
+        resetInProgressRef.current = true;
         const thisResetGen = ++progressRequestGenRef.current;
         const token = localStorage.getItem('auth_token');
         const headers = {};
@@ -150,18 +157,22 @@ const Progress = () => {
                 setChartImage(null);
                 setSessions([]);
                 setHeatmapData([]);
+                resetInProgressRef.current = false;
                 fetchAnalytics();
             } else {
                 alert("Failed to reset progress on server.");
+                resetInProgressRef.current = false;
                 fetchAnalytics();
             }
         } catch (err) {
             console.error("Reset error:", err);
             alert("Network error resetting progress.");
+            resetInProgressRef.current = false;
             if (thisResetGen === progressRequestGenRef.current) {
                 fetchAnalytics();
             }
         } finally {
+            resetInProgressRef.current = false;
             setIsResetting(false);
         }
     };

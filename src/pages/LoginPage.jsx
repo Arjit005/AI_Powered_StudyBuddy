@@ -79,15 +79,16 @@ const LoginPage = () => {
         setIsLoading(true);
 
         try {
-            const isEmail = username.includes('@');
+            const trimmedUsername = username.trim();
+            const isEmail = trimmedUsername.includes('@');
             const res = await fetch('/api/auth/login', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
-                    email: isEmail ? username.trim() : undefined,
-                    username: !isEmail ? username.trim() : undefined,
+                    email: isEmail ? trimmedUsername : undefined,
+                    username: !isEmail ? trimmedUsername : undefined,
                     password: password
                 }),
             });

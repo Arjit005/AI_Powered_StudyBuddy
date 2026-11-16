@@ -57,20 +57,24 @@ const Quiz = () => {
                     // Find option matching rawAnswer strictly (exact match case-insensitively)
                     const matchingOption = normalizedOptions.find(opt => opt.toLowerCase() === rawAnswer.toLowerCase());
                     if (!matchingOption) return null;
-                    return {
-                        ...q,
-                        question: q.question.trim(),
-                        options: normalizedOptions,
-                        correct_answer: matchingOption,
-                        answer: matchingOption
-                    };
-                })
-                .filter(Boolean);
+            const rawExplanation = typeof q.explanation === 'string' 
+                ? q.explanation.trim() 
+                : (q.explanation ? String(q.explanation) : '');
+            return {
+                ...q,
+                question: q.question.trim(),
+                options: normalizedOptions,
+                correct_answer: matchingOption,
+                answer: matchingOption,
+                explanation: rawExplanation
+            };
+        })
+        .filter(Boolean);
 
-            if (validQuestions.length === 0) {
-                throw new Error('Received malformed quiz questions. Please regenerate.');
-            }
-            const newInstanceId = Date.now();
+    if (validQuestions.length === 0) {
+        throw new Error('Received malformed quiz questions. Please regenerate.');
+    }
+    const newInstanceId = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `quiz_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
             quizStartTimeRef.current = Date.now();
             quizInstanceRef.current = newInstanceId;
             setQuiz({ ...data, questions: validQuestions, instanceId: newInstanceId });
@@ -349,7 +353,7 @@ const Quiz = () => {
                                                 Final Score: {calculateScore()} / {quiz.questions.length} ({quiz.questions.length > 0 ? Math.round((calculateScore() / quiz.questions.length) * 100) : 0}%)
                                             </div>
                                             <div className="text-xs font-mono text-slate-400">
-                                                {activityLogged ? 'Activity logged to your study dashboard.' : 'Assessment complete.'}
+                                                {activityLogged === true ? 'Activity logged to your study dashboard.' : activityLogged === false ? 'Assessment complete (activity sync unavailable).' : 'Assessment complete.'}
                                             </div>
                                         </div>
                                     </div>

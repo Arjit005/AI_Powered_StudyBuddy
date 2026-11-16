@@ -141,8 +141,16 @@ export default function CommandPalette({ isOpen, onClose }) {
       previousFocusRef.current = document.activeElement;
       inputRef.current?.focus();
     } else {
-      if (previousFocusRef.current && typeof previousFocusRef.current.focus === 'function') {
+      // Safely restore focus only if previous element is still attached to the live DOM
+      if (
+        previousFocusRef.current && 
+        typeof previousFocusRef.current.focus === 'function' &&
+        document.contains(previousFocusRef.current)
+      ) {
         previousFocusRef.current.focus();
+      } else {
+        // Fallback focus to main document body or safe container
+        document.body?.focus?.();
       }
     }
   }, [isOpen]);

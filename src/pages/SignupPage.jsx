@@ -152,7 +152,16 @@ const SignupPage = () => {
                 data = { detail: res.statusText || 'Registration server response error' };
             }
             if (!res.ok) {
-                throw new Error(data.detail || 'Failed to create account.');
+                const rawDetail = data?.detail;
+                let errMessage = 'Failed to create account.';
+                if (typeof rawDetail === 'string') {
+                    errMessage = rawDetail;
+                } else if (Array.isArray(rawDetail)) {
+                    errMessage = rawDetail.map(d => d.msg || JSON.stringify(d)).join(', ');
+                } else if (rawDetail && typeof rawDetail === 'object') {
+                    errMessage = JSON.stringify(rawDetail);
+                }
+                throw new Error(errMessage);
             }
 
             if (!data.access_token || !data.user) {

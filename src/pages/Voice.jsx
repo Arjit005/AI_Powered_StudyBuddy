@@ -109,6 +109,7 @@ const Voice = () => {
 
         // Stop listening while generating
         if (isListening) {
+            recognitionSessionRef.current += 1;
             recognitionRef.current?.stop();
             setIsListening(false);
         }

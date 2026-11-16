@@ -164,10 +164,24 @@ class RAGService:
                     # Verify actual connected socket peer to mitigate DNS rebinding TOCTOU
                     try:
                         sock = getattr(getattr(resp.raw, '_connection', None), 'sock', None)
-                        if sock:
+                        if sock and hasattr(sock, 'getpeername'):
                             peer_ip = sock.getpeername()[0]
                             if not RAGService._is_safe_ip(peer_ip):
                                 print(f"SSRF Alert: DNS rebinding blocked; peer IP {peer_ip} is disallowed.")
+                                resp.close()
+                                return ""
+                        else:
+                            # In connection pooled or wrapped environments where sock is not exposed on resp.raw,
+                            # re-resolve destination IP directly and fail closed if not verifiable
+                            from urllib.parse import urlparse
+                            import socket
+                            target_host = urlparse(current_url).hostname
+                            if not target_host:
+                                resp.close()
+                                return ""
+                            resolved_ips = [item[4][0] for item in socket.getaddrinfo(target_host, None)]
+                            if not resolved_ips or any(not RAGService._is_safe_ip(ip) for ip in resolved_ips):
+                                print(f"SSRF Alert: Host {target_host} resolved to unverified or disallowed IP. Failing closed.")
                                 resp.close()
                                 return ""
                     except Exception as sock_err:
@@ -389,17 +403,22 @@ class RAGService:
                 }
             })
 
+        # 2. Upsert to Pinecone Vector DB (Isolated User Namespace) first BEFORE committing DB
+        # This prevents database-vector desync if vector operations fail.
+        upsert_ok = RAGService._upsert_to_pinecone(
+            vectors=vectors_to_upsert,
+            namespace=f"user_{source.user_id}" if source.user_id else "global"
+        )
+        if not upsert_ok and os.getenv("PINECONE_API"):
+            db.rollback()
+            raise RuntimeError("Failed to index vector embeddings in Pinecone. Rolled back database transaction.")
+
         db.commit()
 
         # Delete old Pinecone vectors now that new DB commit succeeded
         if old_chunk_indices:
             RAGService.delete_source_vectors(source.id, source.user_id, chunk_ids=old_chunk_indices)
 
-        # 2. Upsert to Pinecone Vector DB (Isolated User Namespace)
-        RAGService._upsert_to_pinecone(
-            vectors=vectors_to_upsert,
-            namespace=f"user_{source.user_id}" if source.user_id else "global"
-        )
         print(f"RAG Service: Successfully chunked & embedded source '{source.title}' into {len(created_chunks)} chunks.")
 
     @staticmethod
@@ -430,14 +449,14 @@ class RAGService:
         return vec
 
     @staticmethod
-    def _upsert_to_pinecone(vectors: List[Dict[str, Any]], namespace: str = "global"):
+    def _upsert_to_pinecone(vectors: List[Dict[str, Any]], namespace: str = "global") -> bool:
         """
-        Safely upserts vector embeddings into the remote Pinecone serverless index.
-        Gracefully handles network errors or missing keys without crashing the ingestion pipeline.
+        Upserts vector embeddings into the remote Pinecone serverless index.
+        Returns True on success, or False if Pinecone operations failed.
         """
         pinecone_api_key = os.getenv("PINECONE_API")
         if not pinecone_api_key or not vectors:
-            return
+            return True
 
         try:
             from pinecone import Pinecone
@@ -449,17 +468,20 @@ class RAGService:
                 batch = vectors[i:i + batch_size]
                 index.upsert(vectors=batch, namespace=namespace)
             print(f"Pinecone: Upserted {len(vectors)} vectors into namespace '{namespace}'.")
+            return True
         except Exception as e:
             print(f"Pinecone Upsert Warning (Graceful Fallback to Local SQL): {e}")
+            return False
 
     @staticmethod
-    def _delete_from_pinecone(vector_ids: List[str], namespace: str = "global"):
+    def _delete_from_pinecone(vector_ids: List[str], namespace: str = "global") -> bool:
         """
         Deletes vector IDs from the Pinecone serverless index to avoid orphaned records.
+        Returns True on success, or False if Pinecone operations failed.
         """
         pinecone_api_key = os.getenv("PINECONE_API")
         if not pinecone_api_key or not vector_ids:
-            return
+            return True
 
         try:
             from pinecone import Pinecone
@@ -467,23 +489,26 @@ class RAGService:
             index = pc.Index("study-buddy-kb")
             index.delete(ids=vector_ids, namespace=namespace)
             print(f"Pinecone: Deleted {len(vector_ids)} vectors from namespace '{namespace}'.")
+            return True
         except Exception as e:
             print(f"Pinecone Delete Warning: {e}")
+            return False
 
     @staticmethod
-    def delete_source_vectors(source_id: int, user_id: Optional[int], chunk_ids: Optional[List[int]] = None):
+    def delete_source_vectors(source_id: int, user_id: Optional[int], chunk_ids: Optional[List[int]] = None) -> bool:
         """
         Removes all vectors belonging to a source from Pinecone.
+        Returns True if deletion succeeded or no remote index configured.
         """
         namespace = f"user_{user_id}" if user_id else "global"
         # Pinecone vector format: src_{source_id}_chunk_{idx}
-        # If chunk indices are provided, delete specific ones; otherwise prefix/batch delete up to 200 chunks
+        # If chunk indices are provided, delete specific ones; otherwise prefix/batch delete up to 1000 chunks
         ids_to_delete = []
         if chunk_ids:
             ids_to_delete = [f"src_{source_id}_chunk_{cid}" for cid in chunk_ids]
         else:
             ids_to_delete = [f"src_{source_id}_chunk_{idx}" for idx in range(1000)]
-        RAGService._delete_from_pinecone(ids_to_delete, namespace=namespace)
+        return RAGService._delete_from_pinecone(ids_to_delete, namespace=namespace)
 
     @staticmethod
     def _query_pinecone(query_vec: List[float], top_k: int = 6, namespace: str = "global", source_ids: Optional[List[int]] = None) -> List[Dict[str, Any]]:

@@ -88,7 +88,11 @@ const Maps = () => {
                                 return false;
                             }
                         };
-                        if (rawB64.length <= 5 * 1024 * 1024 && isValidBase64(rawB64)) {
+                        const hasPngMagicHeader = (str) => {
+                            // PNG base64 representation always begins with "iVBORw0KGgo" (representing bytes 0x89 0x50 0x4E 0x47 0x0D 0x0A 0x1A 0x0A)
+                            return str.startsWith('iVBORw0KGgo');
+                        };
+                        if (rawB64.length <= 5 * 1024 * 1024 && isValidBase64(rawB64) && hasPngMagicHeader(rawB64)) {
                             setMapImage(`data:image/png;base64,${rawB64}`);
                             hasMap = true;
                         }

@@ -170,7 +170,10 @@ class MCPService:
             return cls._query_study_memory(cid, limit, user_id=user_id)
 
         elif name == "create_study_flashcards":
-            topic = arguments.get("topic", "General Topic")
+            raw_topic = arguments.get("topic")
+            if raw_topic is None or not str(raw_topic).strip():
+                raise ValueError("Argument 'topic' is required and cannot be empty.")
+            topic = str(raw_topic).strip()
             count = arguments.get("count", 5)
             if not isinstance(count, int) or isinstance(count, bool):
                 count = 5
@@ -241,25 +244,38 @@ class MCPService:
             cleaned = AIService._clean_json_response(response.text)
             parsed = json.loads(cleaned)
             if isinstance(parsed, dict) and "nodes" in parsed and isinstance(parsed["nodes"], list):
-                def _is_valid_num(val):
-                    return isinstance(val, (int, float)) and not isinstance(val, bool) and math.isfinite(val)
+                def _is_valid_coord(val):
+                    # Coordinate bounds check: finite, between -50,000 and +50,000
+                    return isinstance(val, (int, float)) and not isinstance(val, bool) and math.isfinite(val) and -50000 <= val <= 50000
+
+                def _is_valid_dim(val):
+                    # Dimension bounds check: finite positive, between 1 and 10,000
+                    return isinstance(val, (int, float)) and not isinstance(val, bool) and math.isfinite(val) and 1 <= val <= 10000
 
                 valid_nodes = []
+                valid_node_ids = set()
                 for n in parsed["nodes"]:
                     if isinstance(n, dict) and isinstance(n.get("id"), str) and isinstance(n.get("label"), str):
                         # Ensure numeric geometry if coordinates are provided
-                        if "x" in n and not _is_valid_num(n["x"]):
+                        if "x" not in n or not _is_valid_coord(n["x"]):
                             n["x"] = 0
-                        if "y" in n and not _is_valid_num(n["y"]):
+                        if "y" not in n or not _is_valid_coord(n["y"]):
                             n["y"] = 0
-                        if "width" in n and not _is_valid_num(n["width"]):
+                        if "width" not in n or not _is_valid_dim(n["width"]):
                             n["width"] = 160
-                        if "height" in n and not _is_valid_num(n["height"]):
+                        if "height" not in n or not _is_valid_dim(n["height"]):
                             n["height"] = 60
                         valid_nodes.append(n)
+                        valid_node_ids.add(n["id"])
+
+                # Filter edges to only those connecting existing valid nodes
                 valid_edges = [
                     e for e in parsed.get("edges", [])
-                    if isinstance(e, dict) and isinstance(e.get("source"), str) and isinstance(e.get("target"), str)
+                    if isinstance(e, dict)
+                    and isinstance(e.get("source"), str)
+                    and isinstance(e.get("target"), str)
+                    and e["source"] in valid_node_ids
+                    and e["target"] in valid_node_ids
                 ]
                 if len(valid_nodes) >= 3:
                     parsed["nodes"] = valid_nodes
@@ -709,60 +725,59 @@ class MCPService:
         ]
 
     @classmethod
-    def handle_jsonrpc(cls, payload: Dict[str, Any], user_id: Optional[int] = None) -> Dict[str, Any]:
+    def handle_jsonrpc(cls, payload: Dict[str, Any], user_id: Optional[int] = None) -> Optional[Dict[str, Any]]:
         """
         Standard Model Context Protocol JSON-RPC 2.0 processor.
         Supports initialize, tools/list, tools/call, resources/list, prompts/list.
+        Properly handles notifications (requests without an 'id' member) by returning None.
         """
         if not isinstance(payload, dict):
             return {"jsonrpc": "2.0", "id": None, "error": {"code": -32600, "message": "Invalid Request: payload must be a JSON object."}}
 
-        rpc_id = payload.get("id")
+        rpc_ver = payload.get("jsonrpc")
+        if rpc_ver != "2.0":
+            return {"jsonrpc": "2.0", "id": payload.get("id"), "error": {"code": -32600, "message": "Invalid Request: jsonrpc version must be '2.0'."}}
+
         method = payload.get("method")
+        if not method or not isinstance(method, str):
+            return {"jsonrpc": "2.0", "id": payload.get("id"), "error": {"code": -32600, "message": "Invalid Request: method must be a non-empty string."}}
+
+        is_notification = "id" not in payload
+        rpc_id = payload.get("id")
+
         params = payload.get("params", {})
         if not isinstance(params, dict):
+            if is_notification:
+                return None
             return {"jsonrpc": "2.0", "id": rpc_id, "error": {"code": -32602, "message": "Invalid params: params must be a JSON object."}}
 
+        response_body = None
+
         if method == "initialize":
-            return {
-                "jsonrpc": "2.0",
-                "id": rpc_id,
-                "result": {
-                    "protocolVersion": "2024-11-05",
-                    "serverInfo": {
-                        "name": "ai-study-buddy-mcp",
-                        "version": "1.0.0"
-                    },
-                    "capabilities": {
-                        "tools": {"listChanged": False},
-                        "resources": {"subscribe": False, "listChanged": False},
-                        "prompts": {"listChanged": False}
-                    }
+            response_body = {
+                "protocolVersion": "2024-11-05",
+                "serverInfo": {
+                    "name": "ai-study-buddy-mcp",
+                    "version": "1.0.0"
+                },
+                "capabilities": {
+                    "tools": {"listChanged": False},
+                    "resources": {"subscribe": False, "listChanged": False},
+                    "prompts": {"listChanged": False}
                 }
             }
 
         elif method == "tools/list":
-            return {
-                "jsonrpc": "2.0",
-                "id": rpc_id,
-                "result": {
-                    "tools": cls.get_registered_tools()
-                }
+            response_body = {
+                "tools": cls.get_registered_tools()
             }
 
         elif method == "tools/call":
-            if not isinstance(params, dict):
-                return {
-                    "jsonrpc": "2.0",
-                    "id": rpc_id,
-                    "error": {
-                        "code": -32602,
-                        "message": "Invalid params: payload must be a JSON object."
-                    }
-                }
             tool_name = params.get("name")
             tool_args = params.get("arguments", {})
             if not tool_name or not isinstance(tool_name, str) or not isinstance(tool_args, dict):
+                if is_notification:
+                    return None
                 return {
                     "jsonrpc": "2.0",
                     "id": rpc_id,
@@ -773,83 +788,71 @@ class MCPService:
                 }
             try:
                 result_data = cls.execute_tool(tool_name, tool_args, user_id=user_id)
-                return {
-                    "jsonrpc": "2.0",
-                    "id": rpc_id,
-                    "result": {
-                        "content": [
-                            {
-                                "type": "text",
-                                "text": json.dumps(result_data, indent=2)
-                            }
-                        ],
-                        "isError": False
-                    }
+                response_body = {
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": json.dumps(result_data, indent=2)
+                        }
+                    ],
+                    "isError": False
                 }
             except Exception as err:
                 logger.error(f"MCP tool {tool_name} execution error: {err}")
+                if is_notification:
+                    return None
                 return {
                     "jsonrpc": "2.0",
                     "id": rpc_id,
                     "error": {
                         "code": -32603,
-                        "message": "Tool execution encountered an internal error."
+                        "message": f"Tool execution encountered an internal error: {err}"
                     }
                 }
 
         elif method == "resources/list":
-            return {
-                "jsonrpc": "2.0",
-                "id": rpc_id,
-                "result": {
-                    "resources": [
-                        {
-                            "uri": "study://hybrid-memory",
-                            "name": "AI Study Buddy Hybrid Memory",
-                            "mimeType": "application/json",
-                            "description": "Active conversational context and long-term summaries"
-                        },
-                        {
-                            "uri": "study://canvas-templates",
-                            "name": "Canvas Architecture Templates",
-                            "mimeType": "application/json",
-                            "description": "Pre-built visual layouts for cloud, distributed systems, and algorithms"
-                        }
-                    ]
-                }
+            response_body = {
+                "resources": [
+                    {
+                        "uri": "study://hybrid-memory",
+                        "name": "AI Study Buddy Hybrid Memory",
+                        "mimeType": "application/json",
+                        "description": "Active conversational context and long-term summaries"
+                    },
+                    {
+                        "uri": "study://canvas-templates",
+                        "name": "Canvas Architecture Templates",
+                        "mimeType": "application/json",
+                        "description": "Pre-built visual layouts for cloud, distributed systems, and algorithms"
+                    }
+                ]
             }
 
         elif method == "resources/read":
             uri = params.get("uri")
             if uri == "study://hybrid-memory":
-                return {
-                    "jsonrpc": "2.0",
-                    "id": rpc_id,
-                    "result": {
-                        "contents": [
-                            {
-                                "uri": uri,
-                                "mimeType": "application/json",
-                                "text": json.dumps({"status": "active", "architecture": "Tier-1 Buffer + Tier-2 Episodic Summary"})
-                            }
-                        ]
-                    }
+                response_body = {
+                    "contents": [
+                        {
+                            "uri": uri,
+                            "mimeType": "application/json",
+                            "text": json.dumps({"status": "active", "architecture": "Tier-1 Buffer + Tier-2 Episodic Summary"})
+                        }
+                    ]
                 }
             elif uri == "study://canvas-templates":
-                return {
-                    "jsonrpc": "2.0",
-                    "id": rpc_id,
-                    "result": {
-                        "contents": [
-                            {
-                                "uri": uri,
-                                "mimeType": "application/json",
-                                "text": json.dumps(cls.get_canvas_templates())
-                            }
-                        ]
-                    }
+                response_body = {
+                    "contents": [
+                        {
+                            "uri": uri,
+                            "mimeType": "application/json",
+                            "text": json.dumps(cls.get_canvas_templates())
+                        }
+                    ]
                 }
             else:
+                if is_notification:
+                    return None
                 return {
                     "jsonrpc": "2.0",
                     "id": rpc_id,
@@ -860,23 +863,21 @@ class MCPService:
                 }
 
         elif method == "prompts/list":
-            return {
-                "jsonrpc": "2.0",
-                "id": rpc_id,
-                "result": {
-                    "prompts": [
-                        {
-                            "name": "generate_canvas_architecture",
-                            "description": "Guides the AI to build a multi-tier visual canvas diagram with node placements",
-                            "arguments": [
-                                {"name": "topic", "description": "Subject to visualize", "required": True}
-                            ]
-                        }
-                    ]
-                }
+            response_body = {
+                "prompts": [
+                    {
+                        "name": "generate_canvas_architecture",
+                        "description": "Guides the AI to build a multi-tier visual canvas diagram with node placements",
+                        "arguments": [
+                            {"name": "topic", "description": "Subject to visualize", "required": True}
+                        ]
+                    }
+                ]
             }
 
         else:
+            if is_notification:
+                return None
             return {
                 "jsonrpc": "2.0",
                 "id": rpc_id,
@@ -885,3 +886,12 @@ class MCPService:
                     "message": f"Method '{method}' not found."
                 }
             }
+
+        if is_notification:
+            return None
+
+        return {
+            "jsonrpc": "2.0",
+            "id": rpc_id,
+            "result": response_body
+        }

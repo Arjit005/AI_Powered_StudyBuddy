@@ -150,6 +150,8 @@ const FeedbackWidget = () => {
                                         type="button"
                                         key={star}
                                         onClick={() => setRating(star)}
+                                        aria-label={`Rate ${star} out of 5 stars`}
+                                        aria-pressed={rating === star}
                                         className="p-1 hover:scale-125 transition-transform"
                                     >
                                         <Star

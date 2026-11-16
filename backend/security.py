@@ -74,18 +74,31 @@ class RateLimiter:
             for ip in expired_locks:
                 del self.lockouts[ip]
 
+    def _is_ip_in_network(self, ip_str: str, net_or_ip_str: str) -> bool:
+        """
+        Safely checks if an IP matches a CIDR range or exact IP address (supporting IPv4 and IPv6).
+        """
+        import ipaddress
+        try:
+            ip_obj = ipaddress.ip_address(ip_str.strip())
+            net_str = net_or_ip_str.strip()
+            if "/" in net_str:
+                net_obj = ipaddress.ip_network(net_str, strict=False)
+                return ip_obj in net_obj
+            else:
+                return ip_obj == ipaddress.ip_address(net_str)
+        except Exception:
+            return False
+
     def _get_client_ip(self, request: Request) -> str:
         immediate_host = request.client.host if request.client else "unknown"
         trust_proxy = os.getenv("TRUST_PROXY", "false").lower() == "true"
         
-        # Verify that immediate connecting client is in trusted proxy list or private/loopback network
+        # Verify that immediate connecting client is in trusted proxy list or CIDR networks
         trusted_proxies_cfg = os.getenv("TRUSTED_PROXIES", "127.0.0.1,::1")
-        trusted_proxy_set = {p.strip() for p in trusted_proxies_cfg.split(",") if p.strip()}
+        trusted_proxy_list = [p.strip() for p in trusted_proxies_cfg.split(",") if p.strip()]
         
-        is_trusted_peer = (
-            immediate_host in trusted_proxy_set or
-            immediate_host in ("127.0.0.1", "::1", "localhost")
-        )
+        is_trusted_peer = any(self._is_ip_in_network(immediate_host, net) for net in trusted_proxy_list) or immediate_host in ("127.0.0.1", "::1", "localhost")
         if trust_proxy and is_trusted_peer:
             forwarded = request.headers.get("X-Forwarded-For")
             if forwarded:
@@ -93,7 +106,7 @@ class RateLimiter:
                 # Traverse right-to-left: the client IP is the first non-trusted hop.
                 # Stop at the rightmost untrusted hop to prevent header spoofing.
                 for candidate in reversed(ips):
-                    if candidate in trusted_proxy_set or candidate in ("127.0.0.1", "::1", "localhost"):
+                    if any(self._is_ip_in_network(candidate, net) for net in trusted_proxy_list) or candidate in ("127.0.0.1", "::1", "localhost"):
                         continue
                     try:
                         import ipaddress
@@ -130,8 +143,8 @@ class RateLimiter:
             self._clean_old_requests(key, window_seconds, current_time)
 
             if len(self.history.get(key, [])) >= max_requests:
-                # If auth abuse, trigger a 60 second cooling-off lockout
-                if category == "auth":
+                # If auth abuse, trigger a 60 second cooling-off lockout ONLY if not already locked out
+                if category == "auth" and client_ip not in self.lockouts:
                     self.lockouts[client_ip] = current_time + 60
 
                 raise HTTPException(
@@ -162,6 +175,8 @@ class RateLimiter:
             key = f"auth_fail:{client_ip}"
             if key in self.history:
                 del self.history[key]
+            if client_ip in self.lockouts:
+                del self.lockouts[client_ip]
 
 
 # Global rate limiter instance

@@ -51,6 +51,8 @@ export default function CanvasStudio() {
     fetchInitialCanvas();
     fetchMcpConfig();
     return () => {
+      requestGenRef.current += 1;
+      mcpRequestGenRef.current += 1;
       if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
       if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
     };
@@ -318,15 +320,29 @@ export default function CanvasStudio() {
 
   // Adaptive geometry calculation for edges based on relative node positioning
   const getEdgeGeometry = (srcNode, tgtNode) => {
-    const srcW = Number(srcNode.width) || 190;
-    const srcH = Number(srcNode.height) || 70;
-    const tgtW = Number(tgtNode.width) || 190;
-    const tgtH = Number(tgtNode.height) || 70;
+    const rawSrcW = Number(srcNode?.width);
+    const rawSrcH = Number(srcNode?.height);
+    const rawTgtW = Number(tgtNode?.width);
+    const rawTgtH = Number(tgtNode?.height);
+    const rawSrcX = Number(srcNode?.x);
+    const rawSrcY = Number(srcNode?.y);
+    const rawTgtX = Number(tgtNode?.x);
+    const rawTgtY = Number(tgtNode?.y);
 
-    const srcCenterX = srcNode.x + srcW / 2;
-    const srcCenterY = srcNode.y + srcH / 2;
-    const tgtCenterX = tgtNode.x + tgtW / 2;
-    const tgtCenterY = tgtNode.y + tgtH / 2;
+    const srcW = Number.isFinite(rawSrcW) && rawSrcW > 0 ? rawSrcW : 190;
+    const srcH = Number.isFinite(rawSrcH) && rawSrcH > 0 ? rawSrcH : 70;
+    const tgtW = Number.isFinite(rawTgtW) && rawTgtW > 0 ? rawTgtW : 190;
+    const tgtH = Number.isFinite(rawTgtH) && rawTgtH > 0 ? rawTgtH : 70;
+
+    const srcX = Number.isFinite(rawSrcX) ? rawSrcX : 0;
+    const srcY = Number.isFinite(rawSrcY) ? rawSrcY : 0;
+    const tgtX = Number.isFinite(rawTgtX) ? rawTgtX : 0;
+    const tgtY = Number.isFinite(rawTgtY) ? rawTgtY : 0;
+
+    const srcCenterX = srcX + srcW / 2;
+    const srcCenterY = srcY + srcH / 2;
+    const tgtCenterX = tgtX + tgtW / 2;
+    const tgtCenterY = tgtY + tgtH / 2;
 
     const diffX = tgtCenterX - srcCenterX;
     const diffY = tgtCenterY - srcCenterY;
@@ -335,14 +351,14 @@ export default function CanvasStudio() {
 
     if (Math.abs(diffX) >= Math.abs(diffY)) {
       if (diffX >= 0) {
-        x1 = srcNode.x + srcW;
+        x1 = srcX + srcW;
         y1 = srcCenterY;
-        x2 = tgtNode.x;
+        x2 = tgtX;
         y2 = tgtCenterY;
       } else {
-        x1 = srcNode.x;
+        x1 = srcX;
         y1 = srcCenterY;
-        x2 = tgtNode.x + tgtW;
+        x2 = tgtX + tgtW;
         y2 = tgtCenterY;
       }
       const dx = Math.max(Math.abs(x2 - x1) * 0.5, 30);
@@ -350,14 +366,14 @@ export default function CanvasStudio() {
     } else {
       if (diffY >= 0) {
         x1 = srcCenterX;
-        y1 = srcNode.y + srcH;
+        y1 = srcY + srcH;
         x2 = tgtCenterX;
-        y2 = tgtNode.y;
+        y2 = tgtY;
       } else {
         x1 = srcCenterX;
-        y1 = srcNode.y;
+        y1 = srcY;
         x2 = tgtCenterX;
-        y2 = tgtNode.y + tgtH;
+        y2 = tgtY + tgtH;
       }
       const dy = Math.max(Math.abs(y2 - y1) * 0.5, 30);
       pathD = `M ${x1} ${y1} C ${x1} ${y1 + (diffY >= 0 ? dy : -dy)}, ${x2} ${y2 + (diffY >= 0 ? -dy : dy)}, ${x2} ${y2}`;
@@ -821,11 +837,22 @@ export default function CanvasStudio() {
             </div>
 
             <div className="space-y-4 text-xs">
+              {mcpConfigError && (
+                <div className="p-3 rounded-xl bg-rose-950/60 border border-rose-800 text-rose-300 font-mono text-[11px] flex items-center justify-between">
+                  <span>⚠️ {mcpConfigError}</span>
+                  <button 
+                    onClick={fetchMcpConfig} 
+                    className="px-2 py-0.5 rounded bg-rose-900/60 hover:bg-rose-800 text-rose-200 text-[10px]"
+                  >
+                    Retry
+                  </button>
+                </div>
+              )}
               <div className="p-3 rounded-xl bg-slate-900/80 border border-white/10">
                 <div className="flex items-center justify-between text-slate-300 font-medium mb-1">
                   <span>Connection Status</span>
-                  <span className={`${mcpConfig?.server_status === 'offline' ? 'text-amber-400' : 'text-emerald-400'} font-mono`}>
-                    ● {mcpConfig?.server_status === 'offline' ? 'Offline' : (mcpConfig ? 'Connected & Ready' : 'Connecting...')}
+                  <span className={`${mcpConfigError ? 'text-rose-400' : mcpConfig?.server_status === 'offline' ? 'text-amber-400' : 'text-emerald-400'} font-mono`}>
+                    ● {mcpConfigError ? 'Connection Error' : mcpConfig?.server_status === 'offline' ? 'Offline' : (mcpConfig ? 'Connected & Ready' : (mcpConfigLoading ? 'Connecting...' : 'Ready'))}
                   </span>
                 </div>
                 <div className="text-slate-400 text-[11px]">

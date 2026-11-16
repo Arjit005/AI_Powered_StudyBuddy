@@ -126,6 +126,8 @@ export default function Library() {
     try {
       const res = await fetch(`/api/library/${id}`, { method: 'DELETE', headers: getAuthHeaders() });
       if (res.ok) {
+        // Invalidate any in-flight background fetches so stale results don't restore deleted items
+        requestGenRef.current += 1;
         setItems(prev => prev.filter(item => item.id !== id));
         if (selectedItem?.id === id) {
           detailRequestGenRef.current += 1;
@@ -366,9 +368,32 @@ export default function Library() {
               </div>
             ) : (
               <div className="flex-1 overflow-y-auto p-4 rounded-2xl bg-slate-900/60 border border-white/5 text-sm text-slate-300 leading-relaxed font-mono whitespace-pre-wrap">
-                {typeof selectedItem.content_json === 'object' 
-                  ? JSON.stringify(selectedItem.content_json, null, 2) 
-                  : (selectedItem.content_json || 'No content available.')}
+                {(() => {
+                  const content = selectedItem.content_json;
+                  if (content === null || content === undefined) {
+                    return 'No content available.';
+                  }
+                  if (typeof content === 'object') {
+                    try {
+                      return JSON.stringify(content, null, 2);
+                    } catch (_) {
+                      return String(content);
+                    }
+                  }
+                  if (typeof content === 'string') {
+                    const trimmed = content.trim();
+                    if ((trimmed.startsWith('{') && trimmed.endsWith('}')) || (trimmed.startsWith('[') && trimmed.endsWith(']'))) {
+                      try {
+                        const parsed = JSON.parse(trimmed);
+                        return JSON.stringify(parsed, null, 2);
+                      } catch (_) {
+                        return content;
+                      }
+                    }
+                    return content || 'No content available.';
+                  }
+                  return String(content);
+                })()}
               </div>
             )}
 

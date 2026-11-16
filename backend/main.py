@@ -365,14 +365,21 @@ except Exception as fb_err:
 
 def _verify_google_token(id_token_str: str, project_id: str) -> dict:
     """
-    Verifies Firebase / Google OAuth ID tokens using multi-tier fallback:
-    1. Public x509 cert validation via google.oauth2.id_token.verify_firebase_token (zero credentials/ADC required).
+    Verifies Firebase / Google OAuth ID tokens with strict audience validation:
+    1. Public x509 cert validation via google.oauth2.id_token.verify_firebase_token.
     2. Firebase Admin SDK verify_id_token if initialized with service account.
-    3. Standard Google OAuth2 token verification.
+    3. Standard Google OAuth2 token verification validating explicit client ID audience.
     """
     from google.oauth2 import id_token as google_id_token
     from google.auth.transport import requests as google_requests
     http_req = google_requests.Request()
+
+    allowed_audiences = []
+    configured_client_id = os.getenv("GOOGLE_CLIENT_ID")
+    if configured_client_id and configured_client_id.strip():
+        allowed_audiences.append(configured_client_id.strip())
+    if project_id and project_id.strip():
+        allowed_audiences.append(project_id.strip())
 
     # Tier 1: Public key cert verification against Firebase project audience
     try:
@@ -387,12 +394,20 @@ def _verify_google_token(id_token_str: str, project_id: str) -> dict:
         except Exception as fb_err:
             print(f"fb_auth.verify_id_token note: {fb_err}")
 
-    # Tier 3: Standard Google OAuth2 verification
-    try:
-        return google_id_token.verify_oauth2_token(id_token_str, http_req)
-    except Exception as vo_err:
-        print(f"verify_oauth2_token note: {vo_err}")
-        raise ValueError(f"Google ID token signature verification failed: {vo_err}")
+    # Tier 3: Standard Google OAuth2 verification with strict audience checking
+    # Never accept arbitrary audiences without checking against configured client IDs.
+    if not allowed_audiences:
+        raise ValueError("Google OAuth configuration error: GOOGLE_CLIENT_ID or FIREBASE_PROJECT_ID required.")
+
+    last_err = None
+    for aud in allowed_audiences:
+        try:
+            return google_id_token.verify_oauth2_token(id_token_str, http_req, audience=aud)
+        except Exception as vo_err:
+            last_err = vo_err
+
+    print(f"verify_oauth2_token note: {last_err}")
+    raise ValueError(f"Google ID token verification failed (unmatched audience): {last_err}")
 
 @app.post("/api/auth/google", response_model=AuthResponse, tags=["Authentication"])
 def google_login(req: GoogleLoginRequest, request: Request, db: Session = Depends(get_db)):
@@ -603,11 +618,13 @@ def delete_source(
         raise HTTPException(status_code=404, detail="Source not found or unauthorized.")
     
     user_id = source.user_id
-    # Clean up Pinecone vectors for this source
-    try:
-        rag_service.RAGService.delete_source_vectors(source_id=source_id, user_id=user_id)
-    except Exception as e:
-        print(f"Warning: Failed to delete Pinecone vectors for source {source_id}: {e}")
+    # Clean up Pinecone vectors for this source before deleting SQL records
+    vector_delete_ok = rag_service.RAGService.delete_source_vectors(source_id=source_id, user_id=user_id)
+    if not vector_delete_ok and os.getenv("PINECONE_API"):
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to clean up remote vector embeddings. Source deletion aborted to maintain data consistency."
+        )
 
     db.delete(source)
     db.commit()
@@ -807,10 +824,17 @@ def chat_endpoint(
         conv.title = clean_message[:35] + ("..." if len(clean_message) > 35 else "")
 
     # 6. Check if user has source corpus and retrieve relevant chunks
-    sources_query = db.query(models.Source)
+    # For authenticated users: their own private sources + global/system sources (user_id IS NULL)
+    # For anonymous requests: strictly NO private sources (never query when user_id is None unless public-only)
     if user_id:
-        sources_query = sources_query.filter((models.Source.user_id == user_id) | (models.Source.user_id.is_(None)))
-    has_sources = sources_query.count() > 0
+        sources_query = db.query(models.Source).filter(
+            (models.Source.user_id == user_id) | (models.Source.user_id.is_(None))
+        )
+        has_sources = sources_query.count() > 0
+    else:
+        # Anonymous users: never access any user-owned source. Only explicitly unowned public docs if any.
+        sources_query = db.query(models.Source).filter(models.Source.user_id.is_(None))
+        has_sources = sources_query.count() > 0
 
     citations_list = []
     sources_context_block = ""
@@ -863,13 +887,15 @@ def chat_endpoint(
             ai_response = ai_service.AIService.generate_hybrid_response(
                 prompt=grounded_prompt,
                 recent_turns=chat_history_buffer,
-                long_term_summary=conv.long_term_summary
+                long_term_summary=conv.long_term_summary,
+                user_id=user_id
             )
     else:
         ai_response = ai_service.AIService.generate_hybrid_response(
             prompt=clean_message,
             recent_turns=chat_history_buffer,
-            long_term_summary=conv.long_term_summary
+            long_term_summary=conv.long_term_summary,
+            user_id=user_id
         )
 
     # 9. Persist User Message & AI Message with Citations JSON
@@ -951,9 +977,13 @@ def chat_with_ai_stream(
     conv_id = conv.id
 
     # Check RAG sources
-    sources_query = db.query(models.Source)
+    # Anonymous users cannot access any private tenant sources
     if user_id:
-        sources_query = sources_query.filter((models.Source.user_id == user_id) | (models.Source.user_id.is_(None)))
+        sources_query = db.query(models.Source).filter(
+            (models.Source.user_id == user_id) | (models.Source.user_id.is_(None))
+        )
+    else:
+        sources_query = db.query(models.Source).filter(models.Source.user_id.is_(None))
     has_sources = sources_query.count() > 0
 
     sources_context_block = ""
@@ -1197,8 +1227,15 @@ def map_endpoint(req: MapRequest, request: Request):
     clean_topic = security.InputSanitizer.validate_topic(req.topic, max_length=250)
 
     structure_data = ai_service.AIService.generate_concept_map_data(clean_topic)
-    image_base64 = maps.generate_network_graph(structure_data)
-    return {"map_image": image_base64}
+    map_result = maps.generate_network_graph(structure_data)
+    if isinstance(map_result, dict):
+        if not map_result.get("success", False):
+            raise HTTPException(status_code=500, detail=map_result.get("error") or "Failed to render concept map.")
+        return {"map_image": map_result.get("map_image", "")}
+    # Backward compatibility in case raw base64 string is returned
+    if not map_result:
+        raise HTTPException(status_code=500, detail="Failed to render concept map.")
+    return {"map_image": map_result}
 
 @app.post("/api/generate-diagram", response_model=DiagramResponse, tags=["AI Learning"])
 def diagram_endpoint(req: DiagramRequest, request: Request):

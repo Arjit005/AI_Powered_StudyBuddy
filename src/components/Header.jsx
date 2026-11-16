@@ -30,8 +30,19 @@ const Header = () => {
     useEffect(() => {
         const syncUser = () => {
             try {
+                const token = localStorage.getItem('auth_token');
+                const isAuth = localStorage.getItem('isAuthenticated') === 'true';
                 const rawUser = localStorage.getItem('user');
-                setUser(rawUser ? JSON.parse(rawUser) : null);
+                
+                // Only treat user as logged in if valid auth_token and isAuth flag exist
+                if (token && isAuth && rawUser) {
+                    const parsed = JSON.parse(rawUser);
+                    if (parsed && typeof parsed === 'object') {
+                        setUser(parsed);
+                        return;
+                    }
+                }
+                setUser(null);
             } catch (e) {
                 console.error(e);
                 setUser(null);
@@ -49,12 +60,22 @@ const Header = () => {
                 setWorkspaceOpen(false);
             }
         };
-        document.addEventListener('mousedown', handleClickOutside);
+
+        const handleKeyDown = (e) => {
+            if (e.key === 'Escape') {
+                setToolsOpen(false);
+                setWorkspaceOpen(false);
+            }
+        };
+
+        document.addEventListener('pointerdown', handleClickOutside);
+        document.addEventListener('keydown', handleKeyDown);
 
         return () => {
             window.removeEventListener('storage', syncUser);
             window.removeEventListener('auth-change', syncUser);
-            document.removeEventListener('mousedown', handleClickOutside);
+            document.removeEventListener('pointerdown', handleClickOutside);
+            document.removeEventListener('keydown', handleKeyDown);
         };
     }, []);
 
@@ -126,6 +147,8 @@ const Header = () => {
                                         setToolsOpen(!toolsOpen);
                                         setWorkspaceOpen(false);
                                     }}
+                                    aria-expanded={toolsOpen}
+                                    aria-haspopup="true"
                                     className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all ${
                                         isToolsActive || toolsOpen
                                             ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 font-semibold'
@@ -138,7 +161,7 @@ const Header = () => {
                                 </button>
 
                                 {toolsOpen && (
-                                    <div className="absolute top-11 left-0 w-64 p-2 bg-[#0e1626] border border-emerald-500/20 rounded-2xl shadow-2xl z-50 backdrop-blur-xl animate-in fade-in zoom-in-95 duration-150">
+                                    <div className="absolute top-11 left-0 w-64 p-2 bg-[#0e1626] border border-emerald-500/20 rounded-2xl shadow-2xl z-50 backdrop-blur-xl animate-in fade-in zoom-in-95 duration-150" role="menu">
                                         <div className="px-3 py-1.5 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
                                             Practice & Memorize
                                         </div>
@@ -150,6 +173,7 @@ const Header = () => {
                                                     <Link
                                                         key={tool.path}
                                                         to={tool.path}
+                                                        role="menuitem"
                                                         className={`flex items-start gap-3 p-2 rounded-xl transition-all ${
                                                             active 
                                                                 ? 'bg-emerald-500/20 text-emerald-300' 
@@ -178,6 +202,8 @@ const Header = () => {
                                         setWorkspaceOpen(!workspaceOpen);
                                         setToolsOpen(false);
                                     }}
+                                    aria-expanded={workspaceOpen}
+                                    aria-haspopup="true"
                                     className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all ${
                                         isWorkspaceActive || workspaceOpen
                                             ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 font-semibold'
@@ -190,7 +216,7 @@ const Header = () => {
                                 </button>
 
                                 {workspaceOpen && (
-                                    <div className="absolute top-11 left-0 w-64 p-2 bg-[#0e1626] border border-emerald-500/20 rounded-2xl shadow-2xl z-50 backdrop-blur-xl animate-in fade-in zoom-in-95 duration-150">
+                                    <div className="absolute top-11 left-0 w-64 p-2 bg-[#0e1626] border border-emerald-500/20 rounded-2xl shadow-2xl z-50 backdrop-blur-xl animate-in fade-in zoom-in-95 duration-150" role="menu">
                                         <div className="px-3 py-1.5 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
                                             Content & Notes
                                         </div>
