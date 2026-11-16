@@ -44,7 +44,11 @@ const SignupPage = () => {
             navigate('/');
         } catch (err) {
             console.error("Google auth error:", err);
-            setError(err.message || 'Google sign-up encountered an error.');
+            if (err.code === 'auth/unauthorized-domain' || err.message?.includes('unauthorized-domain')) {
+                setError(`Domain Authorization Required: Please add '${window.location.hostname}' to Authorized Domains in Firebase Console (Authentication > Settings > Authorized domains). Or use the Email & Password form below to sign up immediately.`);
+            } else {
+                setError(err.message || 'Google sign-up encountered an error.');
+            }
         } finally {
             setIsGoogleLoading(false);
         }
