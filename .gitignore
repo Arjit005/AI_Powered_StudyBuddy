@@ -39,6 +39,23 @@ dist/
 build/
 *.log
 
+# Databases & Local Storage
+*.db
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+
+# Testing & Evals
+.pytest_cache/
+.deepeval/
+.coverage
+htmlcov/
+
+# Local Tooling & IDE Plugins
+.claude/
+.kombai/
+
 # Temporary debug scripts (scoped to root)
 /debug_*.py
 /verify_*.py
