@@ -126,9 +126,14 @@ const ChatInterface = () => {
     useEffect(() => {
         if (activeConvId) {
             fetchChatHistory(activeConvId);
-        } else if (conversations.length === 0) {
-            // Check if there are default chats
-            fetchChatHistory(null);
+        } else {
+            historyRequestGenRef.current++;
+            setLoadingHistory(false);
+            if (conversations.length === 0) {
+                fetchChatHistory(null);
+            } else {
+                setMessages([DEFAULT_GREETING]);
+            }
         }
     }, [activeConvId]);
 

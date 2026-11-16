@@ -40,10 +40,9 @@ const FlipCard3D = ({
 
     return (
         <div
-            role="button"
+            role="region"
             tabIndex={0}
-            aria-label={isFlipped ? "Flip card to view question" : "Flip card to reveal answer"}
-            aria-pressed={isFlipped}
+            aria-label={isFlipped ? "Flashcard showing answer" : "Flashcard showing question"}
             className="w-full max-w-xl mx-auto min-h-[21rem] h-[21rem] cursor-pointer select-none focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 rounded-3xl"
             style={{ perspective: '1200px' }}
             onMouseMove={handleMouseMove}
@@ -74,6 +73,7 @@ const FlipCard3D = ({
             >
                 {/* ================= FRONT FACE (Prompt) ================= */}
                 <div
+                    aria-hidden={isFlipped}
                     className="absolute inset-0 w-full h-full rounded-3xl p-8 flex flex-col justify-between bg-gradient-to-br from-slate-900/90 via-slate-900/70 to-slate-950/90 border border-slate-800/80 shadow-[0_10px_35px_rgba(0,0,0,0.5)] backdrop-blur-2xl transition-all"
                     style={{
                         backfaceVisibility: 'hidden',
@@ -97,6 +97,7 @@ const FlipCard3D = ({
                                 </span>
                             )}
                             <button
+                                tabIndex={isFlipped ? -1 : 0}
                                 onClick={(e) => {
                                     e.stopPropagation();
                                     onReadCard?.();
@@ -134,6 +135,7 @@ const FlipCard3D = ({
 
                 {/* ================= BACK FACE (Answer) ================= */}
                 <div
+                    aria-hidden={!isFlipped}
                     className="absolute inset-0 w-full h-full rounded-3xl p-8 flex flex-col justify-between bg-gradient-to-br from-slate-900/95 via-slate-950/80 to-emerald-950/20 border border-emerald-500/40 shadow-[0_10px_40px_rgba(16,185,129,0.15)] backdrop-blur-2xl transition-all"
                     style={{
                         backfaceVisibility: 'hidden',
@@ -152,6 +154,7 @@ const FlipCard3D = ({
                         </span>
 
                         <button
+                            tabIndex={!isFlipped ? -1 : 0}
                             onClick={(e) => {
                                 e.stopPropagation();
                                 onReadCard?.();

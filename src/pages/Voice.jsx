@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Mic, MicOff, Volume2, VolumeX, Sparkles, Send, Bot, RotateCcw, AlertCircle, Headphones } from 'lucide-react';
+import { Mic, MicOff, Volume2, VolumeX, Sparkles, Bot, RotateCcw, AlertCircle, Headphones } from 'lucide-react';
 import SpotlightCard from '../components/ui/SpotlightCard';
 
 const Voice = () => {
@@ -11,7 +11,6 @@ const Voice = () => {
     const [browserSupported, setBrowserSupported] = useState(true);
     const [error, setError] = useState(null);
     const recognitionRef = useRef(null);
-    const recognitionSessionRef = useRef(0);
     const isMountedRef = useRef(true);
 
     useEffect(() => {
@@ -73,13 +72,11 @@ const Voice = () => {
         if (!browserSupported) return;
 
         if (isListening) {
-            recognitionSessionRef.current += 1;
             recognitionRef.current?.stop();
             setIsListening(false);
         } else {
             setTranscript('');
             try {
-                const thisSession = ++recognitionSessionRef.current;
                 recognitionRef.current?.start();
                 setIsListening(true);
             } catch (err) {

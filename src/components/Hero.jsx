@@ -70,10 +70,13 @@ const Hero = () => {
                             </div>
 
                             {/* Live Demo Tabs */}
-                            <div className="flex flex-wrap items-center gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800" role="group" aria-label="Feature showcase tabs">
+                            <div className="flex flex-wrap items-center gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800" role="tablist" aria-label="Feature showcase tabs">
                                 <button
                                     type="button"
-                                    aria-pressed={activeTab === 'chat'}
+                                    role="tab"
+                                    id="tab-chat"
+                                    aria-selected={activeTab === 'chat'}
+                                    aria-controls="panel-chat"
                                     onClick={() => setActiveTab('chat')}
                                     className={`px-3 py-1 rounded-lg text-xs font-mono transition-all flex items-center gap-1.5 ${
                                         activeTab === 'chat' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'text-slate-400 hover:text-white'
@@ -84,7 +87,10 @@ const Hero = () => {
                                 </button>
                                 <button
                                     type="button"
-                                    aria-pressed={activeTab === 'flashcards'}
+                                    role="tab"
+                                    id="tab-flashcards"
+                                    aria-selected={activeTab === 'flashcards'}
+                                    aria-controls="panel-flashcards"
                                     onClick={() => setActiveTab('flashcards')}
                                     className={`px-3 py-1 rounded-lg text-xs font-mono transition-all flex items-center gap-1.5 ${
                                         activeTab === 'flashcards' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'text-slate-400 hover:text-white'
@@ -95,7 +101,10 @@ const Hero = () => {
                                 </button>
                                 <button
                                     type="button"
-                                    aria-pressed={activeTab === 'maps'}
+                                    role="tab"
+                                    id="tab-maps"
+                                    aria-selected={activeTab === 'maps'}
+                                    aria-controls="panel-maps"
                                     onClick={() => setActiveTab('maps')}
                                     className={`px-3 py-1 rounded-lg text-xs font-mono transition-all flex items-center gap-1.5 ${
                                         activeTab === 'maps' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'text-slate-400 hover:text-white'
@@ -110,7 +119,7 @@ const Hero = () => {
                         {/* Window Body */}
                         <div className="p-6 font-mono text-xs sm:text-sm">
                             {activeTab === 'chat' && (
-                                <div className="space-y-4">
+                                <div role="tabpanel" id="panel-chat" aria-labelledby="tab-chat" className="space-y-4">
                                     <div className="flex items-start gap-3">
                                         <span className="text-emerald-400 font-bold">Student:</span>
                                         <span className="text-slate-300">How does Photosynthesis work in plants?</span>
@@ -137,7 +146,7 @@ const Hero = () => {
                             )}
 
                             {activeTab === 'flashcards' && (
-                                <div className="p-6 rounded-2xl bg-slate-950 border border-emerald-500/30 text-center space-y-3">
+                                <div role="tabpanel" id="panel-flashcards" aria-labelledby="tab-flashcards" className="p-6 rounded-2xl bg-slate-950 border border-emerald-500/30 text-center space-y-3">
                                     <span className="px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-400 text-xs font-mono font-semibold border border-emerald-500/20">
                                         Active Card 1 of 12 • Biology Deck
                                     </span>
@@ -156,7 +165,7 @@ const Hero = () => {
                             )}
 
                             {activeTab === 'maps' && (
-                                <div className="p-6 rounded-2xl bg-slate-950 border border-slate-800 text-slate-300 space-y-2">
+                                <div role="tabpanel" id="panel-maps" aria-labelledby="tab-maps" className="p-6 rounded-2xl bg-slate-950 border border-slate-800 text-slate-300 space-y-2">
                                     <div className="flex items-center justify-between text-xs text-slate-400 mb-2">
                                         <span>Concept Map: Cell Biology Hierarchy</span>
                                         <span className="text-teal-400">Interactive Concept Flow</span>

@@ -155,8 +155,10 @@ const Sources = () => {
             if (res.ok) {
                 setSources(current => current.filter(s => s.id !== id));
                 if (selectedSource?.id === id) {
+                    guideRequestGenRef.current += 1;
                     setSelectedSource(null);
                     setSourceGuide(null);
+                    setLoadingGuide(false);
                 }
             } else {
                 alert("Failed to delete source.");
@@ -369,7 +371,7 @@ const Sources = () => {
                                 <input
                                     ref={fileInputRef}
                                     type="file"
-                                    accept=".pdf,.txt,.md"
+                                    accept=".pdf"
                                     onChange={(e) => setSelectedFile(e.target.files[0])}
                                     className="w-full px-4 py-3 rounded-xl bg-slate-900/90 border border-slate-800 text-slate-300 text-xs file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-emerald-500 file:text-slate-950 hover:file:bg-emerald-400 cursor-pointer"
                                 />
@@ -441,7 +443,12 @@ const Sources = () => {
                 <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 z-50 animate-in fade-in duration-200">
                     <div className="glass-panel w-full max-w-3xl max-h-[90vh] overflow-y-auto p-8 rounded-3xl border border-emerald-500/40 shadow-2xl relative">
                         <button
-                            onClick={() => { setSelectedSource(null); setSourceGuide(null); }}
+                            onClick={() => {
+                                guideRequestGenRef.current += 1;
+                                setSelectedSource(null);
+                                setSourceGuide(null);
+                                setLoadingGuide(false);
+                            }}
                             className="absolute top-6 right-6 p-2 rounded-full bg-slate-900 text-slate-400 hover:text-white border border-slate-800"
                         >
                             ✕

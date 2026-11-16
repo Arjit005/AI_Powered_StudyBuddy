@@ -1,6 +1,9 @@
 import os
+import logging
 import jwt
 import bcrypt
+
+logger = logging.getLogger(__name__)
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 from fastapi import Depends, HTTPException, status
@@ -57,7 +60,10 @@ def decode_access_token(token: str) -> Optional[dict]:
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         return payload
-    except Exception:
+    except jwt.PyJWTError:
+        return None
+    except Exception as e:
+        logger.warning(f"Unexpected error decoding access token: {e}")
         return None
 
 def get_current_user_optional(

@@ -143,6 +143,7 @@ class RAGService:
                     current_url,
                     timeout=10,
                     allow_redirects=False,
+                    stream=True,
                     headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AIStudyBuddy/1.0"}
                 )
                 if resp.is_redirect or resp.status_code in (301, 302, 303, 307, 308):
@@ -157,7 +158,17 @@ class RAGService:
                 return ""
 
         if resp and resp.status_code == 200:
-            html_text = resp.text
+            content_chunks = []
+            total_bytes = 0
+            MAX_BYTES = 2 * 1024 * 1024  # 2MB cap to prevent memory exhaustion
+            for chunk in resp.iter_content(chunk_size=16384):
+                if chunk:
+                    content_chunks.append(chunk)
+                    total_bytes += len(chunk)
+                    if total_bytes >= MAX_BYTES:
+                        break
+            encoding = resp.encoding or 'utf-8'
+            html_text = b"".join(content_chunks).decode(encoding, errors="replace")
             if trafilatura:
                 try:
                     extracted = trafilatura.extract(html_text)

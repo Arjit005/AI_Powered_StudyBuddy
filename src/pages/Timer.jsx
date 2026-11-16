@@ -35,7 +35,10 @@ const StudyTimer = () => {
 
                 const duration = mode === 'focus' ? FOCUS_DURATION_SECONDS : BREAK_DURATION_SECONDS;
                 if (mode === 'focus' && remaining <= 0) {
-                    const token = localStorage.getItem('auth_token');
+                    let token = null;
+                    try {
+                        token = localStorage.getItem('auth_token');
+                    } catch (_) {}
                     const headers = { 'Content-Type': 'application/json' };
                     if (token) headers['Authorization'] = `Bearer ${token}`;
 
@@ -66,6 +69,11 @@ const StudyTimer = () => {
             targetEndTimeRef.current = Date.now() + timeLeft * 1000;
             setIsActive(true);
         } else {
+            if (targetEndTimeRef.current) {
+                const now = Date.now();
+                const remaining = Math.max(0, Math.round((targetEndTimeRef.current - now) / 1000));
+                setTimeLeft(remaining);
+            }
             targetEndTimeRef.current = null;
             setIsActive(false);
         }

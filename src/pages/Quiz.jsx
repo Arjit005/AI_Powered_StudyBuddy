@@ -47,9 +47,10 @@ const Quiz = () => {
                     const rawAnswer = String(q.correct_answer || q.answer || '').trim();
                     if (!rawAnswer) return null;
                     const normalizedOptions = q.options.map(opt => String(opt).trim());
-                    // Find option matching rawAnswer strictly (exact or case-insensitive)
-                    const matchingOption = normalizedOptions.find(opt => opt.toLowerCase() === rawAnswer.toLowerCase())
-                        || (rawAnswer.length >= 3 && normalizedOptions.find(opt => opt.length >= 3 && (rawAnswer.toLowerCase().includes(opt.toLowerCase()) || opt.toLowerCase().includes(rawAnswer.toLowerCase()))));
+                    // Reject questions with duplicate options
+                    if (new Set(normalizedOptions).size !== normalizedOptions.length) return null;
+                    // Find option matching rawAnswer strictly (exact match case-insensitively)
+                    const matchingOption = normalizedOptions.find(opt => opt.toLowerCase() === rawAnswer.toLowerCase());
                     if (!matchingOption) return null;
                     return {
                         ...q,
@@ -345,7 +346,8 @@ const Quiz = () => {
                                                 setAnswers({});
                                                 setSubmitted(false);
                                             }}
-                                            className="flex-1 sm:flex-initial px-6 py-2.5 rounded-xl font-mono text-xs bg-emerald-500/20 border border-emerald-500/40 hover:bg-emerald-500/30 text-emerald-300 transition-all text-center"
+                                            disabled={saving}
+                                            className="flex-1 sm:flex-initial px-6 py-2.5 rounded-xl font-mono text-xs bg-emerald-500/20 border border-emerald-500/40 hover:bg-emerald-500/30 text-emerald-300 transition-all text-center disabled:opacity-50"
                                         >
                                             Practice Another Topic
                                         </button>

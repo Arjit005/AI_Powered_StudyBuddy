@@ -134,11 +134,11 @@ const Progress = () => {
                 setHeatmapData(null);
                 fetchAnalytics();
             } else {
-                setLoading(false);
+                fetchAnalytics();
                 alert("Failed to reset progress on server.");
             }
         } catch (err) {
-            setLoading(false);
+            fetchAnalytics();
             console.error("Reset error:", err);
             alert("Network error resetting progress.");
         }

@@ -60,7 +60,9 @@ export default function Library() {
       if (res.ok) {
         const data = await res.json();
         if (thisGen !== requestGenRef.current) return;
-        const serverItems = Array.isArray(data) ? data : [];
+        const serverItems = Array.isArray(data) 
+          ? data.filter(item => item && typeof item === 'object' && item.id != null) 
+          : [];
         setItems(prev => {
           const currentFavMap = new Map(prev.map(p => [p.id, p.is_favorite]));
           return serverItems.map(item => {

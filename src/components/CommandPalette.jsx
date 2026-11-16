@@ -126,10 +126,11 @@ export default function CommandPalette({ isOpen, onClose }) {
     );
   }, [query]);
 
+  const activeIndex = Math.min(selectedIndex, Math.max(filtered.length - 1, 0));
   const filteredRef = useRef(filtered);
   filteredRef.current = filtered;
-  const selectedIndexRef = useRef(selectedIndex);
-  selectedIndexRef.current = selectedIndex;
+  const selectedIndexRef = useRef(activeIndex);
+  selectedIndexRef.current = activeIndex;
 
   useEffect(() => {
     setSelectedIndex(0);

@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Brain, Lock, User, Mail, ArrowRight, ShieldCheck, CheckCircle2, XCircle, Eye, EyeOff } from 'lucide-react';
+import { Brain, Lock, User, Mail, ArrowRight, CheckCircle2, XCircle, Eye, EyeOff } from 'lucide-react';
 import { signInWithGoogle } from '../firebase';
 
 const SignupPage = () => {
@@ -38,9 +38,17 @@ const SignupPage = () => {
             if (!data.access_token || !data.user) {
                 throw new Error('Account setup failed. Please try again.');
             }
-            localStorage.setItem('isAuthenticated', 'true');
-            localStorage.setItem('auth_token', data.access_token);
-            localStorage.setItem('user', JSON.stringify(data.user));
+            try {
+                localStorage.setItem('isAuthenticated', 'true');
+                localStorage.setItem('auth_token', data.access_token);
+                localStorage.setItem('user', JSON.stringify(data.user));
+            } catch (storageErr) {
+                console.warn("Storage write failed:", storageErr);
+                localStorage.removeItem('auth_token');
+                localStorage.removeItem('isAuthenticated');
+                localStorage.removeItem('user');
+                throw new Error("Unable to save login session. Please ensure local storage is enabled.");
+            }
             navigate('/');
         } catch (err) {
             console.error("Google auth error:", err);
@@ -139,9 +147,17 @@ const SignupPage = () => {
                 throw new Error('Account setup failed. Please try again.');
             }
 
-            localStorage.setItem('isAuthenticated', 'true');
-            localStorage.setItem('auth_token', data.access_token);
-            localStorage.setItem('user', JSON.stringify(data.user));
+            try {
+                localStorage.setItem('isAuthenticated', 'true');
+                localStorage.setItem('auth_token', data.access_token);
+                localStorage.setItem('user', JSON.stringify(data.user));
+            } catch (storageErr) {
+                console.warn("Storage write failed:", storageErr);
+                localStorage.removeItem('auth_token');
+                localStorage.removeItem('isAuthenticated');
+                localStorage.removeItem('user');
+                throw new Error("Unable to save login session. Please ensure local storage is enabled.");
+            }
 
             setIsSuccess(true);
             redirectTimerRef.current = setTimeout(() => {

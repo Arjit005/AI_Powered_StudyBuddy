@@ -57,7 +57,7 @@ class MCPService:
                         },
                         "diagram_type": {
                             "type": "string",
-                            "enum": ["flowchart", "sequence", "class", "state", "er"],
+                            "enum": ["flowchart", "sequence", "class", "state", "er", "gantt"],
                             "default": "flowchart"
                         }
                     },

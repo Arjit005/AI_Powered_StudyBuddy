@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Brain, LogOut, Shield, ShieldCheck, Activity, Terminal, ChevronDown, CheckCircle2, User as UserIcon, Search } from 'lucide-react';
+import { Brain, LogOut, Shield, ShieldCheck, Terminal, ChevronDown, CheckCircle2, Search } from 'lucide-react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 
 const Header = () => {

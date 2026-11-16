@@ -8,20 +8,11 @@ import {
   Download, 
   Copy, 
   Check, 
-  Plus, 
-  Trash2, 
   Save, 
-  Cpu, 
-  Share2, 
   Code, 
-  Layers, 
   Info,
-  Server,
-  Database,
-  Shield,
   Activity,
   Terminal,
-  ExternalLink,
   X
 } from 'lucide-react';
 import MermaidViewer from '../components/MermaidViewer';
@@ -95,6 +86,7 @@ export default function CanvasStudio() {
         });
       } else {
         const errData = await res.json().catch(() => ({}));
+        if (thisGen !== requestGenRef.current) return;
         setError(errData.detail || 'Could not initialize template architecture.');
       }
     } catch (err) {
@@ -152,6 +144,7 @@ export default function CanvasStudio() {
         setZoom(1);
       } else {
         const errData = await res.json().catch(() => ({}));
+        if (thisGen !== requestGenRef.current) return;
         setError(errData.detail || 'Diagram generation failed. Please try another prompt.');
       }
     } catch (err) {
@@ -196,10 +189,13 @@ export default function CanvasStudio() {
       const newX = Math.round(mouseX - dragOffset.x);
       const newY = Math.round(mouseY - dragOffset.y);
 
-      setCanvasData(prev => ({
-        ...prev,
-        nodes: prev.nodes.map(n => n.id === draggingNodeId ? { ...n, x: newX, y: newY } : n)
-      }));
+      setCanvasData(prev => {
+        if (!prev || !Array.isArray(prev.nodes)) return prev;
+        return {
+          ...prev,
+          nodes: prev.nodes.map(n => n.id === draggingNodeId ? { ...n, x: newX, y: newY } : n)
+        };
+      });
       setSelectedNode(prev => (prev && prev.id === draggingNodeId ? { ...prev, x: newX, y: newY } : prev));
     } else if (isPanning) {
       setPan({
