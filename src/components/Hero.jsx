@@ -61,7 +61,7 @@ const Hero = () => {
                 <div className="max-w-4xl mx-auto mb-16 rounded-3xl p-1 bg-gradient-to-b from-slate-700/40 via-slate-800/20 to-transparent shadow-[0_20px_50px_rgba(0,0,0,0.6)]">
                     <div className="rounded-[22px] bg-[#0A0D14] border border-slate-800/80 overflow-hidden text-left">
                         {/* Window Header */}
-                        <div className="px-4 py-3 bg-slate-900/80 border-b border-slate-800/80 flex items-center justify-between">
+                        <div className="px-4 py-3 bg-slate-900/80 border-b border-slate-800/80 flex flex-wrap items-center justify-between gap-2">
                             <div className="flex items-center gap-2">
                                 <div className="w-3 h-3 rounded-full bg-rose-500/80" />
                                 <div className="w-3 h-3 rounded-full bg-amber-500/80" />
@@ -70,7 +70,7 @@ const Hero = () => {
                             </div>
 
                             {/* Live Demo Tabs */}
-                            <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800" role="tablist" aria-label="Feature showcase tabs">
+                            <div className="flex flex-wrap items-center gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800" role="tablist" aria-label="Feature showcase tabs">
                                 <button
                                     role="tab"
                                     aria-selected={activeTab === 'chat'}
@@ -124,7 +124,7 @@ const Hero = () => {
                                             In <b>Write-Ahead Logging (WAL)</b> mode, SQLite decouples readers from writers:
                                         </p>
                                         <ul className="list-disc pl-4 space-y-1 text-slate-400">
-                                            <li><span className="text-white">Readers never block Writers</span> and <span className="text-white">Writers never block Readers</span>.</li>
+                                            <li>Readers and a writer can usually proceed concurrently, though checkpointing and database locking still apply.</li>
                                             <li>Changes append to a separate <code className="text-emerald-300 bg-slate-900 px-1 py-0.5 rounded">-wal</code> file instead of the primary database.</li>
                                             <li>However, SQLite still restricts to <span className="text-amber-400">at most ONE writer at a time</span> via a database-level lock.</li>
                                         </ul>

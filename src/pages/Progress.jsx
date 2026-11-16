@@ -34,6 +34,7 @@ const Progress = () => {
                 if (thisGen !== progressRequestGenRef.current) return;
                 setStats(data);
             } else {
+                setStats({ study_hours: 0, quizzes_taken: 0, streak_days: 0 });
                 hasErrors = true;
             }
 
@@ -241,11 +242,12 @@ const Progress = () => {
                             return (
                                 <div key={weekIdx} className="flex flex-col gap-1.5">
                                     {(weekDays.length > 0 ? weekDays : Array.from({ length: 7 })).map((day, dayIdx) => {
-                                        const rawIntensity = day ? day.intensity : 0;
+                                        const isDayObj = day && typeof day === 'object';
+                                        const rawIntensity = isDayObj ? day.intensity : 0;
                                         const intensity = Math.max(0, Math.min(4, Math.floor(rawIntensity || 0)));
-                                        const dateLabel = day ? day.date : `Day ${dayIdx}`;
-                                        const countLabel = day ? day.count : 0;
-                                        const durationLabel = day ? day.duration_minutes : 0;
+                                        const dateLabel = isDayObj ? day.date : `Day ${dayIdx}`;
+                                        const countLabel = isDayObj ? day.count : 0;
+                                        const durationLabel = isDayObj ? day.duration_minutes : 0;
 
                                         const colors = [
                                             'bg-slate-800/60 hover:bg-slate-700/80',

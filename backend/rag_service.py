@@ -496,14 +496,23 @@ class RAGService:
         except Exception as e:
             print(f"EmbeddingService Query Warning (falling back): {e}")
 
-        # 2. Try Pinecone Vector Retrieval first
+        # 2. Try Pinecone Vector Retrieval first (queries user + global shared corpus)
         if query_emb_1536:
-            pinecone_matches = RAGService._query_pinecone(
-                query_vec=query_emb_1536,
-                top_k=top_k,
-                namespace=namespace,
-                source_ids=source_ids
-            )
+            namespaces_to_query = [f"user_{user_id}", "global"] if user_id else ["global"]
+            all_matches = []
+            for ns in namespaces_to_query:
+                matches = RAGService._query_pinecone(
+                    query_vec=query_emb_1536,
+                    top_k=top_k,
+                    namespace=ns,
+                    source_ids=source_ids
+                )
+                if matches:
+                    all_matches.extend(matches)
+
+            all_matches.sort(key=lambda m: m.get("score", 0.0), reverse=True)
+            pinecone_matches = all_matches[:top_k]
+
             if pinecone_matches:
                 # Map vector IDs (src_{source_id}_chunk_{idx}) back to SourceChunk entities
                 scored_results = []

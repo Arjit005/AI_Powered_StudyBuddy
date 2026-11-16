@@ -211,6 +211,11 @@ export default function CommandPalette({ isOpen, onClose }) {
           <input
             ref={inputRef}
             type="text"
+            role="combobox"
+            aria-autocomplete="list"
+            aria-expanded={isOpen}
+            aria-controls="command-listbox"
+            aria-activedescendant={filtered[selectedIndex] ? `cmd-option-${filtered[selectedIndex].id}` : undefined}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Type a command, tool name, or search (e.g. Canvas, Quiz, MCP)..."
@@ -227,7 +232,7 @@ export default function CommandPalette({ isOpen, onClose }) {
         </div>
 
         {/* Results List */}
-        <div className="max-h-96 overflow-y-auto p-2 space-y-1" role="listbox" aria-label="Commands">
+        <div id="command-listbox" className="max-h-96 overflow-y-auto p-2 space-y-1" role="listbox" aria-label="Commands">
           {filtered.length === 0 ? (
             <div className="py-10 text-center text-slate-400 text-sm">
               No matching commands or tools found for "{query}".
@@ -239,16 +244,10 @@ export default function CommandPalette({ isOpen, onClose }) {
               return (
                 <div
                   key={cmd.id}
+                  id={`cmd-option-${cmd.id}`}
                   role="option"
                   aria-selected={isSelected}
-                  tabIndex={0}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.stopPropagation();
-                      cmd.action();
-                      onClose();
-                    }
-                  }}
+                  tabIndex={-1}
                   onClick={() => {
                     cmd.action();
                     onClose();

@@ -9,7 +9,9 @@ const StructuredMessage = ({ content }) => {
         try {
             await navigator.clipboard.writeText(codeText);
             setCopiedCodeIdx(idx);
-            setTimeout(() => setCopiedCodeIdx(null), 2000);
+            setTimeout(() => {
+                setCopiedCodeIdx(currentIdx => currentIdx === idx ? null : currentIdx);
+            }, 2000);
         } catch (err) {
             console.error("Clipboard write error:", err);
         }

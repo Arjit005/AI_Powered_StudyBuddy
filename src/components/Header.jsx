@@ -35,9 +35,11 @@ const Header = () => {
 
                 if (res.ok) {
                     const data = await res.json();
+                    if (!isMounted) return;
                     setSecurityData(data);
                     setApiLatency(`${duration}ms`);
                 } else {
+                    if (!isMounted) return;
                     setSecurityData(null);
                     setApiLatency('Unavailable');
                 }
@@ -161,7 +163,7 @@ const Header = () => {
                                         </div>
                                     </div>
                                     <div className="mt-3 pt-2 border-t border-emerald-500/20 flex justify-between items-center text-[11px] font-mono text-emerald-400">
-                                        <span>Status: ENFORCING</span>
+                                        <span>Status: {securityData?.shield_active ? 'ENFORCING' : (securityData ? 'DEGRADED' : 'UNAVAILABLE')}</span>
                                         <button onClick={() => setSecurityOpen(false)} className="hover:text-white underline">Close</button>
                                     </div>
                                 </div>

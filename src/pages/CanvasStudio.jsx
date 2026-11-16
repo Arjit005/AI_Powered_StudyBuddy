@@ -88,9 +88,13 @@ export default function CanvasStudio() {
           node_count: data.canvas?.nodes?.length || 0,
           edge_count: data.canvas?.edges?.length || 0
         });
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        setError(errData.detail || 'Could not initialize template architecture.');
       }
     } catch (err) {
       console.error("Canvas fetch error:", err);
+      setError('Network error initializing canvas diagram.');
     } finally {
       setLoading(false);
     }
@@ -180,6 +184,7 @@ export default function CanvasStudio() {
         ...prev,
         nodes: prev.nodes.map(n => n.id === draggingNodeId ? { ...n, x: newX, y: newY } : n)
       }));
+      setSelectedNode(prev => (prev && prev.id === draggingNodeId ? { ...prev, x: newX, y: newY } : prev));
     } else if (isPanning) {
       setPan({
         x: e.clientX - panStart.x,
@@ -215,11 +220,19 @@ export default function CanvasStudio() {
   // Copy Excalidraw JSON
   const handleCopyExcalidraw = async () => {
     if (!canvasData?.excalidraw_elements) return;
+    const updatedElements = canvasData.excalidraw_elements.map(el => {
+      const matchingNode = canvasData.nodes?.find(n => n.id === el.id);
+      if (matchingNode) {
+        return { ...el, x: matchingNode.x, y: matchingNode.y };
+      }
+      return el;
+    });
+
     const payload = JSON.stringify({
       type: "excalidraw",
       version: 2,
       source: "https://ai-study-buddy.local",
-      elements: canvasData.excalidraw_elements,
+      elements: updatedElements,
       appState: { viewBackgroundColor: "#0b1329", currentItemFontFamily: 1 }
     }, null, 2);
 

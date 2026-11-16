@@ -354,6 +354,7 @@ class AIService:
 
         # 2. Secondary Route: Direct Gemini API
         if GEMINI_API_KEY and circuit_breaker.is_available("gemini"):
+            gemini_succeeded = False
             try:
                 valid_models = AIService._get_valid_models()
                 for model_name in valid_models:
@@ -363,13 +364,16 @@ class AIService:
                         if hasattr(response, "text"):
                             response.text = sanitize_output(response.text)
                         circuit_breaker.record_success("gemini")
+                        gemini_succeeded = True
                         return response
                     except Exception as e:
                         error_log.append(f"Gemini {model_name} failed: {e}")
                         continue
             except Exception as e:
-                circuit_breaker.record_failure("gemini")
                 error_log.append(f"Gemini Error: {e}")
+            
+            if not gemini_succeeded:
+                circuit_breaker.record_failure("gemini")
         
         # 3. Tertiary Route: Direct OpenRouter API
         if OPENROUTER_API_KEY and circuit_breaker.is_available("openrouter"):
@@ -404,13 +408,15 @@ class AIService:
                 circuit_breaker.record_failure("huggingface")
                 error_log.append(f"HF Error: {hf_e}")
 
-        # 6. Offline Emergency Route: Pollinations
-        try:
-            res = AIService._generate_with_pollinations(prompt)
-            res.text = sanitize_output(res.text)
-            return res
-        except Exception as poll_e:
-            error_log.append(f"Pollinations Error: {poll_e}")
+        # 6. Optional Unauthenticated Fallback (Pollinations) - Requires explicit opt-in to safeguard privacy
+        enable_unauth_fallback = os.getenv("ENABLE_UNAUTHENTICATED_AI_FALLBACK", "false").lower() == "true"
+        if enable_unauth_fallback:
+            try:
+                res = AIService._generate_with_pollinations(prompt)
+                res.text = sanitize_output(res.text)
+                return res
+            except Exception as poll_e:
+                error_log.append(f"Pollinations Error: {poll_e}")
             
         error_msg = "; ".join(error_log)
         if "429" in error_msg:

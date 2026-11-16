@@ -5,7 +5,6 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import io
 import base64
-import random
 import textwrap
 
 def hierarchy_pos(G, root=None, width=1., vert_gap = 0.2, vert_loc = 0, xcenter = 0.5):
@@ -84,7 +83,6 @@ def generate_network_graph(edge_data):
             G.add_node(root if root else "System")
             
         # 3. Dynamic Canvas Sizing (FORCE PORTRAIT FOR TREES)
-        num_nodes = len(G.nodes)
         if root and root in G:
             depths = get_node_depths(G, root)
         else:
@@ -93,9 +91,6 @@ def generate_network_graph(edge_data):
             root = sources[0] if sources else list(G.nodes)[0]
             depths = get_node_depths(G, root)
 
-        # Dynamic Canvas Sizing - Balanced for hierarchy
-        max_depth = max(depths.values()) if depths else 0
-        
         # COMPACT FORMAT (User Requested - "No Scrolling")
         fig = plt.figure(figsize=(13, 9), facecolor='#f8fafc')
         

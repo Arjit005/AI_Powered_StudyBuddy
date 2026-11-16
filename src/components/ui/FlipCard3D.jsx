@@ -40,7 +40,7 @@ const FlipCard3D = ({
 
     return (
         <div
-            className="w-full max-w-xl mx-auto h-84 cursor-pointer select-none"
+            className="w-full max-w-xl mx-auto min-h-[21rem] h-[21rem] cursor-pointer select-none"
             style={{ perspective: '1200px' }}
             onMouseMove={handleMouseMove}
             onMouseLeave={handleMouseLeave}

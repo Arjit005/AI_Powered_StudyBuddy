@@ -206,8 +206,18 @@ const MermaidViewer = ({ chart, title = "Architecture Diagram" }) => {
             {/* Fullscreen View Modal */}
             {isFullscreen && (
                 <div
+                    role="dialog"
+                    aria-modal="true"
+                    aria-label={`${title} Fullscreen Inspection`}
+                    tabIndex={-1}
                     className="fixed inset-0 z-50 bg-black/95 backdrop-blur-md flex flex-col p-6 animate-in fade-in duration-200"
                     onClick={() => setIsFullscreen(false)}
+                    onKeyDown={(e) => {
+                        if (e.key === 'Escape') {
+                            e.stopPropagation();
+                            setIsFullscreen(false);
+                        }
+                    }}
                 >
                     <div className="flex justify-between items-center pb-4 border-b border-white/10" onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center gap-2">

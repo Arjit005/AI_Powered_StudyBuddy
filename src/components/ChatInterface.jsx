@@ -2,8 +2,8 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { 
     Send, Bot, User, Trash2, Shield, Copy, Check, Download, Sparkles, 
-    Terminal, Database, Clock, RefreshCw, Plus, MessageSquare, 
-    PanelLeft, ChevronRight, Brain, Cpu, Layers, Edit3
+    Clock, RefreshCw, Plus, MessageSquare, 
+    PanelLeft, ChevronRight, Brain, Cpu, Layers
 } from 'lucide-react';
 import StructuredMessage from './StructuredMessage';
 
@@ -26,7 +26,6 @@ const ChatInterface = () => {
     const [activeConvId, setActiveConvId] = useState(null);
     const [sidebarOpen, setSidebarOpen] = useState(true);
     const [memoryModalOpen, setMemoryModalOpen] = useState(false);
-    const [hybridTelemetry, setHybridTelemetry] = useState(null);
 
     // Chat state
     const [messages, setMessages] = useState([]);
@@ -321,8 +320,10 @@ const ChatInterface = () => {
 
                             if (parsed.conversation_id && parsed.conversation_id !== activeConvIdRef.current) {
                                 streamConvId = parsed.conversation_id;
-                                setActiveConvId(parsed.conversation_id);
-                                fetchConversations();
+                                if (originatingConvId === activeConvIdRef.current || activeConvIdRef.current === null) {
+                                    setActiveConvId(parsed.conversation_id);
+                                    fetchConversations();
+                                }
                             }
                             if (parsed.token) {
                                 accumulatedText += parsed.token;
@@ -345,8 +346,12 @@ const ChatInterface = () => {
                     return;
                 }
             } catch (streamErr) {
-                console.warn('SSE Streaming connection failed, falling back to standard endpoint:', streamErr);
-                setMessages(prev => prev.filter(m => m.isStreaming && (!m.content || m.content === '')));
+                console.warn('SSE Streaming connection failed:', streamErr);
+                if (accumulatedText.length > 0) {
+                    setMessages(prev => prev.map(m => m.id === streamMsgId ? { ...m, isStreaming: false } : m));
+                    return;
+                }
+                setMessages(prev => prev.filter(m => m.id === streamMsgId));
             }
 
             if (!streamSuccess) {
@@ -368,8 +373,12 @@ const ChatInterface = () => {
                 const data = await response.json();
                 
                 // If user switched conversation during in-flight generation, do not append to new room
-                if (originatingConvId !== activeConvIdRef.current && activeConvIdRef.current !== null) {
-                    return;
+                if (originatingConvId !== activeConvIdRef.current) {
+                    if (originatingConvId === null && activeConvIdRef.current !== null) {
+                        return;
+                    } else if (originatingConvId !== null) {
+                        return;
+                    }
                 }
 
                 if (data.conversation_id && data.conversation_id !== activeConvId) {
@@ -377,10 +386,6 @@ const ChatInterface = () => {
                     fetchConversations();
                 } else {
                     fetchConversations();
-                }
-
-                if (data.hybrid_memory) {
-                    setHybridTelemetry(data.hybrid_memory);
                 }
 
                 const aiMessage = {

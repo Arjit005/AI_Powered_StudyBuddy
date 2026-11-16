@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Play, Pause, RotateCcw, Flame } from 'lucide-react';
 
 const StudyTimer = () => {
@@ -6,52 +6,75 @@ const StudyTimer = () => {
     const [isActive, setIsActive] = useState(false);
     const [mode, setMode] = useState('focus'); // 'focus' or 'break'
     const [trackingStatus, setTrackingStatus] = useState(null);
+    const targetEndTimeRef = useRef(null);
     const totalTime = mode === 'focus' ? 25 * 60 : 5 * 60;
 
     useEffect(() => {
-        let interval = null;
-        if (isActive && timeLeft > 0) {
-            interval = setInterval(() => {
-                setTimeLeft(prev => prev - 1);
-            }, 1000);
-        } else if (timeLeft === 0 && isActive) {
-            setIsActive(false);
-            const duration = mode === 'focus' ? 25 * 60 : 5 * 60;
-            if (mode === 'focus') {
-                const token = localStorage.getItem('auth_token');
-                const headers = { 'Content-Type': 'application/json' };
-                if (token) headers['Authorization'] = `Bearer ${token}`;
-
-                fetch('/api/track-activity', {
-                    method: 'POST',
-                    headers,
-                    body: JSON.stringify({ activity_type: 'timer_focus', duration_seconds: duration })
-                }).then(res => {
-                    if (res.ok) {
-                        setTrackingStatus('Completed session recorded in analytics.');
-                    } else {
-                        setTrackingStatus('Could not record session in analytics.');
-                    }
-                }).catch(err => {
-                    console.error("Failed to track time", err);
-                    setTrackingStatus('Network error while recording session.');
-                });
-            }
+        if (!isActive) {
+            targetEndTimeRef.current = null;
+            return;
         }
+
+        if (targetEndTimeRef.current === null) {
+            targetEndTimeRef.current = Date.now() + timeLeft * 1000;
+        }
+
+        const interval = setInterval(() => {
+            const now = Date.now();
+            const remaining = Math.max(0, Math.round((targetEndTimeRef.current - now) / 1000));
+            setTimeLeft(remaining);
+
+            if (remaining <= 0) {
+                clearInterval(interval);
+                setIsActive(false);
+                targetEndTimeRef.current = null;
+
+                const duration = mode === 'focus' ? 25 * 60 : 5 * 60;
+                if (mode === 'focus') {
+                    const token = localStorage.getItem('auth_token');
+                    const headers = { 'Content-Type': 'application/json' };
+                    if (token) headers['Authorization'] = `Bearer ${token}`;
+
+                    fetch('/api/track-activity', {
+                        method: 'POST',
+                        headers,
+                        body: JSON.stringify({ activity_type: 'timer_focus', duration_seconds: duration })
+                    }).then(res => {
+                        if (res.ok) {
+                            setTrackingStatus('Completed session recorded in analytics.');
+                        } else {
+                            setTrackingStatus('Could not record session in analytics.');
+                        }
+                    }).catch(err => {
+                        console.error("Failed to track time", err);
+                        setTrackingStatus('Network error while recording session.');
+                    });
+                }
+            }
+        }, 500);
+
         return () => clearInterval(interval);
-    }, [isActive, timeLeft, mode]);
+    }, [isActive, mode]);
 
     const toggleTimer = () => {
-        if (timeLeft === 0) return;
-        setIsActive(!isActive);
+        if (timeLeft <= 0) return;
+        if (!isActive) {
+            targetEndTimeRef.current = Date.now() + timeLeft * 1000;
+            setIsActive(true);
+        } else {
+            targetEndTimeRef.current = null;
+            setIsActive(false);
+        }
     };
 
     const resetTimer = () => {
+        targetEndTimeRef.current = null;
         setIsActive(false);
         setTimeLeft(mode === 'focus' ? 25 * 60 : 5 * 60);
     };
 
     const switchMode = (newMode) => {
+        targetEndTimeRef.current = null;
         setMode(newMode);
         setIsActive(false);
         setTimeLeft(newMode === 'focus' ? 25 * 60 : 5 * 60);

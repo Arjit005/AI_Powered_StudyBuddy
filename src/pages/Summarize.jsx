@@ -27,6 +27,7 @@ const Summarize = () => {
     const summarizeGenRef = useRef(0);
     useEffect(() => {
         return () => {
+            summarizeGenRef.current += 1;
             if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
                 window.speechSynthesis.cancel();
             }
@@ -63,6 +64,7 @@ const Summarize = () => {
             }
 
             const data = await response.json();
+            if (thisGen !== summarizeGenRef.current) return;
             setSummary(data.summary);
         } catch (err) {
             if (thisGen === summarizeGenRef.current) {

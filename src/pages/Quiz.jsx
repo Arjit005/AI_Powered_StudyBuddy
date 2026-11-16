@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Zap, CheckCircle2, XCircle, Award, RotateCcw, ArrowRight, ShieldCheck, HelpCircle, Trophy, Save, Check } from 'lucide-react';
+import { Zap, CheckCircle2, XCircle, Award, RotateCcw, Save, Check } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
 const Quiz = () => {
@@ -14,7 +14,7 @@ const Quiz = () => {
     const [error, setError] = useState('');
 
     const generateQuiz = async () => {
-        if (!topic.trim()) return;
+        if (!topic.trim() || saving) return;
         setLoading(true);
         setQuiz(null);
         setAnswers({});
@@ -41,13 +41,15 @@ const Quiz = () => {
             if (!data || !Array.isArray(data.questions) || data.questions.length === 0) {
                 throw new Error('AI engine returned no questions. Please try another topic.');
             }
-            const validQuestions = data.questions.filter(
-                q => q && typeof q.question === 'string' && Array.isArray(q.options) && q.options.length >= 2
-            );
+            const validQuestions = data.questions.filter(q => {
+                if (!q || typeof q.question !== 'string' || !Array.isArray(q.options) || q.options.length < 2) return false;
+                const correct = q.correct_answer || q.answer;
+                return typeof correct === 'string' && correct.trim().length > 0;
+            });
             if (validQuestions.length === 0) {
                 throw new Error('Received malformed quiz questions. Please regenerate.');
             }
-            setQuiz({ ...data, questions: validQuestions });
+            setQuiz({ ...data, questions: validQuestions, instanceId: Date.now() });
 
             // Track activity in background
             try {
@@ -102,6 +104,7 @@ const Quiz = () => {
 
     const handleSaveQuiz = async () => {
         if (!quiz || !quiz.questions || quiz.questions.length === 0 || saving) return;
+        const currentInstanceId = quiz.instanceId;
         setSaving(true);
         try {
             const token = localStorage.getItem('auth_token');
@@ -128,8 +131,10 @@ const Quiz = () => {
             });
 
             if (res.ok) {
-                setSavedSuccess(true);
-                setTimeout(() => setSavedSuccess(false), 3000);
+                if (quiz?.instanceId === currentInstanceId) {
+                    setSavedSuccess(true);
+                    setTimeout(() => setSavedSuccess(false), 3000);
+                }
             } else {
                 alert('Could not save quiz to personal library.');
             }

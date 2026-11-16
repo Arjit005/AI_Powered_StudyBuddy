@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { FileText, Globe, Upload, Trash2, RefreshCw, BookOpen, Sparkles, CheckCircle2, AlertCircle, Plus, Search, ExternalLink, Star } from 'lucide-react';
+import { FileText, Upload, Trash2, RefreshCw, BookOpen, Sparkles, Plus } from 'lucide-react';
 
 const Sources = () => {
     const [sources, setSources] = useState([]);
@@ -30,7 +30,11 @@ const Sources = () => {
         setLoading(true);
         setFetchError(null);
         try {
-            const res = await fetch('/api/sources');
+            const token = localStorage.getItem('auth_token');
+            const headers = {};
+            if (token) headers['Authorization'] = `Bearer ${token}`;
+
+            const res = await fetch('/api/sources', { headers });
             if (res.ok) {
                 const data = await res.json();
                 setSources(Array.isArray(data) ? data : []);
@@ -76,8 +80,13 @@ const Sources = () => {
         }
 
         try {
+            const token = localStorage.getItem('auth_token');
+            const headers = {};
+            if (token) headers['Authorization'] = `Bearer ${token}`;
+
             const res = await fetch('/api/sources', {
                 method: 'POST',
+                headers,
                 body: formData
             });
             if (res.ok) {

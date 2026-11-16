@@ -34,6 +34,15 @@ const Voice = () => {
         recognition.onerror = (event) => {
             console.error('Speech recognition error:', event.error);
             setIsListening(false);
+            if (event.error === 'not-allowed') {
+                setError('Microphone access was denied. Please allow microphone permissions in your browser.');
+            } else if (event.error === 'no-speech') {
+                setError('No speech detected. Please speak closer to your microphone.');
+            } else if (event.error === 'network') {
+                setError('Speech recognition network error. Please verify your connection.');
+            } else {
+                setError(`Microphone error (${event.error}). Please try again.`);
+            }
         };
 
         recognition.onend = () => {
@@ -109,7 +118,8 @@ const Voice = () => {
                 setIsSpeaking(true);
             }
         } catch (err) {
-            setAiResponse(`⚠️ Error: ${err.message || 'Unable to connect to AI tutor.'}`);
+            console.error("Voice response error:", err);
+            setAiResponse('⚠️ Unable to connect to the AI tutor right now. Please check your connection and try again.');
         } finally {
             setIsLoading(false);
         }

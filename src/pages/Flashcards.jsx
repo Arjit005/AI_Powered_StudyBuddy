@@ -39,8 +39,10 @@ const Flashcards = () => {
     // Audio Speech Synthesis & timeout cleanup
     const advanceTimeoutRef = useRef(null);
     const saveTimeoutRef = useRef(null);
+    const currentUtteranceRef = useRef(null);
     useEffect(() => {
         return () => {
+            currentUtteranceRef.current = null;
             if ('speechSynthesis' in window) window.speechSynthesis.cancel();
             if (advanceTimeoutRef.current) clearTimeout(advanceTimeoutRef.current);
             if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
@@ -69,7 +71,7 @@ const Flashcards = () => {
                     const validCards = data.flashcards
                         .filter(c => c && typeof c === 'object')
                         .map((c, i) => ({
-                            id: c.id || `gen_${Date.now()}_${i}`,
+                            id: c.id ? `${c.id}_${i}` : `gen_${Date.now()}_${i}`,
                             front: String(c.front || 'Question'),
                             back: String(c.back || 'Answer')
                         }));
@@ -139,13 +141,25 @@ const Flashcards = () => {
         if (!textToRead) return;
 
         if (isSpeaking) {
+            currentUtteranceRef.current = null;
             window.speechSynthesis.cancel();
             setIsSpeaking(false);
         } else {
             const utterance = new SpeechSynthesisUtterance(textToRead);
             utterance.rate = 1.0;
-            utterance.onend = () => setIsSpeaking(false);
-            utterance.onerror = () => setIsSpeaking(false);
+            currentUtteranceRef.current = utterance;
+            utterance.onend = () => {
+                if (currentUtteranceRef.current === utterance) {
+                    setIsSpeaking(false);
+                    currentUtteranceRef.current = null;
+                }
+            };
+            utterance.onerror = () => {
+                if (currentUtteranceRef.current === utterance) {
+                    setIsSpeaking(false);
+                    currentUtteranceRef.current = null;
+                }
+            };
             window.speechSynthesis.speak(utterance);
             setIsSpeaking(true);
         }

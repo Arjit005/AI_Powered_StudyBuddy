@@ -406,8 +406,14 @@ def create_source(
     user_id = current_user.id if current_user else None
 
     raw_content = content
+    MAX_FILE_BYTES = 20 * 1024 * 1024  # 20MB limit
     if file:
-        file_bytes = file.file.read()
+        file_bytes = file.file.read(MAX_FILE_BYTES + 1)
+        if len(file_bytes) > MAX_FILE_BYTES:
+            raise HTTPException(
+                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                detail="File size exceeds maximum allowed limit (20MB)."
+            )
         raw_content = file_bytes
         if not title or title == "New Source":
             title = file.filename
@@ -904,7 +910,9 @@ async def chat_with_ai_stream(
                 full_content.append(token)
                 yield f"data: {json.dumps({'token': token})}\n\n"
         except Exception as e:
-            yield f"data: {json.dumps({'error': str(e)})}\n\n"
+            import logging
+            logging.error(f"Streaming token generation error: {e}", exc_info=True)
+            yield f"data: {json.dumps({'error': 'AI tutor generation interrupted. Please retry.'})}\n\n"
 
         # Signal completion
         yield "data: [DONE]\n\n"

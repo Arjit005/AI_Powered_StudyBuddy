@@ -58,9 +58,23 @@ class RateLimiter:
             ]
             for k in keys_to_delete:
                 del self.history[k]
-            # Safety ceiling if under DDoS with unique spoofed IPs
+            # Safety ceiling: evict oldest half of entries rather than wiping all active clients
             if len(self.history) > 10000:
-                self.history.clear()
+                sorted_keys = sorted(
+                    self.history.keys(),
+                    key=lambda k: self.history[k][-1] if self.history[k] else 0
+                )
+                for k in sorted_keys[:5000]:
+                    del self.history[k]
+
+            # Periodic cleanup of expired lockouts
+            expired_locks = [ip for ip, exp in self.lockouts.items() if exp < current_time]
+            for ip in expired_locks:
+                del self.lockouts[ip]
+            if len(self.lockouts) > 5000:
+                sorted_locks = sorted(self.lockouts.keys(), key=lambda ip: self.lockouts[ip])
+                for ip in sorted_locks[:2500]:
+                    del self.lockouts[ip]
 
     def _get_client_ip(self, request: Request) -> str:
         # Only trust forwarded headers if explicitly running behind a trusted reverse proxy
@@ -116,8 +130,8 @@ class RateLimiter:
             self.history[key] = []
         self.history[key].append(current_time)
 
-        # 5 consecutive failures within 5 minutes = 3-minute lockout
-        if len(self.history[key]) >= 5:
+        # 5 consecutive failures within 5 minutes = 3-minute lockout (set on threshold crossing)
+        if len(self.history[key]) >= 5 and client_ip not in self.lockouts:
             self.lockouts[client_ip] = current_time + 180
 
     def reset_failed_logins(self, client_ip: str):

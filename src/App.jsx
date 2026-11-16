@@ -36,11 +36,45 @@ const isTokenValid = (token) => {
   }
 };
 
-// Protected Route Component checking both token presence, structure, and validity
+// Protected Route Component checking token presence, structure, and server verification
 const ProtectedRoute = ({ children }) => {
   const token = localStorage.getItem('auth_token');
-  const isAuthenticated = localStorage.getItem('isAuthenticated') === 'true' && isTokenValid(token);
-  if (!isAuthenticated) {
+  const [isAuthorized, setIsAuthorized] = useState(() => {
+    return localStorage.getItem('isAuthenticated') === 'true' && isTokenValid(token);
+  });
+
+  useEffect(() => {
+    let isMounted = true;
+    if (!token || !isTokenValid(token)) {
+      setIsAuthorized(false);
+      return;
+    }
+
+    // Cryptographic validation against server session endpoint
+    fetch('/api/auth/me', {
+      headers: { 'Authorization': `Bearer ${token}` }
+    })
+      .then(res => {
+        if (!isMounted) return;
+        if (res.ok) {
+          setIsAuthorized(true);
+        } else {
+          localStorage.removeItem('auth_token');
+          localStorage.removeItem('isAuthenticated');
+          localStorage.removeItem('user');
+          setIsAuthorized(false);
+        }
+      })
+      .catch(() => {
+        // In transient offline states, retain local optimistic verification
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [token]);
+
+  if (!isAuthorized) {
     localStorage.removeItem('auth_token');
     localStorage.removeItem('isAuthenticated');
     localStorage.removeItem('user');

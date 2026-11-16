@@ -129,7 +129,7 @@ def verify_rag_grounding(answer: str, retrieved_chunks: List[str]) -> Tuple[bool
     # Calculate overlap of meaningful words (length > 3)
     meaningful_answer_words = {w for w in answer_words if len(w) > 3}
     if not meaningful_answer_words:
-        return True, 1.0
+        return False, 0.0
 
     overlap = meaningful_answer_words.intersection(corpus_words)
     faithfulness_score = len(overlap) / len(meaningful_answer_words)

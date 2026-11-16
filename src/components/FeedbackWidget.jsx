@@ -20,6 +20,17 @@ const FeedbackWidget = () => {
         };
     }, []);
 
+    const handleClose = () => {
+        if (closeTimerRef.current) {
+            clearTimeout(closeTimerRef.current);
+            closeTimerRef.current = null;
+        }
+        setSubmitted(false);
+        setComment('');
+        setSubmitError(null);
+        setIsOpen(false);
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
         setSubmitting(true);
@@ -68,10 +79,7 @@ const FeedbackWidget = () => {
             ) : (
                 <div className="glass-panel w-80 p-5 rounded-3xl border border-emerald-500/40 shadow-2xl relative animate-in fade-in slide-in-from-bottom-4 duration-200">
                     <button
-                        onClick={() => {
-                            if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
-                            setIsOpen(false);
-                        }}
+                        onClick={handleClose}
                         className="absolute top-4 right-4 p-1.5 rounded-full bg-slate-900 text-slate-400 hover:text-white border border-slate-800"
                     >
                         <X className="w-3.5 h-3.5" />
