@@ -450,7 +450,7 @@ class AIService:
                     except Exception as me:
                         print(f"Gemini Stream model {model_name} failed: {me}")
                         if has_yielded:
-                            return
+                            raise
                         continue
                 if not gemini_succeeded:
                     circuit_breaker.record_failure("gemini")
@@ -621,12 +621,14 @@ flowchart TD
             response = AIService._generate_content_safe(prompt, generation_config={"response_mime_type": "application/json"})
             quiz_data = json.loads(AIService._clean_json_response(response.text))
             questions = quiz_data.get("questions", [])
-            if len(questions) != 10 or any(
+            if not isinstance(questions, list) or len(questions) != 10 or any(
                 not isinstance(q, dict)
                 or not all(k in q for k in ("id", "question", "options", "answer", "explanation"))
                 or not isinstance(q["options"], list)
+                or not all(isinstance(opt, str) for opt in q["options"])
                 or len(q["options"]) != 4
                 or len(set(q["options"])) != 4
+                or not isinstance(q["answer"], str)
                 or q["answer"] not in q["options"]
                 for q in questions
             ):
@@ -673,7 +675,7 @@ flowchart TD
                     if isinstance(c, dict) and c.get("front") and c.get("back") and str(c["front"]).strip() and str(c["back"]).strip()
                 ]
                 if len(valid_cards) >= 3:
-                    return {"flashcards": valid_cards}
+                    return {"flashcards": valid_cards[:num]}
         except Exception as e:
             print(f"Flashcards note: {e}")
 

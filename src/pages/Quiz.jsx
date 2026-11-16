@@ -45,11 +45,12 @@ const Quiz = () => {
                 .filter(q => q && typeof q.question === 'string' && Array.isArray(q.options) && q.options.length >= 2)
                 .map(q => {
                     const rawAnswer = String(q.correct_answer || q.answer || '').trim();
+                    if (!rawAnswer) return null;
                     const normalizedOptions = q.options.map(opt => String(opt).trim());
-                    // Find option matching rawAnswer (exact or case-insensitive or substring), fallback to first option
+                    // Find option matching rawAnswer strictly (exact or case-insensitive)
                     const matchingOption = normalizedOptions.find(opt => opt.toLowerCase() === rawAnswer.toLowerCase())
-                        || normalizedOptions.find(opt => rawAnswer.toLowerCase().includes(opt.toLowerCase()) || opt.toLowerCase().includes(rawAnswer.toLowerCase()))
-                        || normalizedOptions[0];
+                        || (rawAnswer.length >= 3 && normalizedOptions.find(opt => opt.length >= 3 && (rawAnswer.toLowerCase().includes(opt.toLowerCase()) || opt.toLowerCase().includes(rawAnswer.toLowerCase()))));
+                    if (!matchingOption) return null;
                     return {
                         ...q,
                         question: q.question.trim(),
@@ -58,28 +59,23 @@ const Quiz = () => {
                         answer: matchingOption
                     };
                 })
-                .filter(q => q.correct_answer.length > 0);
+                .filter(Boolean);
 
             if (validQuestions.length === 0) {
                 throw new Error('Received malformed quiz questions. Please regenerate.');
             }
             setQuiz({ ...data, questions: validQuestions, instanceId: Date.now() });
 
-            // Track activity in background
-            try {
-                const actRes = await fetch('/api/track-activity', {
-                    method: 'POST',
-                    headers,
-                    body: JSON.stringify({ activity_type: 'quiz', duration_seconds: 120 })
-                });
-                if (actRes.ok) {
-                    setActivityLogged(true);
-                } else {
-                    setActivityLogged(false);
-                }
-            } catch (_) {
+            // Track activity non-blocking in background
+            fetch('/api/track-activity', {
+                method: 'POST',
+                headers,
+                body: JSON.stringify({ activity_type: 'quiz', duration_seconds: 120 })
+            }).then(actRes => {
+                setActivityLogged(actRes.ok);
+            }).catch(() => {
                 setActivityLogged(false);
-            }
+            });
         } catch (err) {
             setError(err.message || 'Error creating quiz.');
         } finally {

@@ -48,9 +48,17 @@ const FlipCard3D = ({
             style={{ perspective: '1200px' }}
             onMouseMove={handleMouseMove}
             onMouseLeave={handleMouseLeave}
-            onClick={onFlip}
+            onClick={(e) => {
+                if (e.target !== e.currentTarget && e.target.closest('button, [role="button"]')) {
+                    return;
+                }
+                if (onFlip) onFlip();
+            }}
             onKeyDown={(e) => {
                 if (e.key === 'Enter' || e.key === ' ') {
+                    if (e.target !== e.currentTarget && e.target.closest('button, [role="button"], a, input')) {
+                        return;
+                    }
                     e.preventDefault();
                     if (onFlip) onFlip();
                 }

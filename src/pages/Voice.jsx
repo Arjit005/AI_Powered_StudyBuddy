@@ -11,6 +11,7 @@ const Voice = () => {
     const [browserSupported, setBrowserSupported] = useState(true);
     const [error, setError] = useState(null);
     const recognitionRef = useRef(null);
+    const recognitionSessionRef = useRef(0);
     const isMountedRef = useRef(true);
 
     useEffect(() => {
@@ -50,7 +51,9 @@ const Voice = () => {
         };
 
         recognition.onend = () => {
-            if (isMountedRef.current) setIsListening(false);
+            if (isMountedRef.current) {
+                setIsListening(false);
+            }
         };
 
         recognitionRef.current = recognition;
@@ -70,11 +73,13 @@ const Voice = () => {
         if (!browserSupported) return;
 
         if (isListening) {
+            recognitionSessionRef.current += 1;
             recognitionRef.current?.stop();
             setIsListening(false);
         } else {
             setTranscript('');
             try {
+                const thisSession = ++recognitionSessionRef.current;
                 recognitionRef.current?.start();
                 setIsListening(true);
             } catch (err) {
@@ -109,14 +114,23 @@ const Voice = () => {
             });
 
             if (!res.ok) throw new Error('AI consultation failed');
-            const data = await res.json();
+            let data = null;
+            try {
+                data = await res.json();
+            } catch (_) {
+                throw new Error('Invalid response received from server.');
+            }
             if (!isMountedRef.current) return;
-            const reply = data.response || 'No response generated.';
+            if (!data || typeof data !== 'object') {
+                throw new Error('Unexpected response format from AI tutor.');
+            }
+            const reply = typeof data.response === 'string' ? data.response : 'No response generated.';
             setAiResponse(reply);
 
             // Auto-read response if speech synthesis available and still mounted
             if (isMountedRef.current && 'speechSynthesis' in window && typeof window.SpeechSynthesisUtterance !== 'undefined') {
                 window.speechSynthesis.cancel();
+                setIsSpeaking(false);
                 const cleanText = reply.replace(/[#*`_\[\]()]/g, '');
                 const utterance = new SpeechSynthesisUtterance(cleanText);
                 utterance.rate = 1.0;

@@ -25,13 +25,17 @@ const Summarize = () => {
     const [error, setError] = useState('');
     const [isSpeaking, setIsSpeaking] = useState(false);
 
-    // Audio Speech Synthesis cleanup on unmount
+    // Audio Speech Synthesis & timeout cleanup on unmount
     const summarizeGenRef = useRef(0);
     const utteranceGenRef = useRef(0);
+    const copyTimeoutRef = useRef(null);
+    const saveTimeoutRef = useRef(null);
     useEffect(() => {
         return () => {
             summarizeGenRef.current += 1;
             utteranceGenRef.current += 1;
+            if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
+            if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
             if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
                 window.speechSynthesis.cancel();
             }
@@ -90,7 +94,8 @@ const Summarize = () => {
         try {
             await navigator.clipboard.writeText(summary);
             setCopied(true);
-            setTimeout(() => setCopied(false), 2000);
+            if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
+            copyTimeoutRef.current = setTimeout(() => setCopied(false), 2000);
         } catch (copyErr) {
             console.error("Clipboard copy failed:", copyErr);
         }
@@ -98,7 +103,7 @@ const Summarize = () => {
 
     // Text to Speech Toggle
     const handleToggleTTS = () => {
-        if (!('speechSynthesis' in window) || !summary) return;
+        if (typeof window === 'undefined' || !('speechSynthesis' in window) || !summary) return;
 
         if (isSpeaking) {
             window.speechSynthesis.cancel();
@@ -122,7 +127,7 @@ const Summarize = () => {
     // Save to Library
     const handleSaveToLibrary = async () => {
         if (!summary || isSaving) return;
-        const activeTopic = summaryTopic || topic;
+        const activeTopic = (summaryTopic && summaryTopic.trim()) ? summaryTopic.trim() : (topic && topic.trim()) ? topic.trim() : 'Study Summary';
         setIsSaving(true);
         try {
             const token = localStorage.getItem('auth_token');
@@ -142,7 +147,8 @@ const Summarize = () => {
             });
             if (res.ok) {
                 setSaved(true);
-                setTimeout(() => setSaved(false), 3000);
+                if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+                saveTimeoutRef.current = setTimeout(() => setSaved(false), 3000);
             } else {
                 alert("Failed to save summary to library.");
             }

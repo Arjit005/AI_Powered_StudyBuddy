@@ -1,9 +1,12 @@
 import json
+import logging
 import re
 from typing import Dict, Any, List, Optional
 from backend.ai_service import AIService
 from backend.database import SessionLocal
 from backend.models import Conversation, ChatHistory
+
+logger = logging.getLogger("mcp_service")
 
 class MCPService:
     """
@@ -125,19 +128,34 @@ class MCPService:
         Executes a registered tool by name with arguments.
         """
         if name == "generate_canvas_diagram":
-            topic = arguments.get("topic", "System Architecture")
+            raw_topic = arguments.get("topic")
+            topic = str(raw_topic).strip() if raw_topic is not None else "System Architecture"
+            if not topic:
+                topic = "System Architecture"
             detail = arguments.get("detail_level", "standard")
+            if detail not in ("overview", "standard", "deep_dive"):
+                detail = "standard"
             dtype = arguments.get("diagram_type", "architecture")
+            if dtype not in ("architecture", "flowchart", "sequence", "mindmap"):
+                dtype = "architecture"
             return cls._generate_canvas_diagram(topic, detail, dtype)
 
         elif name == "generate_mermaid_spec":
-            topic = arguments.get("topic", "System Architecture")
+            raw_topic = arguments.get("topic")
+            topic = str(raw_topic).strip() if raw_topic is not None else "System Architecture"
+            if not topic:
+                topic = "System Architecture"
             diagram_type = arguments.get("diagram_type", "flowchart")
+            if diagram_type not in ("flowchart", "sequence", "class", "state", "er", "gantt"):
+                diagram_type = "flowchart"
             return AIService.generate_detailed_mermaid_diagram(topic, diagram_type=diagram_type)
 
         elif name == "export_to_canvas_json":
-            content = arguments.get("content", "")
+            raw_content = arguments.get("content", "")
+            content = str(raw_content) if raw_content is not None else ""
             layout = arguments.get("layout", "horizontal_flow")
+            if layout not in ("horizontal_flow", "vertical_tree", "grid"):
+                layout = "horizontal_flow"
             return cls._export_notes_to_canvas(content, layout)
 
         elif name == "query_study_memory":
@@ -755,7 +773,7 @@ class MCPService:
                     "id": rpc_id,
                     "error": {
                         "code": -32603,
-                        "message": f"Tool execution failed: {str(err)}"
+                        "message": "Tool execution encountered an internal error."
                     }
                 }
 

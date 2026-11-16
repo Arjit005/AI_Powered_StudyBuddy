@@ -47,6 +47,12 @@ const Flashcards = () => {
         if (!topic.trim() || loading) return;
         setLoading(true);
         setIsFlipped(false);
+        setSaved(false);
+        if (advanceTimeoutRef.current) {
+            clearTimeout(advanceTimeoutRef.current);
+            advanceTimeoutRef.current = null;
+        }
+        currentUtteranceRef.current = null;
         if ('speechSynthesis' in window) window.speechSynthesis.cancel();
         setIsSpeaking(false);
         try {

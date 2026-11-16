@@ -13,6 +13,7 @@ const FeedbackWidget = () => {
     const closeTimerRef = useRef(null);
     const isOpenRef = useRef(false);
     const abortControllerRef = useRef(null);
+    const submissionSessionRef = useRef(0);
 
     useEffect(() => {
         isOpenRef.current = isOpen;
@@ -29,7 +30,14 @@ const FeedbackWidget = () => {
         };
     }, []);
 
+    const handleOpen = () => {
+        submissionSessionRef.current += 1;
+        isOpenRef.current = true;
+        setIsOpen(true);
+    };
+
     const handleClose = () => {
+        submissionSessionRef.current += 1;
         if (abortControllerRef.current) {
             abortControllerRef.current.abort();
             abortControllerRef.current = null;
@@ -38,6 +46,8 @@ const FeedbackWidget = () => {
             clearTimeout(closeTimerRef.current);
             closeTimerRef.current = null;
         }
+        isOpenRef.current = false;
+        setSubmitting(false);
         setSubmitted(false);
         setComment('');
         setSubmitError(null);
@@ -46,43 +56,50 @@ const FeedbackWidget = () => {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
+        if (submitting) return;
         setSubmitting(true);
         setSubmitError(null);
-        abortControllerRef.current = new AbortController();
+        const thisSession = submissionSessionRef.current;
+        const controller = new AbortController();
+        abortControllerRef.current = controller;
         try {
             const res = await fetch('/api/feedback', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                signal: abortControllerRef.current.signal,
+                signal: controller.signal,
                 body: JSON.stringify({
                     page: location.pathname,
                     rating,
                     comment
                 })
             });
+            if (thisSession !== submissionSessionRef.current || !isOpenRef.current) return;
             if (!res.ok) {
                 const errData = await res.json().catch(() => ({}));
                 throw new Error(errData.detail || 'Feedback submission failed');
             }
-            if (!isOpenRef.current) {
-                return; // Ignore completion if widget was closed while request was in-flight
-            }
+            if (thisSession !== submissionSessionRef.current || !isOpenRef.current) return;
             setSubmitted(true);
             if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
             closeTimerRef.current = setTimeout(() => {
-                setSubmitted(false);
-                setIsOpen(false);
-                setComment('');
-                closeTimerRef.current = null;
+                if (thisSession === submissionSessionRef.current) {
+                    setSubmitted(false);
+                    setIsOpen(false);
+                    isOpenRef.current = false;
+                    setComment('');
+                    closeTimerRef.current = null;
+                }
             }, 2500);
         } catch (err) {
-            if (err.name === 'AbortError') return;
+            if (err.name === 'AbortError' || thisSession !== submissionSessionRef.current) return;
             console.error("Feedback error:", err);
             if (isOpenRef.current) {
                 setSubmitError(err.message || 'Submission failed. Please try again.');
             }
         } finally {
-            setSubmitting(false);
+            if (thisSession === submissionSessionRef.current) {
+                setSubmitting(false);
+            }
         }
     };
 
@@ -90,7 +107,7 @@ const FeedbackWidget = () => {
         <div className="fixed bottom-6 right-6 z-50">
             {!isOpen ? (
                 <button
-                    onClick={() => setIsOpen(true)}
+                    onClick={handleOpen}
                     className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 text-slate-950 font-bold text-xs shadow-[0_0_20px_rgba(16,185,129,0.35)] hover:scale-105 transition-all group cursor-pointer"
                     title="Send Feedback"
                 >

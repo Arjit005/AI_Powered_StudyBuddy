@@ -424,7 +424,7 @@ class RAGService:
         if chunk_ids:
             ids_to_delete = [f"src_{source_id}_chunk_{cid}" for cid in chunk_ids]
         else:
-            ids_to_delete = [f"src_{source_id}_chunk_{idx}" for idx in range(250)]
+            ids_to_delete = [f"src_{source_id}_chunk_{idx}" for idx in range(1000)]
         RAGService._delete_from_pinecone(ids_to_delete, namespace=namespace)
 
     @staticmethod
@@ -555,17 +555,20 @@ class RAGService:
                             (user_id and (meta_user == str(user_id) or meta_user == "global")) or
                             (not user_id and meta_user in ("global", None))
                         )
-                        if source_ids and src_id:
+                        if source_ids:
                             try:
-                                if int(src_id) not in source_ids:
+                                if not src_id or int(src_id) not in source_ids:
                                     is_allowed = False
                             except (ValueError, TypeError):
                                 is_allowed = False
 
+                        if not src_id or c_idx is None:
+                            is_allowed = False
+
                         if is_allowed:
                             mock_chunk = SourceChunk(
-                                source_id=int(src_id) if src_id else 0,
-                                chunk_index=int(c_idx) if c_idx else 0,
+                                source_id=int(src_id),
+                                chunk_index=int(c_idx),
                                 text=meta.get("text", ""),
                                 token_count=len(meta.get("text", "").split())
                             )

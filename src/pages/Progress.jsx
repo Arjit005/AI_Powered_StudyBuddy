@@ -131,6 +131,7 @@ const Progress = () => {
                 setStats({ study_hours: 0, quizzes_taken: 0, streak_days: 0 });
                 setChartImage(null);
                 setSessions([]);
+                setHeatmapData(null);
                 fetchAnalytics();
             } else {
                 setLoading(false);

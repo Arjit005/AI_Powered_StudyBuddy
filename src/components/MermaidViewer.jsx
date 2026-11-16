@@ -33,6 +33,12 @@ const sanitizeSvg = (svgStr) => {
                 }
             }
         });
+        // Remove style elements containing @import or url()
+        doc.querySelectorAll('style').forEach(el => {
+            if (/@import|url\s*\(/i.test(el.textContent || '')) {
+                el.remove();
+            }
+        });
         return doc.documentElement ? new XMLSerializer().serializeToString(doc.documentElement) : '';
     } catch {
         return '';
@@ -70,6 +76,7 @@ const MermaidViewer = ({ chart, title = "Architecture Diagram" }) => {
     const [svgContent, setSvgContent] = useState('');
     const [error, setError] = useState(null);
     const [copied, setCopied] = useState(false);
+    const [copyError, setCopyError] = useState(false);
     const [zoom, setZoom] = useState(1);
     const [isFullscreen, setIsFullscreen] = useState(false);
 
@@ -150,6 +157,7 @@ const MermaidViewer = ({ chart, title = "Architecture Diagram" }) => {
         try {
             await navigator.clipboard.writeText(chart || '');
             setCopied(true);
+            setCopyError(false);
             if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
             copyTimeoutRef.current = setTimeout(() => {
                 setCopied(false);
@@ -157,6 +165,12 @@ const MermaidViewer = ({ chart, title = "Architecture Diagram" }) => {
             }, 2000);
         } catch (err) {
             console.error("Clipboard copy failed:", err);
+            setCopyError(true);
+            if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
+            copyTimeoutRef.current = setTimeout(() => {
+                setCopyError(false);
+                copyTimeoutRef.current = null;
+            }, 2500);
         }
     };
 
@@ -278,6 +292,24 @@ const MermaidViewer = ({ chart, title = "Architecture Diagram" }) => {
                         if (e.key === 'Escape') {
                             e.stopPropagation();
                             setIsFullscreen(false);
+                        } else if (e.key === 'Tab' && modalRef.current) {
+                            const focusables = Array.from(modalRef.current.querySelectorAll(
+                                'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+                            ));
+                            if (focusables.length > 0) {
+                                const first = focusables[0];
+                                const last = focusables[focusables.length - 1];
+                                if (!modalRef.current.contains(document.activeElement)) {
+                                    e.preventDefault();
+                                    first.focus();
+                                } else if (e.shiftKey && document.activeElement === first) {
+                                    e.preventDefault();
+                                    last.focus();
+                                } else if (!e.shiftKey && document.activeElement === last) {
+                                    e.preventDefault();
+                                    first.focus();
+                                }
+                            }
                         }
                     }}
                 >
@@ -287,6 +319,7 @@ const MermaidViewer = ({ chart, title = "Architecture Diagram" }) => {
                         </div>
                         <button
                             onClick={() => setIsFullscreen(false)}
+                            aria-label="Close fullscreen view"
                             className="p-2 rounded-xl bg-slate-900 text-slate-400 hover:text-white"
                         >
                             <X className="w-5 h-5" />

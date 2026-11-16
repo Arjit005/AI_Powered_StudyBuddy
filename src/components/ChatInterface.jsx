@@ -180,19 +180,17 @@ const ChatInterface = () => {
             if (res.ok) {
                 setConversations(prev => {
                     const remaining = prev.filter(c => c.id !== convId);
-                    setActiveConvId(currentActive => {
-                        if (currentActive === convId) {
-                            if (remaining.length > 0) {
-                                return remaining[0].id;
-                            } else {
-                                setMessages([DEFAULT_GREETING]);
-                                return null;
-                            }
-                        }
-                        return currentActive;
-                    });
                     return remaining;
                 });
+                if (activeConvId === convId) {
+                    const remaining = conversations.filter(c => c.id !== convId);
+                    if (remaining.length > 0) {
+                        setActiveConvId(remaining[0].id);
+                    } else {
+                        setActiveConvId(null);
+                        setMessages([DEFAULT_GREETING]);
+                    }
+                }
             }
         } catch (err) {
             console.error("Error deleting session:", err);
@@ -298,13 +296,22 @@ const ChatInterface = () => {
                     let doneReading = false;
                     let buffer = '';
 
+                    const isStillCurrentConv = () => (
+                        originatingConvId === activeConvIdRef.current || 
+                        (streamConvId && activeConvIdRef.current === streamConvId)
+                    );
+
                     while (!doneReading) {
                         const { value, done } = await reader.read();
-                        if (done) break;
-                        buffer += decoder.decode(value, { stream: true });
+                        if (done) {
+                            buffer += decoder.decode();
+                            doneReading = true;
+                        } else {
+                            buffer += decoder.decode(value, { stream: true });
+                        }
 
                         const lines = buffer.split('\n');
-                        buffer = lines.pop() || '';
+                        buffer = done ? '' : (lines.pop() || '');
 
                         for (const line of lines) {
                             const trimmed = line.trim();
@@ -335,39 +342,51 @@ const ChatInterface = () => {
                             }
                             if (parsed.token) {
                                 accumulatedText += parsed.token;
-                                if (originatingConvId === activeConvIdRef.current || activeConvIdRef.current === streamConvId) {
+                                if (isStillCurrentConv()) {
                                     setMessages(prev => prev.map(m => m.id === streamMsgId ? { ...m, content: accumulatedText } : m));
                                 }
                             }
                         }
                     }
 
-                    if (!doneReading) {
-                        if (accumulatedText.length === 0) {
+                    if (!doneReading && accumulatedText.length === 0) {
+                        if (isStillCurrentConv()) {
                             setMessages(prev => prev.filter(m => m.id !== streamMsgId));
-                            throw new Error('Streaming connection closed unexpectedly before response was received.');
-                        } else {
-                            // Truncated stream EOF without [DONE]: indicate interrupted state
-                            setMessages(prev => prev.map(m => m.id === streamMsgId ? { ...m, isStreaming: false, content: accumulatedText + "\n\n*(Generation interrupted)*" } : m));
-                            fetchConversations();
-                            streamSuccess = true;
-                            return;
                         }
+                        throw new Error('Streaming connection closed unexpectedly before response was received.');
+                    } else if (!doneReading) {
+                        // Truncated stream EOF without [DONE]: indicate interrupted state
+                        if (isStillCurrentConv()) {
+                            setMessages(prev => prev.map(m => m.id === streamMsgId ? { ...m, isStreaming: false, content: accumulatedText + "\n\n*(Generation interrupted)*" } : m));
+                        }
+                        fetchConversations();
+                        streamSuccess = true;
+                        return;
                     }
 
                     // Mark streaming complete
-                    setMessages(prev => prev.map(m => m.id === streamMsgId ? { ...m, isStreaming: false } : m));
+                    if (isStillCurrentConv()) {
+                        setMessages(prev => prev.map(m => m.id === streamMsgId ? { ...m, isStreaming: false } : m));
+                    }
                     fetchConversations();
                     streamSuccess = true;
                     return;
                 }
             } catch (streamErr) {
                 console.warn('SSE Streaming connection failed:', streamErr);
+                const isStillCurrentConv = () => (
+                    originatingConvId === activeConvIdRef.current || 
+                    (streamConvId && activeConvIdRef.current === streamConvId)
+                );
                 if (accumulatedText.length > 0) {
-                    setMessages(prev => prev.map(m => m.id === streamMsgId ? { ...m, isStreaming: false } : m));
+                    if (isStillCurrentConv()) {
+                        setMessages(prev => prev.map(m => m.id === streamMsgId ? { ...m, isStreaming: false } : m));
+                    }
                     return;
                 }
-                setMessages(prev => prev.filter(m => m.id !== streamMsgId));
+                if (isStillCurrentConv()) {
+                    setMessages(prev => prev.filter(m => m.id !== streamMsgId));
+                }
             }
 
             if (!streamSuccess) {

@@ -81,6 +81,7 @@ const ProtectedRoute = ({ children }) => {
         if (!isMounted) return;
         if (res.ok) {
           const data = await res.json().catch(() => null);
+          if (!isMounted) return;
           if (data && (data.id || data.email || data.username)) {
             setAuthStatus('authorized');
           } else {

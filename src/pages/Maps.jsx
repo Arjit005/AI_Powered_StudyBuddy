@@ -37,8 +37,8 @@ const Maps = () => {
         if (token) headers['Authorization'] = `Bearer ${token}`;
 
         try {
-            // Fetch detailed Mermaid diagram and NetworkX topology graph concurrently
-            const [diagramRes, mapRes] = await Promise.all([
+            // Fetch detailed Mermaid diagram and NetworkX topology graph concurrently with independent fault tolerance
+            const [diagramResult, mapResult] = await Promise.allSettled([
                 fetch('/api/generate-diagram', {
                     method: 'POST',
                     headers,
@@ -53,16 +53,13 @@ const Maps = () => {
 
             if (thisGen !== mapRequestGenRef.current) return;
 
-            if (!diagramRes.ok && !mapRes.ok) {
-                throw new Error('Failed to generate architecture diagram or concept map.');
-            }
-
             let hasDiagram = false;
             let hasMap = false;
 
-            if (diagramRes.ok) {
+            if (diagramResult.status === 'fulfilled' && diagramResult.value.ok) {
                 try {
-                    const data = await diagramRes.json();
+                    const data = await diagramResult.value.json();
+                    if (thisGen !== mapRequestGenRef.current) return;
                     if (data && typeof data === 'object' && typeof data.mermaid_code === 'string' && data.mermaid_code.trim()) {
                         setDiagramData(data);
                         hasDiagram = true;
@@ -72,9 +69,10 @@ const Maps = () => {
                 }
             }
 
-            if (mapRes.ok) {
+            if (mapResult.status === 'fulfilled' && mapResult.value.ok) {
                 try {
-                    const mapJson = await mapRes.json();
+                    const mapJson = await mapResult.value.json();
+                    if (thisGen !== mapRequestGenRef.current) return;
                     if (mapJson && mapJson.map_image) {
                         setMapImage(`data:image/png;base64,${mapJson.map_image}`);
                         hasMap = true;

@@ -60,7 +60,16 @@ export default function Library() {
       if (res.ok) {
         const data = await res.json();
         if (thisGen !== requestGenRef.current) return;
-        setItems(Array.isArray(data) ? data : []);
+        const serverItems = Array.isArray(data) ? data : [];
+        setItems(prev => {
+          const currentFavMap = new Map(prev.map(p => [p.id, p.is_favorite]));
+          return serverItems.map(item => {
+            if (pendingFavoritesRef.current.has(item.id) && currentFavMap.has(item.id)) {
+              return { ...item, is_favorite: currentFavMap.get(item.id) };
+            }
+            return item;
+          });
+        });
       } else {
         setError("Failed to load study materials. Please try again.");
       }
@@ -102,8 +111,8 @@ export default function Library() {
       const res = await fetch(`/api/library/${id}`, { method: 'DELETE', headers: getAuthHeaders() });
       if (res.ok) {
         setItems(prev => prev.filter(item => item.id !== id));
+        detailRequestGenRef.current += 1;
         if (selectedItem?.id === id) {
-          detailRequestGenRef.current += 1;
           setSelectedItem(null);
         }
       } else {

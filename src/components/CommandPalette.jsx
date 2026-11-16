@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Search, 
@@ -13,8 +13,7 @@ import {
   BarChart2, 
   Sparkles, 
   Plus, 
-  X,
-  Cpu
+  X
 } from 'lucide-react';
 
 export default function CommandPalette({ isOpen, onClose }) {
@@ -118,11 +117,19 @@ export default function CommandPalette({ isOpen, onClose }) {
     }
   ];
 
-  const filtered = commands.filter(cmd => 
-    cmd.title.toLowerCase().includes(query.toLowerCase()) ||
-    cmd.description.toLowerCase().includes(query.toLowerCase()) ||
-    cmd.category.toLowerCase().includes(query.toLowerCase())
-  );
+  const filtered = useMemo(() => {
+    const q = query.toLowerCase();
+    return commands.filter(cmd => 
+      cmd.title.toLowerCase().includes(q) ||
+      cmd.description.toLowerCase().includes(q) ||
+      cmd.category.toLowerCase().includes(q)
+    );
+  }, [query]);
+
+  const filteredRef = useRef(filtered);
+  filteredRef.current = filtered;
+  const selectedIndexRef = useRef(selectedIndex);
+  selectedIndexRef.current = selectedIndex;
 
   useEffect(() => {
     setSelectedIndex(0);
@@ -180,14 +187,17 @@ export default function CommandPalette({ isOpen, onClose }) {
         }
       } else if (e.key === 'ArrowDown') {
         e.preventDefault();
-        setSelectedIndex(prev => (prev + 1) % (filtered.length || 1));
+        const len = filteredRef.current.length || 1;
+        setSelectedIndex(prev => (prev + 1) % len);
       } else if (e.key === 'ArrowUp') {
         e.preventDefault();
-        setSelectedIndex(prev => (prev - 1 + (filtered.length || 1)) % (filtered.length || 1));
+        const len = filteredRef.current.length || 1;
+        setSelectedIndex(prev => (prev - 1 + len) % len);
       } else if (e.key === 'Enter') {
         e.preventDefault();
-        if (filtered[selectedIndex]) {
-          filtered[selectedIndex].action();
+        const active = filteredRef.current[selectedIndexRef.current];
+        if (active) {
+          active.action();
           onClose();
         }
       }
@@ -195,7 +205,7 @@ export default function CommandPalette({ isOpen, onClose }) {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, filtered, selectedIndex, onClose]);
+  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 

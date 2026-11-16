@@ -24,24 +24,21 @@ def hierarchy_pos(G, root=None, width=1., vert_gap = 0.2, vert_loc = 0, xcenter 
     # FORCE HIERARCHY: Create a BFS tree for layout purposes to ignore back-edges/cycles
     layout_G = nx.bfs_tree(G, root)
 
-    def _hierarchy_pos(G, root, width=1., vert_gap = 0.2, vert_loc = 0, xcenter = 0.5, pos = None, parent = None):
-        if pos is None:
-            pos = {root:(xcenter,vert_loc)}
-        else:
-            pos[root] = (xcenter, vert_loc)
-        
-        children = list(G.neighbors(root))
-        if len(children)!=0:
-            dx = width/len(children) 
-            nextx = xcenter - width/2 - dx/2
+    from collections import deque
+    pos = {root: (xcenter, vert_loc)}
+    queue = deque([(root, width, vert_loc, xcenter)])
+    while queue:
+        node, node_width, node_y, node_x = queue.popleft()
+        children = list(layout_G.neighbors(node))
+        if children:
+            dx = node_width / len(children)
+            next_x = node_x - node_width / 2 - dx / 2
             for child in children:
-                nextx += dx
-                pos = _hierarchy_pos(G,child, width = dx, vert_gap = vert_gap, 
-                                    vert_loc = vert_loc-vert_gap, xcenter=nextx,
-                                    pos=pos, parent = root)
-        return pos
+                next_x += dx
+                pos[child] = (next_x, node_y - vert_gap)
+                queue.append((child, dx, node_y - vert_gap, next_x))
 
-    return _hierarchy_pos(layout_G, root, width, vert_gap, vert_loc, xcenter)
+    return pos
 
 def get_node_depths(G, root):
     """Calculate depth of each node from root using BFS."""

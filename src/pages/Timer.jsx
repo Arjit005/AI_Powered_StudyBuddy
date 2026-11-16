@@ -34,7 +34,7 @@ const StudyTimer = () => {
                 targetEndTimeRef.current = null;
 
                 const duration = mode === 'focus' ? FOCUS_DURATION_SECONDS : BREAK_DURATION_SECONDS;
-                if (mode === 'focus') {
+                if (mode === 'focus' && remaining <= 0) {
                     const token = localStorage.getItem('auth_token');
                     const headers = { 'Content-Type': 'application/json' };
                     if (token) headers['Authorization'] = `Bearer ${token}`;

@@ -17,6 +17,7 @@ const Header = () => {
                 setUser(rawUser ? JSON.parse(rawUser) : null);
             } catch (e) {
                 console.error(e);
+                setUser(null);
             }
         };
         syncUser();
