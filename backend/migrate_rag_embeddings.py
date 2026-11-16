@@ -5,8 +5,6 @@ and upserts them into Pinecone with tenant namespace isolation.
 """
 import os
 import json
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
 from dotenv import load_dotenv
 
 load_dotenv("backend/.env")
@@ -15,14 +13,12 @@ load_dotenv(".env")
 from backend.models import Source, SourceChunk
 from backend.embedding_service import EmbeddingService
 from backend.rag_service import RAGService
+from backend.database import SessionLocal, engine
 
 
 def migrate_embeddings():
-    db_url = os.getenv("DATABASE_URL") or "sqlite:///./study_buddy.db"
-    print(f"Connecting to database: {db_url.split('@')[-1] if '@' in db_url else db_url}")
-    engine = create_engine(db_url, connect_args={"connect_timeout": 10} if "postgresql" in db_url else {})
-    Session = sessionmaker(bind=engine)
-    db = Session()
+    print(f"Connecting to database via engine: {engine.dialect.name} (driver: {engine.dialect.driver})")
+    db = SessionLocal()
 
     sources = db.query(Source).all()
     print(f"Found {len(sources)} sources to evaluate.")

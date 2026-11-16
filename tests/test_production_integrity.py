@@ -46,3 +46,13 @@ def test_semantic_embedding_dimension():
     # Vector must be L2 normalized
     norm = sum(x * x for x in emb)
     assert 0.99 <= norm <= 1.01
+
+def test_database_url_normalization_and_driver_resolution():
+    """Verify PostgreSQL connection URLs from Render/Supabase are normalized and resolved to available DBAPI drivers."""
+    from backend.database import _prepare_database_url
+    raw_render_url = "postgres://study_user:secret_pass@ep-shiny-pond-12345.us-east-2.aws.neon.tech/neondb?sslmode=require"
+    resolved_url = _prepare_database_url(raw_render_url)
+    assert not resolved_url.startswith("postgres://")
+    assert resolved_url.startswith("postgresql+psycopg://") or resolved_url.startswith("postgresql+psycopg2://")
+    assert "sslmode=require" in resolved_url
+
