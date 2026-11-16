@@ -59,6 +59,8 @@ const LoginPage = () => {
                 setError("Sign-in popup was closed. Please try again or use the form below.");
             } else if (errStr.includes('network-request-failed')) {
                 setError("Network error connecting to Google. Please check your internet connection.");
+            } else if (err?.message && typeof err.message === 'string' && !err.message.includes('[object')) {
+                setError(err.message);
             } else {
                 setError("Google sign-in could not be completed. Please sign in with your email and password below.");
             }

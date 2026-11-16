@@ -69,6 +69,8 @@ const SignupPage = () => {
                 setError("Sign-up popup was closed. Please try again or use the form below.");
             } else if (errStr.includes('network-request-failed')) {
                 setError("Network error connecting to Google. Please check your internet connection.");
+            } else if (err?.message && typeof err.message === 'string' && !err.message.includes('[object')) {
+                setError(err.message);
             } else {
                 setError("Google sign-up could not be completed. Please create your account using the form below.");
             }

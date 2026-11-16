@@ -352,7 +352,7 @@ def get_current_user_profile(user: models.User = Depends(auth.get_current_user_r
         "email": user.email
     }
 
-# Initialize Firebase Admin SDK for Google ID token verification
+# Initialize Firebase Admin SDK for Google ID token verification (optional fallback)
 try:
     import firebase_admin
     from firebase_admin import auth as fb_auth
@@ -363,15 +363,44 @@ except Exception as fb_err:
     print(f"Firebase Admin init note: {fb_err}")
     fb_auth = None
 
+def _verify_google_token(id_token_str: str, project_id: str) -> dict:
+    """
+    Verifies Firebase / Google OAuth ID tokens using multi-tier fallback:
+    1. Public x509 cert validation via google.oauth2.id_token.verify_firebase_token (zero credentials/ADC required).
+    2. Firebase Admin SDK verify_id_token if initialized with service account.
+    3. Standard Google OAuth2 token verification.
+    """
+    from google.oauth2 import id_token as google_id_token
+    from google.auth.transport import requests as google_requests
+    http_req = google_requests.Request()
+
+    # Tier 1: Public key cert verification against Firebase project audience
+    try:
+        return google_id_token.verify_firebase_token(id_token_str, http_req, audience=project_id)
+    except Exception as tf_err:
+        print(f"verify_firebase_token note: {tf_err}")
+
+    # Tier 2: Firebase Admin SDK (if ADC credentials exist)
+    if fb_auth:
+        try:
+            return fb_auth.verify_id_token(id_token_str)
+        except Exception as fb_err:
+            print(f"fb_auth.verify_id_token note: {fb_err}")
+
+    # Tier 3: Standard Google OAuth2 verification
+    try:
+        return google_id_token.verify_oauth2_token(id_token_str, http_req)
+    except Exception as vo_err:
+        print(f"verify_oauth2_token note: {vo_err}")
+        raise ValueError(f"Google ID token signature verification failed: {vo_err}")
+
 @app.post("/api/auth/google", response_model=AuthResponse, tags=["Authentication"])
 def google_login(req: GoogleLoginRequest, request: Request, db: Session = Depends(get_db)):
     security.limiter.check_rate_limit(request, category="auth", max_requests=15, window_seconds=60)
     
-    if not fb_auth:
-        raise HTTPException(status_code=500, detail="Firebase Admin authentication service is uninitialized.")
-
+    fb_proj = os.getenv("FIREBASE_PROJECT_ID", "loyal-synthesis-477817-e7")
     try:
-        decoded = fb_auth.verify_id_token(req.id_token)
+        decoded = _verify_google_token(req.id_token, fb_proj)
     except Exception as e:
         print(f"Google ID token verification failed: {e}")
         raise HTTPException(
