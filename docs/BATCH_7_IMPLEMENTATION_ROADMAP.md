@@ -1,7 +1,7 @@
 # Batch 7 — Implementation Roadmap
 
 **Planning basis:** Phase 0 source audit at `a94ef7aec1bbffd46f676adfc19a0a049d3a0ad2`.
-**Status:** Phase 1 analytics authorization and Phase 2 API-client centralization are complete. Phases 3–6 have not started.
+**Status:** Phase 1 analytics authorization and Phase 2 API-client centralization are complete. Phase 3 auth hardening and Phase 4 security remediation are partially complete; Phases 5–6 have not started.
 
 ## Phase 2 — Centralized API client
 
@@ -49,7 +49,7 @@
 
 ## Phase 3 — Authentication and LoginPage hardening
 
-**Status:** Not started.
+**Status:** In progress. The shared Login/Signup response validation and storage rollback for F-04 are complete; broader auth-policy acceptance criteria remain open. See [BATCH_7_PHASE_3_AUTH_HARDENING_REPORT.md](./BATCH_7_PHASE_3_AUTH_HARDENING_REPORT.md).
 
 **Goal:** Make login/signup/session behavior consistent and define backend enforcement for enterprise authorization.
 
@@ -94,7 +94,7 @@
 
 ## Phase 4 — Frontend security remediation
 
-**Status:** Pending. The analytics dashboard authorization and isolation finding (F-01) was remediated in Phase 1; see [BATCH_7_PHASE_1_ANALYTICS_SECURITY_REPORT.md](./BATCH_7_PHASE_1_ANALYTICS_SECURITY_REPORT.md).
+**Status:** In progress. F-01 was remediated in Phase 1 and the Mermaid mount fallback (F-03) is now fixed; F-02 remains policy-dependent and unchanged. See [BATCH_7_PHASE_4_SECURITY_REMEDIATION_REPORT.md](./BATCH_7_PHASE_4_SECURITY_REMEDIATION_REPORT.md).
 
 **Goal:** Close remaining fail-closed rendering gaps; review CORS and data boundaries.
 
@@ -135,6 +135,8 @@
 
 ## Phase 5 — Reliability and code quality
 
+**Status:** Not started.
+
 **Goal:** Apply consistent network lifecycle handling and error states after the client/auth contracts settle.
 
 **Files expected to change**
@@ -172,6 +174,8 @@
 - Revert only lifecycle/error changes causing regressions, retaining the shared client, security checks, and test coverage. Do not remove timeouts from all requests as a blanket rollback; scope adjustments to slow operations.
 
 ## Phase 6 — Full regression and release verification
+
+**Status:** Not started.
 
 **Goal:** Validate the integrated change set, record evidence, and prepare a release checkpoint.
 
@@ -214,4 +218,4 @@
 
 ## Execution status
 
-The original Phase 0 approval gate was satisfied by the later user authorization for the master execution. Phase 2 is complete; subsequent phase status must be updated only when that work is implemented and verified. This roadmap is a status record and does not authorize deployment or changes to the agreed authentication architecture.
+The original Phase 0 approval gate was satisfied by the later user authorization for the master execution. Phase 2 is complete, and Phases 3–4 are in progress as recorded above. This roadmap is a status record and does not authorize deployment or changes to the agreed authentication architecture.

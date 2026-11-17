@@ -37,7 +37,7 @@ The existing documented historical Batch 6 verification is 33 Vitest component t
 
 - Completed: repository baseline and documentation review; Batch 6 Phase 4 completion verified.
 - Completed: Batch 7 Phase 2A API-client foundation and contract tests; Phase 2C Feedback/Timer pilot; Analytics/Progress; study generation tools; Maps/Canvas groups.
-- Current phase: Batch 7 Phase 2 centralized API client and all 42 call-site migrations are complete; the next authorized work is auth/security hardening.
+- Current phase: Batch 7 Phase 2 is complete; Phase 3 F-04 auth consistency and Phase 4 F-03 Mermaid fail-closed remediation are complete, with both broader phases still in progress.
 - Files changed in the API migration: `src/config/apiClient.js`; `src/App.jsx`; `src/components/{ChatInterface,FeedbackWidget}.jsx`; `src/pages/{CanvasStudio,Flashcards,Library,LoginPage,Maps,Progress,Quiz,SignupPage,Sources,Summarize,Timer,Voice}.jsx`; and API-client/caller tests under `tests/`.
 - Current verified consumer migration count: **42/42** API operations now call `apiRequest` across 15 caller files. A fresh scan finds only the transport-level `fetch` inside `src/config/apiClient.js`.
 - Full frontend component suite: `npm run test:components` — **12 files passed, 74 tests passed**.
@@ -46,6 +46,9 @@ The existing documented historical Batch 6 verification is 33 Vitest component t
 - Production build: `npm exec -- vite build --outDir 'C:\\Users\\Dell\\AppData\\Local\\Temp\\studybuddy-api-client-build'` — **passed**; build output was removed and tracked `dist/` assets were not changed.
 - Focused lint: `npm exec -- eslint src/config/apiClient.js tests/api-client.component.test.js tests/api-client-auth.component.test.jsx tests/api-client-library-sources.component.test.jsx` — **passed**. `npm run lint` did not complete: ESLint scanned `.venv` and its formatter threw `RangeError: Invalid string length`. A targeted lint over all changed JSX also reports repository JSX-only import false positives and existing hook/no-empty/escape diagnostics; this is documented in the Phase 2 implementation report.
 - `git diff --check` initially identified trailing whitespace in two migrated Library lines; those lines were corrected. Re-run the check before final completion.
+- Auth hardening: `npm run test:components -- tests/api-client-auth.component.test.jsx tests/signup-page.component.test.jsx` — **2 files passed, 15 tests passed**. Login and Signup now share strict response validation and rollback-aware persistence through `src/config/authSession.js`.
+- Mermaid remediation: `npm run test:components -- tests/mermaid-viewer-security.component.test.jsx` — **1 file passed, 10 tests passed**. The mount-time `innerHTML` fallback is removed; a parser failure now fails closed.
+- Security findings F-01 and F-03 are remediated; F-04 is remediated. F-02 remains an explicit policy-sensitive open item because the application has intentional anonymous flows and no instruction has authorized changing their ownership/access policy.
 - No commit, push, deployment, dependency install, or database/schema change has occurred.
 
 ### Pilot behavior recorded before migration
@@ -57,9 +60,9 @@ The existing documented historical Batch 6 verification is 33 Vitest component t
 
 1. Complete: implement/test the API client and migrate all 42 API operations, including Chat SSE.
 2. Complete: refresh the API inventory and record Phase 2 implementation evidence.
-3. Next: harden confirmed Login/auth consistency defects without introducing refresh-token or cookie auth.
-4. Revalidate and remediate confirmed frontend security findings; do not repeat already-completed fixes.
-5. Address confirmed reliability defects using deterministic tests.
+3. Partial: unify Login/Signup response validation and session persistence; continue only non-policy-changing auth hardening.
+4. Partial: fix Mermaid fail-closed mounting; preserve F-02 anonymous policy until explicitly decided.
+5. Next: identify and address confirmed reliability defects using deterministic tests.
 6. Run final regression, lint, build, and security verification; create the engineering report.
 
 ## 6. Constraints and stop conditions
@@ -72,4 +75,4 @@ The existing documented historical Batch 6 verification is 33 Vitest component t
 
 ## 7. Exact next action
 
-Finish the Phase 2 completion report and update status evidence, then begin the next authorized auth/security task without changing the existing localStorage bearer architecture or introducing refresh, cookie, or backend auth-policy changes.
+Inspect the remaining reliability findings in source and the prior audit; fix only deterministic defects that do not require new timeout, ownership, or authentication policy decisions. Then run final regression and update the engineering report.
