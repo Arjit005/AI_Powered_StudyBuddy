@@ -77,10 +77,36 @@ describe('API client contract', () => {
         expect(fetch.mock.calls[0][1].body).toBe('{"title":"Review"}');
     });
 
+    it('throws a typed request error when JSON serialization fails', async () => {
+        const circular = { title: 'Review' };
+        circular.self = circular;
+
+        await expect(apiRequest('/api/items', { method: 'POST', json: circular })).rejects.toMatchObject({
+            name: 'ApiError',
+            kind: 'request',
+            message: 'The JSON request body could not be serialized.',
+        });
+        expect(fetch).not.toHaveBeenCalled();
+    });
+
     it('returns null for an empty JSON response', async () => {
         fetch.mockResolvedValue(new Response(null, { status: 204 }));
 
         await expect(apiRequest('/api/items')).resolves.toBeNull();
+    });
+
+    it('cancels response bodies when only status and headers are requested', async () => {
+        const cancel = vi.fn();
+        const body = new ReadableStream({
+            cancel,
+        });
+        fetch.mockResolvedValue(new Response(body, { status: 200 }));
+
+        await expect(apiRequest('/api/items', { responseType: 'none' })).resolves.toMatchObject({
+            status: 200,
+        });
+
+        expect(cancel).toHaveBeenCalledOnce();
     });
 
     it('reports malformed successful JSON explicitly', async () => {
@@ -176,6 +202,48 @@ describe('API client contract', () => {
         streamController.error(new DOMException('Aborted', 'AbortError'));
 
         await nextChunk;
+    });
+
+    it('preserves the lifecycle for raw response bodies until they are consumed or cancelled', async () => {
+        vi.useFakeTimers();
+        let streamController;
+        const body = new ReadableStream({
+            start(controller) {
+                streamController = controller;
+            },
+        });
+        fetch.mockResolvedValue(new Response(body, { status: 200 }));
+
+        const response = await apiRequest('/api/response-body', {
+            responseType: 'response',
+            timeoutMs: 20,
+        });
+        const reader = response.body.getReader();
+        const nextChunk = expect(reader.read()).rejects.toMatchObject({ kind: 'timeout' });
+        await vi.advanceTimersByTimeAsync(20);
+        streamController.error(new DOMException('Aborted', 'AbortError'));
+
+        await nextChunk;
+    });
+
+    it('preserves timeout classification when a non-2xx response body is aborted while reading', async () => {
+        vi.useFakeTimers();
+        let streamController;
+        const body = new ReadableStream({
+            start(controller) {
+                streamController = controller;
+            },
+        });
+        fetch.mockResolvedValue(new Response(body, { status: 401 }));
+
+        const request = expect(apiRequest('/api/private', { timeoutMs: 20 })).rejects.toMatchObject({
+            kind: 'timeout',
+            message: 'The request timed out.',
+        });
+        await vi.advanceTimersByTimeAsync(20);
+        streamController.error(new DOMException('Aborted', 'AbortError'));
+
+        await request;
     });
 
     it('passes FormData through without overriding the multipart boundary', async () => {

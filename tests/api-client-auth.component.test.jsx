@@ -4,6 +4,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import LoginPage from '../src/pages/LoginPage.jsx';
 import App from '../src/App.jsx';
+import { persistSession } from '../src/config/authSession.js';
 
 function jsonResponse(data, status = 200) {
     return new Response(JSON.stringify(data), {
@@ -129,6 +130,85 @@ describe('API client migrated authentication callers', () => {
                 writable: true,
             });
         }
+    });
+
+    it('restores the previous session if a later storage write fails during login persistence', () => {
+        const previousUser = { id: 7, username: 'existing', email: 'existing@example.com' };
+        localStorage.setItem('auth_token', 'existing-token');
+        localStorage.setItem('user', JSON.stringify(previousUser));
+        localStorage.setItem('isAuthenticated', 'true');
+
+        const originalSetItem = window.localStorage.setItem;
+        Object.defineProperty(window.localStorage, 'setItem', {
+            value: (key, value) => {
+                if (key === 'isAuthenticated') {
+                    throw new Error('Storage exception details');
+                }
+                return originalSetItem.call(window.localStorage, key, value);
+            },
+            configurable: true,
+            writable: true,
+        });
+
+        try {
+            expect(() => persistSession('new-token', { id: 8, username: 'new', email: 'new@example.com' }))
+                .toThrow('Unable to save login session. Please ensure cookies and local storage are enabled in your browser.');
+            expect(localStorage.getItem('auth_token')).toBe('existing-token');
+            expect(JSON.parse(localStorage.getItem('user'))).toEqual(previousUser);
+            expect(localStorage.getItem('isAuthenticated')).toBe('true');
+        } finally {
+            Object.defineProperty(window.localStorage, 'setItem', {
+                value: originalSetItem,
+                configurable: true,
+                writable: true,
+            });
+        }
+    });
+
+    it('does not write session data when the previous session cannot be read', () => {
+        const originalGetItem = window.localStorage.getItem;
+        const setItem = vi.spyOn(window.localStorage, 'setItem');
+        Object.defineProperty(window.localStorage, 'getItem', {
+            value: () => {
+                throw new Error('Storage exception details');
+            },
+            configurable: true,
+            writable: true,
+        });
+
+        try {
+            expect(() => persistSession('new-token', { id: 8, username: 'new', email: 'new@example.com' }))
+                .toThrow('Unable to save login session. Please ensure cookies and local storage are enabled in your browser.');
+            expect(setItem).not.toHaveBeenCalled();
+        } finally {
+            Object.defineProperty(window.localStorage, 'getItem', {
+                value: originalGetItem,
+                configurable: true,
+                writable: true,
+            });
+        }
+    });
+
+    it('keeps an in-flight verification alive when auth-change fires for the same token', async () => {
+        const token = `header.${btoa(JSON.stringify({ exp: Math.floor(Date.now() / 1000) + 3600 }))}.signature`;
+        localStorage.setItem('auth_token', token);
+        window.history.replaceState({}, '', '/chat');
+
+        fetch.mockImplementation((url) => {
+            if (url === '/api/auth/me') {
+                return Promise.resolve(jsonResponse({ id: 8, username: 'student' }));
+            }
+            if (url === '/api/conversations' || url === '/api/chat') {
+                return Promise.resolve(jsonResponse([]));
+            }
+            throw new Error(`Unexpected API path: ${url}`);
+        });
+
+        render(React.createElement(App));
+        window.dispatchEvent(new Event('auth-change'));
+
+        expect(await screen.findByText('AI Study Companion')).toBeTruthy();
+        expect(fetch.mock.calls.filter(([url]) => url === '/api/auth/me')).toHaveLength(1);
     });
 
     it('verifies a protected session with required bearer auth', async () => {

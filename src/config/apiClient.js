@@ -121,7 +121,7 @@ function createHeaders(input, auth, token, hasJsonBody, isFormData) {
     return headers;
 }
 
-async function createHttpError(response) {
+async function createHttpError(response, lifecycle) {
     let message = `Request failed with status ${response.status}.`;
     let hasDetail = false;
     try {
@@ -152,7 +152,14 @@ async function createHttpError(response) {
                 // Keep the status-only message for non-JSON error bodies.
             }
         }
-    } catch {
+    } catch (error) {
+        if (
+            lifecycle.timedOut() ||
+            lifecycle.callerAborted() ||
+            (error && typeof error === 'object' && (error.name === 'AbortError' || error.code === 20))
+        ) {
+            throw error;
+        }
         // The status remains useful even if the error body cannot be read.
     }
     return new ApiError('http', message, response.status, { hasDetail });
@@ -178,6 +185,15 @@ function retainStreamLifecycle(response, lifecycle) {
         finished = true;
         lifecycle.cleanup();
     };
+    const originalCleanup = lifecycle.cleanup.bind(lifecycle);
+    const onAbort = () => finish();
+    if (lifecycle.signal && typeof lifecycle.signal.addEventListener === 'function') {
+        lifecycle.signal.addEventListener('abort', onAbort, { once: true });
+        lifecycle.cleanup = () => {
+            lifecycle.signal.removeEventListener('abort', onAbort);
+            originalCleanup();
+        };
+    }
     const body = new ReadableStream({
         async pull(controller) {
             try {
@@ -238,7 +254,7 @@ export async function apiRequest(path, options = {}) {
     if (hasJsonBody && hasFormData) {
         throw new ApiError('request', 'A request cannot contain both JSON and FormData bodies.');
     }
-    if (hasFormData && !(formData instanceof FormData)) {
+    if (hasFormData && (typeof FormData === 'undefined' || !(formData instanceof FormData))) {
         throw new ApiError('request', 'FormData requests require a FormData body.');
     }
 
@@ -249,7 +265,16 @@ export async function apiRequest(path, options = {}) {
         throw new ApiError('auth', 'Authentication is required for this request.');
     }
     const requestHeaders = createHeaders(inputHeaders, auth, token, hasJsonBody, hasFormData);
-    const body = hasFormData ? formData : hasJsonBody ? JSON.stringify(json) : undefined;
+    let body;
+    if (hasFormData) {
+        body = formData;
+    } else if (hasJsonBody) {
+        try {
+            body = JSON.stringify(json);
+        } catch {
+            throw new ApiError('request', 'The JSON request body could not be serialized.');
+        }
+    }
     const lifecycle = createRequestLifecycle(signal, timeoutMs);
     let retainLifecycle = false;
 
@@ -261,7 +286,7 @@ export async function apiRequest(path, options = {}) {
             signal: lifecycle.signal,
         });
 
-        if (!response.ok) throw await createHttpError(response);
+        if (!response.ok) throw await createHttpError(response, lifecycle);
 
         switch (responseType) {
             case 'json':
@@ -270,15 +295,21 @@ export async function apiRequest(path, options = {}) {
                 return await response.text();
             case 'blob':
                 return await response.blob();
-            case 'none':
+            case 'none': {
+                if (response.body) {
+                    await response.body.cancel();
+                }
                 return { status: response.status, headers: response.headers };
+            }
             case 'stream': {
                 const streamResponse = retainStreamLifecycle(response, lifecycle);
                 retainLifecycle = Boolean(response.body);
                 return streamResponse;
             }
-            case 'response':
-                return response;
+            case 'response': {
+                retainLifecycle = Boolean(response.body);
+                return retainLifecycle ? retainStreamLifecycle(response, lifecycle) : response;
+            }
             default:
                 throw new ApiError('request', 'The API response type is invalid.');
         }

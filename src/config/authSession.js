@@ -32,17 +32,35 @@ export const validateAuthPayload = (data) => {
  * Persist session keys with the auth flag written last and rollback on failure.
  */
 export const persistSession = (accessToken, user) => {
-    const clearStorage = () => {
-        const failedKeys = [];
-        for (const key of ['auth_token', 'user', 'isAuthenticated']) {
-            try {
-                localStorage.removeItem(key);
-            } catch {
-                failedKeys.push(key);
-            }
+    const sessionKeys = ['auth_token', 'user', 'isAuthenticated'];
+    const previousValues = {};
+    let canRollback = true;
+
+    for (const key of sessionKeys) {
+        try {
+            previousValues[key] = localStorage.getItem(key);
+        } catch {
+            canRollback = false;
+            break;
         }
-        if (failedKeys.length > 0) {
-            console.error('Unable to fully clear a partial authentication session.');
+    }
+
+    if (!canRollback) {
+        throw new Error('Unable to save login session. Please ensure cookies and local storage are enabled in your browser.');
+    }
+
+    const restorePreviousSession = () => {
+        for (const key of sessionKeys) {
+            try {
+                const prev = previousValues[key];
+                if (prev === null) {
+                    localStorage.removeItem(key);
+                } else {
+                    localStorage.setItem(key, prev);
+                }
+            } catch {
+                console.error(`Unable to restore the previous value for ${key}.`);
+            }
         }
     };
 
@@ -51,7 +69,7 @@ export const persistSession = (accessToken, user) => {
         localStorage.setItem('user', JSON.stringify(user));
         localStorage.setItem('isAuthenticated', 'true');
     } catch {
-        clearStorage();
+        restorePreviousSession();
         throw new Error('Unable to save login session. Please ensure cookies and local storage are enabled in your browser.');
     }
 };

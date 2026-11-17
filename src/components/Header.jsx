@@ -23,10 +23,15 @@ const Header = () => {
     const location = useLocation();
     const [user, setUser] = useState(null);
     const [openMenu, setOpenMenu] = useState(null);
+    const openMenuRef = useRef(openMenu);
     const toolsOpen = openMenu?.name === 'tools' && openMenu.locationKey === location.key;
     const workspaceOpen = openMenu?.name === 'workspace' && openMenu.locationKey === location.key;
     const toolsRef = useRef(null);
     const workspaceRef = useRef(null);
+
+    useEffect(() => {
+        openMenuRef.current = openMenu;
+    }, [openMenu]);
 
     useEffect(() => {
         const syncUser = () => {
@@ -54,10 +59,20 @@ const Header = () => {
         window.addEventListener('auth-change', syncUser);
 
         const handleClickOutside = (e) => {
-            if (toolsRef.current && !toolsRef.current.contains(e.target)) {
+            const target = e.target;
+            const insideTools = toolsRef.current && target instanceof Node && toolsRef.current.contains(target);
+            const insideWorkspace = workspaceRef.current && target instanceof Node && workspaceRef.current.contains(target);
+
+            if (!insideTools && !insideWorkspace) {
+                setOpenMenu(null);
+                return;
+            }
+
+            if (openMenuRef.current?.name === 'tools' && !insideTools) {
                 setOpenMenu(null);
             }
-            if (workspaceRef.current && !workspaceRef.current.contains(e.target)) {
+
+            if (openMenuRef.current?.name === 'workspace' && !insideWorkspace) {
                 setOpenMenu(null);
             }
         };

@@ -46,6 +46,7 @@ const ProtectedRoute = ({ children }) => {
   const [failedToken, setFailedToken] = useState(null);
   const [retryCount, setRetryCount] = useState(0);
   const verificationGenRef = useRef(0);
+  const currentTokenRef = useRef(currentToken);
   const [authStatus, setAuthStatus] = useState(() => {
     if (!currentToken || !isTokenValid(currentToken)) return 'unauthorized';
     return 'checking';
@@ -53,8 +54,18 @@ const ProtectedRoute = ({ children }) => {
   const [networkError, setNetworkError] = useState(false);
 
   useEffect(() => {
+    currentTokenRef.current = currentToken;
+  }, [currentToken]);
+
+  useEffect(() => {
     const handleAuthChange = () => {
       const freshToken = localStorage.getItem('auth_token');
+      const tokenChanged = freshToken !== currentTokenRef.current;
+
+      if (!tokenChanged) {
+        return;
+      }
+
       verificationGenRef.current += 1;
       setFailedToken(freshToken && !isTokenValid(freshToken) ? freshToken : null);
       setAuthStatus(freshToken && isTokenValid(freshToken) ? 'checking' : 'unauthorized');

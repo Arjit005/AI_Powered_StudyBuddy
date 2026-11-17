@@ -21,6 +21,7 @@ export default function CommandPalette({ isOpen, onClose }) {
   const [selection, setSelection] = useState({ query: '', index: 0 });
   const navigate = useNavigate();
   const previousFocusRef = useRef(null);
+  const wasOpenRef = useRef(false);
   const modalRef = useRef(null);
   const inputRef = useRef(null);
 
@@ -130,29 +131,35 @@ export default function CommandPalette({ isOpen, onClose }) {
   useEffect(() => {
     if (isOpen) {
       previousFocusRef.current = document.activeElement;
+      wasOpenRef.current = true;
       inputRef.current?.focus();
-    } else {
-      // Safely restore focus only if previous element is still attached to the live DOM
-      if (
-        previousFocusRef.current && 
-        typeof previousFocusRef.current.focus === 'function' &&
-        document.contains(previousFocusRef.current)
-      ) {
-        previousFocusRef.current.focus();
-      } else {
-        // Fallback focus to main document body or safe container
-        document.body?.focus?.();
-      }
+      return;
     }
+
+    if (!wasOpenRef.current) {
+      return;
+    }
+
+    const previous = previousFocusRef.current;
+    if (previous && typeof previous.focus === 'function' && document.contains(previous)) {
+      previous.focus();
+    }
+    previousFocusRef.current = null;
+    wasOpenRef.current = false;
   }, [isOpen]);
 
   useEffect(() => {
     const handleKeyDown = (e) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
         const target = e.target;
-        if (!isOpen && target instanceof HTMLElement && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName))) {
+        const isEditableTarget = target instanceof HTMLElement && (
+          target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName)
+        );
+
+        if (isEditableTarget && !(isOpen && modalRef.current?.contains(target))) {
           return;
         }
+
         e.preventDefault();
         if (isOpen) {
           onClose();
