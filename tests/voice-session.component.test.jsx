@@ -211,10 +211,11 @@ describe('Voice Component Real Lifecycle & Session Isolation Suite (8 scenarios)
 
     // Scenario 6: handleAskAi cancellation prevents old recognition callbacks from affecting the next interaction
     it('Scenario 6: handleAskAi cancellation stops listening and isolates the session', async () => {
-        const mockFetch = vi.fn().mockResolvedValue({
-            ok: true,
-            json: async () => ({ response: 'Socratic AI feedback' })
-        });
+        localStorage.setItem('auth_token', 'voice-token');
+        const mockFetch = vi.fn().mockResolvedValue(new Response(
+            JSON.stringify({ response: 'Socratic AI feedback' }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } }
+        ));
         globalThis.fetch = mockFetch;
 
         render(<Voice />);
@@ -248,6 +249,8 @@ describe('Voice Component Real Lifecycle & Session Isolation Suite (8 scenarios)
         await waitFor(() => {
             expect(screen.getByText('Socratic AI feedback')).toBeDefined();
         });
+        expect(mockFetch.mock.calls[0][1].headers.get('Authorization')).toBe('Bearer voice-token');
+        expect(JSON.parse(mockFetch.mock.calls[0][1].body)).toEqual({ message: 'What is polymorphism?' });
     });
 
     // Scenario 7: Component unmount prevents stale callback state updates

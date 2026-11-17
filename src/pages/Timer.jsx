@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Play, Pause, RotateCcw, Flame } from 'lucide-react';
 import { API_ENDPOINTS } from '../config/api';
+import { apiRequest } from '../config/apiClient';
 
 const FOCUS_DURATION_SECONDS = 25 * 60;
 const BREAK_DURATION_SECONDS = 5 * 60;
@@ -37,26 +38,18 @@ const StudyTimer = () => {
 
                 const duration = mode === 'focus' ? FOCUS_DURATION_SECONDS : BREAK_DURATION_SECONDS;
                 if (mode === 'focus' && remaining <= 0) {
-                    let token = null;
-                    try {
-                        token = localStorage.getItem('auth_token');
-                    } catch (_) {}
-                    const headers = { 'Content-Type': 'application/json' };
-                    if (token) headers['Authorization'] = `Bearer ${token}`;
-
-                    fetch(TRACK_ACTIVITY_ENDPOINT, {
+                    apiRequest(TRACK_ACTIVITY_ENDPOINT, {
                         method: 'POST',
-                        headers,
-                        body: JSON.stringify({ activity_type: 'timer_focus', duration_seconds: duration })
-                    }).then(res => {
-                        if (res.ok) {
-                            setTrackingStatus('Completed session recorded in analytics.');
-                        } else {
-                            setTrackingStatus('Could not record session in analytics.');
-                        }
+                        auth: 'optional',
+                        responseType: 'none',
+                        json: { activity_type: 'timer_focus', duration_seconds: duration }
+                    }).then(() => {
+                        setTrackingStatus('Completed session recorded in analytics.');
                     }).catch(err => {
                         console.error("Failed to track time", err);
-                        setTrackingStatus('Network error while recording session.');
+                        setTrackingStatus(err.kind === 'http'
+                            ? 'Could not record session in analytics.'
+                            : 'Network error while recording session.');
                     });
                 }
             }

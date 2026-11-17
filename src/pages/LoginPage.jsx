@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Brain, Lock, User, ArrowRight, ShieldCheck, AlertTriangle, Eye, EyeOff, Zap } from 'lucide-react';
 import { signInWithGoogle } from '../firebase';
+import { apiRequest } from '../config/apiClient';
+import { persistSession, validateAuthPayload } from '../config/authSession';
 
 const LoginPage = () => {
     // Empty default credentials in production builds
@@ -29,26 +31,13 @@ const LoginPage = () => {
         setIsGoogleLoading(true);
         try {
             const { idToken } = await signInWithGoogle();
-            const res = await fetch('/api/auth/google', {
+            const data = await apiRequest('/api/auth/google', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ id_token: idToken })
+                auth: 'none',
+                json: { id_token: idToken },
             });
-            let data = {};
-            try {
-                data = await res.json();
-            } catch (_) {
-                data = { detail: res.statusText || 'Google sign-in server error' };
-            }
-            if (!res.ok) {
-                throw new Error(data.detail || 'Google sign-in failed');
-            }
-            if (!data.access_token || !data.user) {
-                throw new Error('Sign in failed. Please try again.');
-            }
-            localStorage.setItem('isAuthenticated', 'true');
-            localStorage.setItem('auth_token', data.access_token);
-            localStorage.setItem('user', JSON.stringify(data.user));
+            const { accessToken, user } = validateAuthPayload(data);
+            persistSession(accessToken, user);
             navigate('/');
         } catch (err) {
             console.error("Google auth error:", err);
@@ -81,40 +70,23 @@ const LoginPage = () => {
         try {
             const trimmedUsername = username.trim();
             const isEmail = trimmedUsername.includes('@');
-            const res = await fetch('/api/auth/login', {
+            const data = await apiRequest('/api/auth/login', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
+                auth: 'none',
+                json: {
                     email: isEmail ? trimmedUsername : undefined,
                     username: !isEmail ? trimmedUsername : undefined,
                     password: password
-                }),
+                },
             });
 
-            let data = {};
-            try {
-                data = await res.json();
-            } catch (_) {
-                data = { detail: res.statusText || 'Unexpected server response' };
-            }
-            if (!res.ok) {
-                if (res.status === 429) {
-                    setLockoutSecs(60);
-                }
-                throw new Error(data.detail || 'Invalid username/email or password');
-            }
-
-            if (!data.access_token || !data.user) {
-                throw new Error('Sign in failed. Please try again.');
-            }
-
-            localStorage.setItem('isAuthenticated', 'true');
-            localStorage.setItem('auth_token', data.access_token);
-            localStorage.setItem('user', JSON.stringify(data.user));
+            const { accessToken, user } = validateAuthPayload(data);
+            persistSession(accessToken, user);
             navigate('/');
         } catch (err) {
+            if (err.status === 429) {
+                setLockoutSecs(60);
+            }
             setError(err.message || 'Login failed. Please check your username/email and password.');
         } finally {
             setIsLoading(false);

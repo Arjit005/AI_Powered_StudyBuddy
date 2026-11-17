@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import React from 'react';
 import { render, screen, waitFor } from '@testing-library/react';
 import MermaidViewer from '../src/components/MermaidViewer';
@@ -6,6 +6,11 @@ import mermaid from 'mermaid';
 
 describe('MermaidViewer Real Component Security & Sanitization Suite', () => {
     beforeEach(() => {
+        vi.restoreAllMocks();
+    });
+
+    afterEach(() => {
+        vi.unstubAllGlobals();
         vi.restoreAllMocks();
     });
 
@@ -280,5 +285,29 @@ describe('MermaidViewer Real Component Security & Sanitization Suite', () => {
         await waitFor(() => {
             expect(screen.getByText(/Diagram sanitization failed or produced invalid SVG/i)).toBeDefined();
         });
+    });
+
+    it('fails closed when the sanitized SVG cannot be parsed for mounting', async () => {
+        const NativeDOMParser = window.DOMParser;
+        let parseCount = 0;
+        class MountFailingDOMParser {
+            parseFromString(...args) {
+                parseCount += 1;
+                if (parseCount > 1) throw new Error('Mount parser failed');
+                return new NativeDOMParser().parseFromString(...args);
+            }
+        }
+        vi.stubGlobal('DOMParser', MountFailingDOMParser);
+        mockMermaidSvg(`
+            <svg id="ID_PLACEHOLDER" xmlns="http://www.w3.org/2000/svg">
+                <text>Mount boundary content</text>
+            </svg>
+        `);
+
+        const { container } = render(<MermaidViewer chart="graph TD; A;" />);
+
+        expect(await screen.findByText('Diagram could not be displayed safely.')).toBeDefined();
+        expect(screen.queryByText('Mount boundary content')).toBeNull();
+        expect(container.querySelector('svg text')).toBeNull();
     });
 });

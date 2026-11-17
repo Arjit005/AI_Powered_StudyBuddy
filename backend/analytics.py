@@ -8,9 +8,12 @@ from . import models
 # Ensure headless matplotlib directory
 os.environ.setdefault('MPLCONFIGDIR', '/tmp/matplotlib')
 
-def generate_study_chart(db: Session):
+def generate_study_chart(db: Session, user_id: int):
     # 1. Fetch data using SQLALchemy
-    query = db.query(models.StudySession.activity_type, models.StudySession.duration_seconds)
+    query = db.query(
+        models.StudySession.activity_type,
+        models.StudySession.duration_seconds
+    ).filter(models.StudySession.user_id == user_id)
     data = query.all()
 
     if not data:

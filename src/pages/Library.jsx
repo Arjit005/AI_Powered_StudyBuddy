@@ -14,6 +14,7 @@ import {
   X
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { apiRequest } from '../config/apiClient';
 
 export default function Library() {
   const [items, setItems] = useState([]);
@@ -37,13 +38,6 @@ export default function Library() {
     };
   }, [activeTab, search]);
 
-  const getAuthHeaders = () => {
-    const token = localStorage.getItem('auth_token');
-    const headers = {};
-    if (token) headers['Authorization'] = `Bearer ${token}`;
-    return headers;
-  };
-
   const fetchLibrary = async () => {
     setLoading(true);
     setError(null);
@@ -55,35 +49,31 @@ export default function Library() {
       if (search.trim()) params.append('search', search.trim());
       if (params.toString()) url += `?${params.toString()}`;
 
-      const res = await fetch(url, { headers: getAuthHeaders() });
+      const data = await apiRequest(url, { auth: 'optional' });
       if (thisGen !== requestGenRef.current) return;
 
-      if (res.ok) {
-        const data = await res.json();
-        if (thisGen !== requestGenRef.current) return;
-        const serverItems = Array.isArray(data) 
-          ? data.filter(item => item && typeof item === 'object' && item.id !== null && item.id !== undefined) 
-          : [];
-        setItems(prev => {
-          const currentFavMap = new Map(prev.map(p => [p.id, p.is_favorite]));
-          return serverItems.map(item => {
-            const override = itemFavoriteEpochRef.current.get(item.id);
-            if (override && thisGen <= override.minGen) {
-              return { ...item, is_favorite: override.is_favorite };
-            }
-            if (pendingFavoritesRef.current.has(item.id) && currentFavMap.has(item.id)) {
-              return { ...item, is_favorite: currentFavMap.get(item.id) };
-            }
-            return item;
-          });
+      const serverItems = Array.isArray(data)
+        ? data.filter(item => item && typeof item === 'object' && item.id !== null && item.id !== undefined)
+        : [];
+      setItems(prev => {
+        const currentFavMap = new Map(prev.map(p => [p.id, p.is_favorite]));
+        return serverItems.map(item => {
+          const override = itemFavoriteEpochRef.current.get(item.id);
+          if (override && thisGen <= override.minGen) {
+            return { ...item, is_favorite: override.is_favorite };
+          }
+          if (pendingFavoritesRef.current.has(item.id) && currentFavMap.has(item.id)) {
+            return { ...item, is_favorite: currentFavMap.get(item.id) };
+          }
+          return item;
         });
-      } else {
-        setError("Failed to load study materials. Please try again.");
-      }
+      });
     } catch (err) {
       console.error("Library fetch error:", err);
       if (thisGen === requestGenRef.current) {
-        setError("Network error while loading library.");
+        setError(err.kind === 'http'
+          ? 'Failed to load study materials. Please try again.'
+          : 'Network error while loading library.');
       }
     } finally {
       if (thisGen === requestGenRef.current) {
@@ -104,17 +94,18 @@ export default function Library() {
     setItems(prev => prev.map(item => item.id === id ? { ...item, is_favorite: newFav } : item));
 
     try {
-      const res = await fetch(`/api/library/${id}/favorite`, { method: 'PUT', headers: getAuthHeaders() });
-      if (!res.ok) {
-        itemFavoriteEpochRef.current.delete(id);
-        setItems(prev => prev.map(item => item.id === id ? { ...item, is_favorite: !newFav } : item));
-        alert("Could not update favorite status.");
-      }
+      await apiRequest(`/api/library/${id}/favorite`, {
+        method: 'PUT',
+        auth: 'optional',
+        responseType: 'none',
+      });
     } catch (err) {
       console.error("Favorite toggle error:", err);
       itemFavoriteEpochRef.current.delete(id);
       setItems(prev => prev.map(item => item.id === id ? { ...item, is_favorite: !newFav } : item));
-      alert("Network error updating favorite.");
+      alert(err.kind === 'http'
+        ? 'Could not update favorite status.'
+        : 'Network error updating favorite.');
     } finally {
       pendingFavoritesRef.current.delete(id);
     }
@@ -124,23 +115,25 @@ export default function Library() {
     e.stopPropagation();
     if (!window.confirm("Are you sure you want to delete this study material?")) return;
     try {
-      const res = await fetch(`/api/library/${id}`, { method: 'DELETE', headers: getAuthHeaders() });
-      if (res.ok) {
-        // Invalidate any in-flight background fetches so stale results don't restore deleted items
-        requestGenRef.current += 1;
-        setItems(prev => prev.filter(item => item.id !== id));
-        if (selectedItem?.id === id) {
-          detailRequestGenRef.current += 1;
-          setSelectedItem(null);
-          setDetailLoading(false);
-          setDetailError(null);
-        }
-      } else {
-        alert("Failed to delete item from library.");
+      await apiRequest(`/api/library/${id}`, {
+        method: 'DELETE',
+        auth: 'optional',
+        responseType: 'none',
+      });
+      // Invalidate any in-flight background fetches so stale results don't restore deleted items
+      requestGenRef.current += 1;
+      setItems(prev => prev.filter(item => item.id !== id));
+      if (selectedItem?.id === id) {
+        detailRequestGenRef.current += 1;
+        setSelectedItem(null);
+        setDetailLoading(false);
+        setDetailError(null);
       }
     } catch (err) {
       console.error("Delete error:", err);
-      alert("Network error deleting item.");
+      alert(err.kind === 'http'
+        ? 'Failed to delete item from library.'
+        : 'Network error deleting item.');
     }
   };
 
@@ -157,19 +150,15 @@ export default function Library() {
     setDetailLoading(true);
     setDetailError(null);
     try {
-      const res = await fetch(`/api/library/${item.id}`, { headers: getAuthHeaders() });
+      const full = await apiRequest(`/api/library/${item.id}`, { auth: 'optional' });
       if (thisGen !== detailRequestGenRef.current) return;
-      if (res.ok) {
-        const full = await res.json();
-        if (thisGen !== detailRequestGenRef.current) return;
-        setSelectedItem(full);
-      } else {
-        setDetailError("Failed to fetch full study material details.");
-      }
+      setSelectedItem(full);
     } catch (err) {
       console.error("Fetch full item error:", err);
       if (thisGen === detailRequestGenRef.current) {
-        setDetailError("Network error while loading item details.");
+        setDetailError(err.kind === 'http'
+          ? 'Failed to fetch full study material details.'
+          : 'Network error while loading item details.');
       }
     } finally {
       if (thisGen === detailRequestGenRef.current) {

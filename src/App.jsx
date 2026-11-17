@@ -19,6 +19,7 @@ import Sources from './pages/Sources';
 import Pricing from './pages/Pricing';
 import LoginPage from './pages/LoginPage';
 import SignupPage from './pages/SignupPage';
+import { apiRequest } from './config/apiClient';
 
 // Helper to check JWT format and valid expiration
 const isTokenValid = (token) => {
@@ -82,33 +83,29 @@ const ProtectedRoute = ({ children }) => {
     setNetworkError(false);
 
     // Cryptographic validation against server session endpoint
-    fetch('/api/auth/me', {
-      headers: { 'Authorization': `Bearer ${currentToken}` },
-      signal: abortCtrl.signal
+    apiRequest('/api/auth/me', {
+      auth: 'required',
+      signal: abortCtrl.signal,
     })
-      .then(async res => {
+      .then(data => {
         if (!isMounted || thisGen !== verificationGenRef.current) return;
-        if (res.ok) {
-          const data = await res.json().catch(() => null);
-          if (!isMounted || thisGen !== verificationGenRef.current) return;
-          if (data && (data.id || data.email || data.username)) {
-            setAuthStatus('authorized');
-            setFailedToken(null);
-          } else {
-            setFailedToken(currentToken);
-            setAuthStatus('unauthorized');
-          }
-        } else if (res.status === 401 || res.status === 403) {
+        if (data && (data.id || data.email || data.username)) {
+          setAuthStatus('authorized');
+          setFailedToken(null);
+        } else {
           setFailedToken(currentToken);
           setAuthStatus('unauthorized');
-        } else {
-          setNetworkError(true);
         }
       })
       .catch((err) => {
-        if (err.name === 'AbortError' || thisGen !== verificationGenRef.current) return;
+        if (err.kind === 'aborted' || thisGen !== verificationGenRef.current) return;
         if (isMounted) {
-          setNetworkError(true);
+          if (err.status === 401 || err.status === 403) {
+            setFailedToken(currentToken);
+            setAuthStatus('unauthorized');
+          } else {
+            setNetworkError(true);
+          }
         }
       });
 

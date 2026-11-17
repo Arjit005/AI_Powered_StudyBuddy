@@ -16,6 +16,7 @@ import {
   X
 } from 'lucide-react';
 import MermaidViewer from '../components/MermaidViewer';
+import { apiRequest } from '../config/apiClient';
 
 export default function CanvasStudio() {
   const [topic, setTopic] = useState('Distributed Microservices with Event Sourcing');
@@ -58,46 +59,33 @@ export default function CanvasStudio() {
     };
   }, []);
 
-  const getAuthHeaders = () => {
-    const token = localStorage.getItem('auth_token');
-    const headers = { 'Content-Type': 'application/json' };
-    if (token) headers['Authorization'] = `Bearer ${token}`;
-    return headers;
-  };
-
   const fetchInitialCanvas = async () => {
     setLoading(true);
     const thisGen = ++requestGenRef.current;
     try {
-      const res = await fetch('/api/canvas/generate', {
+      const data = await apiRequest('/api/canvas/generate', {
         method: 'POST',
-        headers: getAuthHeaders(),
-        body: JSON.stringify({
+        auth: 'optional',
+        json: {
           topic: 'Distributed Microservices with Event Sourcing',
           detail_level: 'standard',
           diagram_type: 'architecture'
-        })
+        }
       });
       if (thisGen !== requestGenRef.current) return;
-      if (res.ok) {
-        const data = await res.json();
-        if (thisGen !== requestGenRef.current) return;
-        setSelectedNode(null);
-        setCanvasData(data.canvas);
-        setTelemetry({
-          execution_time_ms: data.execution_time_ms,
-          node_count: data.canvas?.nodes?.length || 0,
-          edge_count: data.canvas?.edges?.length || 0
-        });
-      } else {
-        const errData = await res.json().catch(() => ({}));
-        if (thisGen !== requestGenRef.current) return;
-        setError(errData.detail || 'Could not initialize template architecture.');
-      }
+      setSelectedNode(null);
+      setCanvasData(data.canvas);
+      setTelemetry({
+        execution_time_ms: data.execution_time_ms,
+        node_count: data.canvas?.nodes?.length || 0,
+        edge_count: data.canvas?.edges?.length || 0
+      });
     } catch (err) {
       if (thisGen === requestGenRef.current) {
         console.error("Canvas fetch error:", err);
-        setError('Network error initializing canvas diagram.');
+        setError(err.kind === 'http'
+          ? (err.hasDetail ? err.message : 'Could not initialize template architecture.')
+          : 'Network error initializing canvas diagram.');
       }
     } finally {
       if (thisGen === requestGenRef.current) {
@@ -111,18 +99,15 @@ export default function CanvasStudio() {
     setMcpConfigError(null);
     const thisGen = ++mcpRequestGenRef.current;
     try {
-      const res = await fetch('/api/mcp/config', { headers: getAuthHeaders() });
+      const data = await apiRequest('/api/mcp/config', { auth: 'none' });
       if (thisGen !== mcpRequestGenRef.current) return;
-      if (res.ok) {
-        const data = await res.json();
-        setMcpConfig(data);
-      } else {
-        setMcpConfigError("Unable to retrieve MCP configuration.");
-      }
+      setMcpConfig(data);
     } catch (err) {
       console.error("MCP config fetch error:", err);
       if (thisGen === mcpRequestGenRef.current) {
-        setMcpConfigError("Network error fetching MCP configuration.");
+        setMcpConfigError(err.kind === 'http'
+          ? 'Unable to retrieve MCP configuration.'
+          : 'Network error fetching MCP configuration.');
       }
     } finally {
       if (thisGen === mcpRequestGenRef.current) {
@@ -139,36 +124,32 @@ export default function CanvasStudio() {
     setSelectedNode(null);
     const thisGen = ++requestGenRef.current;
     try {
-      const res = await fetch('/api/canvas/generate', {
+      const data = await apiRequest('/api/canvas/generate', {
         method: 'POST',
-        headers: getAuthHeaders(),
-        body: JSON.stringify({
+        auth: 'optional',
+        json: {
           topic,
           detail_level: detailLevel,
           diagram_type: diagramType
-        })
+        }
       });
       if (thisGen !== requestGenRef.current) return;
-      if (res.ok) {
-        const data = await res.json();
-        if (thisGen !== requestGenRef.current) return;
-        setCanvasData(data.canvas);
-        setTelemetry({
-          execution_time_ms: data.execution_time_ms,
-          node_count: data.canvas?.nodes?.length || 0,
-          edge_count: data.canvas?.edges?.length || 0
-        });
-        setPan({ x: 0, y: 0 });
-        setZoom(1);
-      } else {
-        const errData = await res.json().catch(() => ({}));
-        if (thisGen !== requestGenRef.current) return;
-        setError(errData.detail || 'Diagram generation failed. Please try another prompt.');
-      }
+      setCanvasData(data.canvas);
+      setTelemetry({
+        execution_time_ms: data.execution_time_ms,
+        node_count: data.canvas?.nodes?.length || 0,
+        edge_count: data.canvas?.edges?.length || 0
+      });
+      setPan({ x: 0, y: 0 });
+      setZoom(1);
     } catch (err) {
       if (thisGen === requestGenRef.current) {
         console.error("Generate canvas error:", err);
-        setError("Network error communicating with canvas generation engine.");
+        setError(err.kind === 'http' && err.hasDetail
+          ? err.message
+          : err.kind === 'http'
+            ? 'Diagram generation failed. Please try another prompt.'
+            : 'Network error communicating with canvas generation engine.');
       }
     } finally {
       if (thisGen === requestGenRef.current) {
@@ -284,30 +265,29 @@ export default function CanvasStudio() {
   const handleSaveToLibrary = async () => {
     if (!canvasData) return;
     try {
-      const res = await fetch('/api/library', {
+      await apiRequest('/api/library', {
         method: 'POST',
-        headers: getAuthHeaders(),
-        body: JSON.stringify({
+        auth: 'optional',
+        responseType: 'none',
+        json: {
           material_type: 'canvas_diagram',
           title: canvasData.title || `Canvas: ${topic}`,
           topic: topic,
           content_json: JSON.stringify(canvasData),
           tags: `${diagramType},mcp,architecture`
-        })
+        }
       });
-      if (res.ok) {
-        setSavedSuccess(true);
-        if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
-        saveTimeoutRef.current = setTimeout(() => {
-          setSavedSuccess(false);
-          saveTimeoutRef.current = null;
-        }, 3000);
-      } else {
-        alert("Failed to save canvas diagram to library.");
-      }
+      setSavedSuccess(true);
+      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+      saveTimeoutRef.current = setTimeout(() => {
+        setSavedSuccess(false);
+        saveTimeoutRef.current = null;
+      }, 3000);
     } catch (err) {
       console.error("Save to library error:", err);
-      alert("Network error saving canvas diagram.");
+      alert(err.kind === 'http'
+        ? 'Failed to save canvas diagram to library.'
+        : 'Network error saving canvas diagram.');
     }
   };
 

@@ -6,6 +6,7 @@ import {
     PanelLeft, ChevronRight, Brain, Cpu, Layers
 } from 'lucide-react';
 import StructuredMessage from './StructuredMessage';
+import { apiRequest } from '../config/apiClient';
 
 const SUGGESTED_PROMPTS = [
     "Explain how Photosynthesis works with a simple step-by-step diagram",
@@ -64,20 +65,13 @@ const ChatInterface = () => {
     const fetchConversations = async () => {
         const thisFetchGen = ++fetchConversationsGenRef.current;
         try {
-            const token = localStorage.getItem('auth_token');
-            const headers = {};
-            if (token) headers['Authorization'] = `Bearer ${token}`;
-
-            const res = await fetch('/api/conversations', { headers });
-            if (res.ok) {
-                const data = await res.json();
-                if (thisFetchGen !== fetchConversationsGenRef.current) return;
-                setConversations(data);
-                // Only select the default first conversation if the user has NOT selected or created one
-                if (data.length > 0 && !activeConvIdRef.current) {
-                    activeConvIdRef.current = data[0].id;
-                    setActiveConvId(data[0].id);
-                }
+            const data = await apiRequest('/api/conversations', { auth: 'optional' });
+            if (thisFetchGen !== fetchConversationsGenRef.current) return;
+            setConversations(data);
+            // Only select the default first conversation if the user has NOT selected or created one
+            if (data.length > 0 && !activeConvIdRef.current) {
+                activeConvIdRef.current = data[0].id;
+                setActiveConvId(data[0].id);
             }
         } catch (err) {
             console.error("Error loading conversations:", err);
@@ -89,31 +83,22 @@ const ChatInterface = () => {
         setLoadingHistory(true);
         const thisGen = ++historyRequestGenRef.current;
         try {
-            const token = localStorage.getItem('auth_token');
-            const headers = {};
-            if (token) headers['Authorization'] = `Bearer ${token}`;
-
             const url = convId ? `/api/chat?conversation_id=${convId}` : '/api/chat';
-            const res = await fetch(url, { headers });
+            const data = await apiRequest(url, { auth: 'optional' });
             
             // Check if this response is still for the current request generation and conversation
             if (thisGen !== historyRequestGenRef.current || convId !== activeConvIdRef.current) {
                 return;
             }
 
-            if (res.ok) {
-                const data = await res.json();
-                if (data && data.length > 0) {
-                    setMessages(data.map(item => ({
-                        id: item.id,
-                        role: item.role,
-                        content: item.content,
-                        shield: 'Active',
-                        timestamp: item.timestamp ? new Date(item.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : undefined
-                    })));
-                } else {
-                    setMessages([DEFAULT_GREETING]);
-                }
+            if (data && data.length > 0) {
+                setMessages(data.map(item => ({
+                    id: item.id,
+                    role: item.role,
+                    content: item.content,
+                    shield: 'Active',
+                    timestamp: item.timestamp ? new Date(item.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : undefined
+                })));
             } else {
                 setMessages([DEFAULT_GREETING]);
             }
@@ -156,22 +141,14 @@ const ChatInterface = () => {
     // Create New Chat Session
     const handleNewChat = async () => {
         try {
-            const token = localStorage.getItem('auth_token');
-            const headers = { 'Content-Type': 'application/json' };
-            if (token) headers['Authorization'] = `Bearer ${token}`;
-
-            const res = await fetch('/api/conversations', {
+            const newConv = await apiRequest('/api/conversations', {
                 method: 'POST',
-                headers,
-                body: JSON.stringify({ title: 'New Study Session' })
+                auth: 'optional',
+                json: { title: 'New Study Session' },
             });
-
-            if (res.ok) {
-                const newConv = await res.json();
-                setConversations(prev => [newConv, ...prev]);
-                setActiveConvId(newConv.id);
-                setMessages([DEFAULT_GREETING]);
-            }
+            setConversations(prev => [newConv, ...prev]);
+            setActiveConvId(newConv.id);
+            setMessages([DEFAULT_GREETING]);
         } catch (err) {
             console.error("Error creating new session:", err);
         }
@@ -185,31 +162,26 @@ const ChatInterface = () => {
         sendGenerationRef.current += 1;
 
         try {
-            const token = localStorage.getItem('auth_token');
-            const headers = {};
-            if (token) headers['Authorization'] = `Bearer ${token}`;
-
-            const res = await fetch(`/api/conversations/${convId}`, {
+            await apiRequest(`/api/conversations/${convId}`, {
                 method: 'DELETE',
-                headers
+                auth: 'optional',
+                responseType: 'none',
             });
 
-            if (res.ok) {
-                setConversations(prev => {
-                    const remaining = prev.filter(c => c.id !== convId);
-                    if (activeConvIdRef.current === convId) {
-                        if (remaining.length > 0) {
-                            activeConvIdRef.current = remaining[0].id;
-                            setActiveConvId(remaining[0].id);
-                        } else {
-                            activeConvIdRef.current = null;
-                            setActiveConvId(null);
-                            setMessages([DEFAULT_GREETING]);
-                        }
+            setConversations(prev => {
+                const remaining = prev.filter(c => c.id !== convId);
+                if (activeConvIdRef.current === convId) {
+                    if (remaining.length > 0) {
+                        activeConvIdRef.current = remaining[0].id;
+                        setActiveConvId(remaining[0].id);
+                    } else {
+                        activeConvIdRef.current = null;
+                        setActiveConvId(null);
+                        setMessages([DEFAULT_GREETING]);
                     }
-                    return remaining;
-                });
-            }
+                }
+                return remaining;
+            });
         } catch (err) {
             console.error("Error deleting session:", err);
         }
@@ -239,13 +211,12 @@ const ChatInterface = () => {
         const targetConv = activeConvId;
         const clearKey = targetConv || 'current';
         try {
-            const token = localStorage.getItem('auth_token');
-            const headers = {};
-            if (token) headers['Authorization'] = `Bearer ${token}`;
-
             const url = activeConvId ? `/api/chat?conversation_id=${activeConvId}` : '/api/chat';
-            const res = await fetch(url, { method: 'DELETE', headers });
-            if (!res.ok) throw new Error('Unable to clear this session. Please try again.');
+            await apiRequest(url, {
+                method: 'DELETE',
+                auth: 'optional',
+                responseType: 'none',
+            });
             
             // Invalidate in-flight messages ONLY upon confirmed clear success
             invalidatedConvsRef.current.add(clearKey);
@@ -295,10 +266,6 @@ const ChatInterface = () => {
         };
 
         try {
-            const token = localStorage.getItem('auth_token');
-            const headers = { 'Content-Type': 'application/json' };
-            if (token) headers['Authorization'] = `Bearer ${token}`;
-
             // 1. Attempt Real-Time SSE Token Streaming
             let streamSuccess = false;
             let streamAccepted = false;
@@ -306,16 +273,17 @@ const ChatInterface = () => {
             const streamMsgId = Date.now();
 
             try {
-                const streamResponse = await fetch('/api/chat/stream', {
+                const streamResponse = await apiRequest('/api/chat/stream', {
                     method: 'POST',
-                    headers,
-                    body: JSON.stringify({ 
+                    auth: 'optional',
+                    json: {
                         message: textToSend,
                         conversation_id: originatingConvId
-                    }),
+                    },
+                    responseType: 'stream',
                 });
 
-                if (streamResponse.ok && streamResponse.body) {
+                if (streamResponse.body) {
                     streamAccepted = true;
                     const reader = streamResponse.body.getReader();
                     const decoder = new TextDecoder('utf-8');
@@ -456,21 +424,14 @@ const ChatInterface = () => {
                 }
 
                 // 2. Fallback to standard synchronous endpoint
-                const response = await fetch('/api/chat', {
+                const data = await apiRequest('/api/chat', {
                     method: 'POST',
-                    headers,
-                    body: JSON.stringify({ 
+                    auth: 'optional',
+                    json: {
                         message: textToSend,
                         conversation_id: originatingConvId
-                    }),
+                    },
                 });
-
-                if (!response.ok) {
-                    const errData = await response.json().catch(() => ({}));
-                    throw new Error(errData.detail || 'Network response failed');
-                }
-
-                const data = await response.json();
                 
                 // If user switched or deleted conversation during in-flight generation, do not append
                 if (!isStillCurrentConv()) {

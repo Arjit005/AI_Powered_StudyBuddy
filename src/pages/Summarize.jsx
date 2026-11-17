@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { apiRequest } from '../config/apiClient';
 import { 
   FileText, 
   ArrowRight, 
@@ -50,33 +51,14 @@ const Summarize = () => {
         setIsSpeaking(false);
         const thisGen = ++summarizeGenRef.current;
         try {
-            const token = localStorage.getItem('auth_token');
-            const headers = { 'Content-Type': 'application/json' };
-            if (token) headers['Authorization'] = `Bearer ${token}`;
-
-            const response = await fetch('/api/summarize', {
+            const data = await apiRequest('/api/summarize', {
                 method: 'POST',
-                headers,
-                body: JSON.stringify({ topic: topic.trim() })
+                auth: 'none',
+                json: { topic: topic.trim() }
             });
 
             if (thisGen !== summarizeGenRef.current) return;
 
-            if (!response.ok) {
-                let errDetail = 'Failed to synthesize summary';
-                try {
-                    const errData = await response.json();
-                    if (typeof errData?.detail === 'string') {
-                        errDetail = errData.detail;
-                    } else if (errData?.detail) {
-                        errDetail = JSON.stringify(errData.detail);
-                    }
-                } catch (_) {}
-                throw new Error(errDetail);
-            }
-
-            const data = await response.json();
-            if (thisGen !== summarizeGenRef.current) return;
             if (!data || typeof data.summary !== 'string' || !data.summary.trim()) {
                 throw new Error('Received an invalid or empty summary from AI service.');
             }
@@ -87,7 +69,9 @@ const Summarize = () => {
             if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
         } catch (err) {
             if (thisGen === summarizeGenRef.current) {
-                setError(err.message || 'Error occurred while generating summary.');
+                setError(err.kind === 'http' && !err.hasDetail
+                    ? 'Failed to synthesize summary'
+                    : err.message || 'Error occurred while generating summary.');
             }
         } finally {
             if (thisGen === summarizeGenRef.current) {
@@ -156,38 +140,31 @@ const Summarize = () => {
         const activeTopic = (summaryTopic && summaryTopic.trim()) ? summaryTopic.trim() : (topic && topic.trim()) ? topic.trim() : 'Study Summary';
         setIsSaving(true);
         try {
-            const token = localStorage.getItem('auth_token');
-            const headers = { 'Content-Type': 'application/json' };
-            if (token) headers['Authorization'] = `Bearer ${token}`;
-
-            const res = await fetch('/api/library', {
+            await apiRequest('/api/library', {
                 method: 'POST',
-                headers,
-                body: JSON.stringify({
+                auth: 'optional',
+                responseType: 'none',
+                json: {
                     material_type: 'summary',
                     title: `Summary: ${activeTopic.slice(0, 45)}...`,
                     topic: activeTopic.slice(0, 40),
                     content_json: contentToSave,
                     tags: 'summary,takeaways,study_guide'
-                })
-            });
-            if (res.ok) {
-                if (currentSummaryRef.current === contentToSave) {
-                    setSaved(true);
-                    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
-                    saveTimeoutRef.current = setTimeout(() => setSaved(false), 3000);
                 }
-            } else {
-                let errDetail = 'Failed to save summary to library.';
-                try {
-                    const errData = await res.json();
-                    errDetail = errData.detail || errDetail;
-                } catch (_) {}
-                alert(errDetail);
+            });
+
+            if (currentSummaryRef.current === contentToSave) {
+                setSaved(true);
+                if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+                saveTimeoutRef.current = setTimeout(() => setSaved(false), 3000);
             }
         } catch (err) {
             console.error("Save error:", err);
-            alert("Network error saving summary: " + err.message);
+            if (err.kind === 'http') {
+                alert(err.hasDetail ? err.message : 'Failed to save summary to library.');
+            } else {
+                alert(`Network error saving summary: ${err.message}`);
+            }
         } finally {
             setIsSaving(false);
         }

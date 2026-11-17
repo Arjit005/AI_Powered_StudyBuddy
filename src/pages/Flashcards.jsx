@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import FlipCard3D from '../components/ui/FlipCard3D';
+import { apiRequest } from '../config/apiClient';
 import { 
   ChevronLeft, 
   ChevronRight, 
@@ -63,46 +64,38 @@ const Flashcards = () => {
         if ('speechSynthesis' in window) window.speechSynthesis.cancel();
         setIsSpeaking(false);
         try {
-            const token = localStorage.getItem('auth_token');
-            const headers = { 'Content-Type': 'application/json' };
-            if (token) headers['Authorization'] = `Bearer ${token}`;
-
-            const res = await fetch('/api/generate-flashcards', {
+            const data = await apiRequest('/api/generate-flashcards', {
                 method: 'POST',
-                headers,
-                body: JSON.stringify({ topic: topic.trim() })
+                auth: 'none',
+                json: { topic: topic.trim() }
             });
             if (thisGen !== flashcardsGenRef.current) return;
-            if (res.ok) {
-                const data = await res.json();
-                if (thisGen !== flashcardsGenRef.current) return;
-                if (data.flashcards && Array.isArray(data.flashcards) && data.flashcards.length > 0) {
-                    const validCards = data.flashcards
-                        .filter(c => c && typeof c === 'object')
-                        .map((c, i) => ({
-                            id: c.id ? `${c.id}_${i}` : `gen_${Date.now()}_${i}`,
-                            front: String(c.front || 'Question'),
-                            back: String(c.back || 'Answer')
-                        }));
-                    if (validCards.length > 0) {
-                        if (advanceTimeoutRef.current) clearTimeout(advanceTimeoutRef.current);
-                        deckIdRef.current = Date.now();
-                        setCards(validCards);
-                        setCurrentCard(0);
-                        setMastery({});
-                    } else {
-                        alert("No valid flashcards found in the generated response. Please try another topic.");
-                    }
+            if (data.flashcards && Array.isArray(data.flashcards) && data.flashcards.length > 0) {
+                const validCards = data.flashcards
+                    .filter(c => c && typeof c === 'object')
+                    .map((c, i) => ({
+                        id: c.id ? `${c.id}_${i}` : `gen_${Date.now()}_${i}`,
+                        front: String(c.front || 'Question'),
+                        back: String(c.back || 'Answer')
+                    }));
+                if (validCards.length > 0) {
+                    if (advanceTimeoutRef.current) clearTimeout(advanceTimeoutRef.current);
+                    deckIdRef.current = Date.now();
+                    setCards(validCards);
+                    setCurrentCard(0);
+                    setMastery({});
                 } else {
-                    alert("No flashcards could be generated for this topic. Please try another topic.");
+                    alert("No valid flashcards found in the generated response. Please try another topic.");
                 }
             } else {
-                alert("Failed to generate flashcards. Please try another topic.");
+                alert("No flashcards could be generated for this topic. Please try another topic.");
             }
         } catch (err) {
             if (thisGen !== flashcardsGenRef.current) return;
             console.error(err);
-            alert("Network error generating flashcards.");
+            alert(err.kind === 'http'
+                ? 'Failed to generate flashcards. Please try another topic.'
+                : 'Network error generating flashcards.');
         } finally {
             if (thisGen === flashcardsGenRef.current) {
                 setLoading(false);
@@ -192,36 +185,32 @@ const Flashcards = () => {
         const savedSnapshotDeckId = deckIdRef.current;
         setSaving(true);
         try {
-            const token = localStorage.getItem('auth_token');
-            const headers = { 'Content-Type': 'application/json' };
-            if (token) headers['Authorization'] = `Bearer ${token}`;
-
-            const res = await fetch('/api/library', {
+            await apiRequest('/api/library', {
                 method: 'POST',
-                headers,
-                body: JSON.stringify({
+                auth: 'optional',
+                responseType: 'none',
+                json: {
                     material_type: 'flashcards',
                     title: `Flashcards: ${topic || 'Computer Science Core'} (${cards.length} cards)`,
                     topic: topic || 'Core CS',
                     content_json: JSON.stringify(cards),
                     tags: 'flashcards,active_recall,spaced_repetition'
-                })
-            });
-            if (res.ok) {
-                if (deckIdRef.current === savedSnapshotDeckId) {
-                    setSaved(true);
-                    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
-                    saveTimeoutRef.current = setTimeout(() => {
-                        setSaved(false);
-                        saveTimeoutRef.current = null;
-                    }, 3000);
                 }
-            } else {
-                alert("Failed to save flashcards to library.");
+            });
+
+            if (deckIdRef.current === savedSnapshotDeckId) {
+                setSaved(true);
+                if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+                saveTimeoutRef.current = setTimeout(() => {
+                    setSaved(false);
+                    saveTimeoutRef.current = null;
+                }, 3000);
             }
         } catch (err) {
             console.error("Save deck error:", err);
-            alert("Network error saving flashcards.");
+            alert(err.kind === 'http'
+                ? 'Failed to save flashcards to library.'
+                : 'Network error saving flashcards.');
         } finally {
             setSaving(false);
         }

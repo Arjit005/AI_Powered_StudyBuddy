@@ -1,6 +1,7 @@
-import React, { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { MessageSquarePlus, Star, Send, X, CheckCircle2 } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
+import { apiRequest } from '../config/apiClient';
 
 const FeedbackWidget = () => {
     const location = useLocation();
@@ -63,21 +64,18 @@ const FeedbackWidget = () => {
         const controller = new AbortController();
         abortControllerRef.current = controller;
         try {
-            const res = await fetch('/api/feedback', {
+            await apiRequest('/api/feedback', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                auth: 'none',
+                responseType: 'none',
                 signal: controller.signal,
-                body: JSON.stringify({
+                json: {
                     page: location.pathname,
                     rating,
                     comment
-                })
+                }
             });
             if (thisSession !== submissionSessionRef.current || !isOpenRef.current) return;
-            if (!res.ok) {
-                const errData = await res.json().catch(() => ({}));
-                throw new Error(errData.detail || 'Feedback submission failed');
-            }
             if (thisSession !== submissionSessionRef.current || !isOpenRef.current) return;
             setSubmitted(true);
             if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
@@ -96,10 +94,13 @@ const FeedbackWidget = () => {
                 }
             }, 2500);
         } catch (err) {
-            if (err.name === 'AbortError' || thisSession !== submissionSessionRef.current) return;
+            if (err.name === 'AbortError' || err.kind === 'aborted' || thisSession !== submissionSessionRef.current) return;
             console.error("Feedback error:", err);
             if (isOpenRef.current) {
-                setSubmitError(err.message || 'Submission failed. Please try again.');
+                const fallbackMessage = err.kind === 'http' && !err.hasDetail
+                    ? 'Feedback submission failed'
+                    : 'Submission failed. Please try again.';
+                setSubmitError(err.hasDetail ? err.message : fallbackMessage);
             }
         } finally {
             if (thisSession === submissionSessionRef.current) {

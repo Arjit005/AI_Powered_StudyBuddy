@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { Sparkles, X, ZoomIn, Download, Network, Layers, Cpu, CheckCircle2 } from 'lucide-react';
 import MermaidViewer from '../components/MermaidViewer';
+import { apiRequest } from '../config/apiClient';
 
 const SUGGESTIONS = [
     "Photosynthesis & Plant Biology",
@@ -32,25 +33,18 @@ const Maps = () => {
         setMapImage(null);
 
         const thisGen = ++mapRequestGenRef.current;
-        let token = null;
-        try {
-            token = localStorage.getItem('auth_token');
-        } catch (_) {}
-        const headers = { 'Content-Type': 'application/json' };
-        if (token) headers['Authorization'] = `Bearer ${token}`;
-
         try {
             // Fetch detailed Mermaid diagram and NetworkX topology graph concurrently with independent fault tolerance
             const [diagramResult, mapResult] = await Promise.allSettled([
-                fetch('/api/generate-diagram', {
+                apiRequest('/api/generate-diagram', {
                     method: 'POST',
-                    headers,
-                    body: JSON.stringify({ topic: topicToUse.trim() })
+                    auth: 'none',
+                    json: { topic: topicToUse.trim() }
                 }),
-                fetch('/api/generate-map', {
+                apiRequest('/api/generate-map', {
                     method: 'POST',
-                    headers,
-                    body: JSON.stringify({ topic: topicToUse.trim() })
+                    auth: 'none',
+                    json: { topic: topicToUse.trim() }
                 })
             ]);
 
@@ -59,46 +53,36 @@ const Maps = () => {
             let hasDiagram = false;
             let hasMap = false;
 
-            if (diagramResult.status === 'fulfilled' && diagramResult.value.ok) {
-                try {
-                    const data = await diagramResult.value.json();
-                    if (thisGen !== mapRequestGenRef.current) return;
-                    if (data && typeof data === 'object' && typeof data.mermaid_code === 'string' && data.mermaid_code.trim()) {
-                        setDiagramData(data);
-                        hasDiagram = true;
-                    }
-                } catch (pErr) {
-                    console.warn("Diagram JSON parse error:", pErr);
+            if (diagramResult.status === 'fulfilled') {
+                const data = diagramResult.value;
+                if (data && typeof data === 'object' && typeof data.mermaid_code === 'string' && data.mermaid_code.trim()) {
+                    setDiagramData(data);
+                    hasDiagram = true;
                 }
             }
 
-            if (mapResult.status === 'fulfilled' && mapResult.value.ok) {
-                try {
-                    const mapJson = await mapResult.value.json();
-                    if (thisGen !== mapRequestGenRef.current) return;
-                    if (mapJson && typeof mapJson.map_image === 'string') {
-                        const rawB64 = mapJson.map_image.trim();
-                        // Validate Base64 length (<= 5MB) and decodability/padding format
-                        const isValidBase64 = (str) => {
-                            if (!str || str.length % 4 !== 0) return false;
-                            if (!/^[A-Za-z0-9+/]+={0,2}$/.test(str)) return false;
-                            try {
-                                return typeof atob === 'function' ? !!atob(str.slice(0, 100)) : true;
-                            } catch (_) {
-                                return false;
-                            }
-                        };
-                        const hasPngMagicHeader = (str) => {
-                            // PNG base64 representation always begins with "iVBORw0KGgo" (representing bytes 0x89 0x50 0x4E 0x47 0x0D 0x0A 0x1A 0x0A)
-                            return str.startsWith('iVBORw0KGgo');
-                        };
-                        if (rawB64.length <= 5 * 1024 * 1024 && isValidBase64(rawB64) && hasPngMagicHeader(rawB64)) {
-                            setMapImage(`data:image/png;base64,${rawB64}`);
-                            hasMap = true;
+            if (mapResult.status === 'fulfilled') {
+                const mapJson = mapResult.value;
+                if (mapJson && typeof mapJson.map_image === 'string') {
+                    const rawB64 = mapJson.map_image.trim();
+                    // Validate Base64 length (<= 5MB) and decodability/padding format
+                    const isValidBase64 = (str) => {
+                        if (!str || str.length % 4 !== 0) return false;
+                        if (!/^[A-Za-z0-9+/]+={0,2}$/.test(str)) return false;
+                        try {
+                            return typeof atob === 'function' ? !!atob(str.slice(0, 100)) : true;
+                        } catch (_) {
+                            return false;
                         }
                     }
-                } catch (pErr) {
-                    console.warn("Map JSON parse error:", pErr);
+                    const hasPngMagicHeader = (str) => {
+                        // PNG base64 representation always begins with "iVBORw0KGgo" (representing bytes 0x89 0x50 0x4E 0x47 0x0D 0x0A 0x1A 0x0A)
+                        return str.startsWith('iVBORw0KGgo');
+                    };
+                    if (rawB64.length <= 5 * 1024 * 1024 && isValidBase64(rawB64) && hasPngMagicHeader(rawB64)) {
+                        setMapImage(`data:image/png;base64,${rawB64}`);
+                        hasMap = true;
+                    }
                 }
             }
 

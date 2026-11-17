@@ -5,6 +5,11 @@ import { MemoryRouter } from 'react-router-dom';
 import SignupPage from '../src/pages/SignupPage';
 import * as firebaseAuth from '../src/firebase';
 
+const jsonResponse = (data, status = 200) => new Response(JSON.stringify(data), {
+    status,
+    headers: { 'Content-Type': 'application/json' },
+});
+
 describe('SignupPage Real Component Regression Suite', () => {
     let originalFetch;
     let originalStorageSetItem;
@@ -34,18 +39,16 @@ describe('SignupPage Real Component Regression Suite', () => {
 
     // Scenario 1: Valid email signup persists a valid session
     it('Scenario 1: Valid email signup persists a valid session', async () => {
+        localStorage.setItem('auth_token', 'previous-session-token');
         globalThis.fetch = vi.fn(async (url) => {
             if (url === '/api/auth/register') {
-                return {
-                    ok: true,
-                    json: async () => ({
-                        access_token: 'valid_jwt_token_123',
-                        token_type: 'bearer',
-                        user: { id: 42, username: 'alice_smith', email: 'alice@example.com' }
-                    })
-                };
+                return jsonResponse({
+                    access_token: 'valid_jwt_token_123',
+                    token_type: 'bearer',
+                    user: { id: 42, username: 'alice_smith', email: 'alice@example.com' }
+                });
             }
-            return { ok: true, json: async () => ({}) };
+            return jsonResponse({});
         });
 
         render(
@@ -68,6 +71,12 @@ describe('SignupPage Real Component Regression Suite', () => {
             username: 'alice_smith',
             email: 'alice@example.com'
         });
+        expect(globalThis.fetch.mock.calls[0][1].headers.get('Authorization')).toBeNull();
+        expect(JSON.parse(globalThis.fetch.mock.calls[0][1].body)).toEqual({
+            username: 'alice_smith',
+            email: 'alice@example.com',
+            password: 'StrongP@ss1',
+        });
     });
 
     // Scenario 2: Valid Google signup persists a valid session
@@ -76,16 +85,13 @@ describe('SignupPage Real Component Regression Suite', () => {
 
         globalThis.fetch = vi.fn(async (url) => {
             if (url === '/api/auth/google') {
-                return {
-                    ok: true,
-                    json: async () => ({
-                        access_token: 'google_jwt_token_999',
-                        token_type: 'bearer',
-                        user: { id: 77, username: 'google_user', email: 'google@example.com' }
-                    })
-                };
+                return jsonResponse({
+                    access_token: 'google_jwt_token_999',
+                    token_type: 'bearer',
+                    user: { id: 77, username: 'google_user', email: 'google@example.com' }
+                });
             }
-            return { ok: true, json: async () => ({}) };
+            return jsonResponse({});
         });
 
         render(
@@ -111,15 +117,12 @@ describe('SignupPage Real Component Regression Suite', () => {
     it('Scenario 3: Missing or non-string access token is rejected', async () => {
         globalThis.fetch = vi.fn(async (url) => {
             if (url === '/api/auth/register') {
-                return {
-                    ok: true,
-                    json: async () => ({
-                        access_token: '', // empty token
-                        user: { id: 1, username: 'user1', email: 'u1@example.com' }
-                    })
-                };
+                return jsonResponse({
+                    access_token: '', // empty token
+                    user: { id: 1, username: 'user1', email: 'u1@example.com' }
+                });
             }
-            return { ok: true, json: async () => ({}) };
+            return jsonResponse({});
         });
 
         render(
@@ -140,15 +143,12 @@ describe('SignupPage Real Component Regression Suite', () => {
     it('Scenario 4: Malformed user objects are rejected', async () => {
         globalThis.fetch = vi.fn(async (url) => {
             if (url === '/api/auth/register') {
-                return {
-                    ok: true,
-                    json: async () => ({
-                        access_token: 'valid_token_abc',
-                        user: 'string_not_an_object' // invalid primitive user
-                    })
-                };
+                return jsonResponse({
+                    access_token: 'valid_token_abc',
+                    user: 'string_not_an_object' // invalid primitive user
+                });
             }
-            return { ok: true, json: async () => ({}) };
+            return jsonResponse({});
         });
 
         render(
@@ -181,15 +181,12 @@ describe('SignupPage Real Component Regression Suite', () => {
 
         globalThis.fetch = vi.fn(async (url) => {
             if (url === '/api/auth/register') {
-                return {
-                    ok: true,
-                    json: async () => ({
-                        access_token: 'valid_token_xyz',
-                        user: { id: 5, username: 'alice', email: 'a@example.com' }
-                    })
-                };
+                return jsonResponse({
+                    access_token: 'valid_token_xyz',
+                    user: { id: 5, username: 'alice', email: 'a@example.com' }
+                });
             }
-            return { ok: true, json: async () => ({}) };
+            return jsonResponse({});
         });
 
         render(
@@ -232,15 +229,12 @@ describe('SignupPage Real Component Regression Suite', () => {
 
         globalThis.fetch = vi.fn(async (url) => {
             if (url === '/api/auth/register') {
-                return {
-                    ok: true,
-                    json: async () => ({
-                        access_token: 'token_part_1',
-                        user: { id: 10, username: 'bob', email: 'b@example.com' }
-                    })
-                };
+                return jsonResponse({
+                    access_token: 'token_part_1',
+                    user: { id: 10, username: 'bob', email: 'b@example.com' }
+                });
             }
-            return { ok: true, json: async () => ({}) };
+            return jsonResponse({});
         });
 
         render(
@@ -272,15 +266,12 @@ describe('SignupPage Real Component Regression Suite', () => {
         // Google endpoint returns missing user
         globalThis.fetch = vi.fn(async (url) => {
             if (url === '/api/auth/google') {
-                return {
-                    ok: true,
-                    json: async () => ({
-                        access_token: 'valid_google_token'
-                        // missing user object
-                    })
-                };
+                return jsonResponse({
+                    access_token: 'valid_google_token'
+                    // missing user object
+                });
             }
-            return { ok: true, json: async () => ({}) };
+            return jsonResponse({});
         });
 
         render(
@@ -300,18 +291,14 @@ describe('SignupPage Real Component Regression Suite', () => {
     it('Scenario 8: Backend error structures produce readable messages without [object Object]', async () => {
         globalThis.fetch = vi.fn(async (url) => {
             if (url === '/api/auth/register') {
-                return {
-                    ok: false,
-                    status: 422,
-                    json: async () => ({
-                        detail: [
-                            { loc: ['body', 'email'], msg: 'Invalid email domain provided' },
-                            { loc: ['body', 'password'], msg: 'Password contains disallowed characters' }
-                        ]
-                    })
-                };
+                return jsonResponse({
+                    detail: [
+                        { loc: ['body', 'email'], msg: 'Invalid email domain provided' },
+                        { loc: ['body', 'password'], msg: 'Password contains disallowed characters' }
+                    ]
+                }, 422);
             }
-            return { ok: true, json: async () => ({}) };
+            return jsonResponse({});
         });
 
         render(

@@ -31,6 +31,13 @@ function createMockSSEStream(chunks) {
     });
 }
 
+function jsonResponse(data, status = 200) {
+    return new Response(JSON.stringify(data), {
+        status,
+        headers: { 'Content-Type': 'application/json' },
+    });
+}
+
 describe('ChatInterface Real Component Regression Suite', () => {
     let originalFetch;
 
@@ -50,7 +57,7 @@ describe('ChatInterface Real Component Regression Suite', () => {
     it('Test 1: Fallback error handling triggers error block without ReferenceError', async () => {
         globalThis.fetch = vi.fn(async (url, opts) => {
             if (url === '/api/conversations') {
-                return { ok: true, json: async () => [] };
+                return jsonResponse([]);
             }
             if (url === '/api/chat/stream') {
                 throw new Error('Stream connection rejected');
@@ -58,7 +65,7 @@ describe('ChatInterface Real Component Regression Suite', () => {
             if (url === '/api/chat' && opts?.method === 'POST') {
                 throw new Error('Network timeout during fallback');
             }
-            return { ok: true, json: async () => ({}) };
+            return jsonResponse({});
         });
 
         render(
@@ -75,7 +82,7 @@ describe('ChatInterface Real Component Regression Suite', () => {
 
         const errorAlert = await screen.findByText(/Session Error/i);
         expect(errorAlert).toBeDefined();
-        expect(screen.getByText(/Network timeout during fallback/i)).toBeDefined();
+        expect(screen.getByText(/A network error interrupted the request/i)).toBeDefined();
     });
 
     // Test 2 — Concurrent session deletion
@@ -85,22 +92,19 @@ describe('ChatInterface Real Component Regression Suite', () => {
 
         globalThis.fetch = vi.fn(async (url, opts) => {
             if (url === '/api/conversations') {
-                return {
-                    ok: true,
-                    json: async () => [
-                        { id: 'conv-1', title: 'Calculus 101', message_count: 3 },
-                        { id: 'conv-2', title: 'Biology Lab', message_count: 5 }
-                    ]
-                };
+                return jsonResponse([
+                    { id: 'conv-1', title: 'Calculus 101', message_count: 3 },
+                    { id: 'conv-2', title: 'Biology Lab', message_count: 5 }
+                ]);
             }
             if (url.startsWith('/api/chat?conversation_id=')) {
-                return { ok: true, json: async () => [] };
+                return jsonResponse([]);
             }
             if (url === '/api/conversations/conv-1' && opts?.method === 'DELETE') {
                 await deferredDelete.promise;
-                return { ok: true, json: async () => ({ success: true }) };
+                return jsonResponse({ success: true });
             }
-            return { ok: true, json: async () => ({}) };
+            return jsonResponse({});
         });
 
         const { rerender } = render(
@@ -120,19 +124,19 @@ describe('ChatInterface Real Component Regression Suite', () => {
         // While DELETE is pending, another conversation fetch returns with Quantum Physics added
         globalThis.fetch = vi.fn(async (url, opts) => {
             if (url === '/api/conversations') {
-                return {
-                    ok: true,
-                    json: async () => [
-                        { id: 'conv-1', title: 'Calculus 101', message_count: 3 },
-                        { id: 'conv-2', title: 'Biology Lab', message_count: 5 },
-                        { id: 'conv-3', title: 'Quantum Physics', message_count: 1 }
-                    ]
-                };
+                if (opts?.method === 'POST') {
+                    return jsonResponse({ id: 'conv-3', title: 'Quantum Physics', message_count: 1 });
+                }
+                return jsonResponse([
+                    { id: 'conv-1', title: 'Calculus 101', message_count: 3 },
+                    { id: 'conv-2', title: 'Biology Lab', message_count: 5 },
+                    { id: 'conv-3', title: 'Quantum Physics', message_count: 1 }
+                ]);
             }
             if (url.startsWith('/api/chat?conversation_id=')) {
-                return { ok: true, json: async () => [] };
+                return jsonResponse([]);
             }
-            return { ok: true, json: async () => ({}) };
+            return jsonResponse({});
         });
 
         // Trigger conversation refresh by clicking New Chat then switching
@@ -146,7 +150,8 @@ describe('ChatInterface Real Component Regression Suite', () => {
         // Calculus 101 should be removed, while Biology Lab remains
         await waitFor(() => {
             expect(screen.queryByText('Calculus 101')).toBeNull();
-            expect(screen.getByText('Biology Lab')).toBeDefined();
+            expect(screen.getAllByText('Biology Lab').length).toBeGreaterThan(0);
+            expect(screen.getAllByText('Quantum Physics').length).toBeGreaterThan(0);
         });
     });
 
@@ -157,17 +162,14 @@ describe('ChatInterface Real Component Regression Suite', () => {
         globalThis.fetch = vi.fn(async (url) => {
             if (url === '/api/conversations') {
                 await deferredInitialFetch.promise;
-                return {
-                    ok: true,
-                    json: async () => [
-                        { id: 'default-conv', title: 'Old History Session', message_count: 10 }
-                    ]
-                };
+                return jsonResponse([
+                    { id: 'default-conv', title: 'Old History Session', message_count: 10 }
+                ]);
             }
             if (url.startsWith('/api/chat?conversation_id=')) {
-                return { ok: true, json: async () => [] };
+                return jsonResponse([]);
             }
-            return { ok: true, json: async () => ({}) };
+            return jsonResponse({});
         });
 
         render(
@@ -196,26 +198,23 @@ describe('ChatInterface Real Component Regression Suite', () => {
 
         globalThis.fetch = vi.fn(async (url, opts) => {
             if (url === '/api/conversations') {
-                return { ok: true, json: async () => [{ id: 'conv-active', title: 'History 202', message_count: 2 }] };
+                return jsonResponse([{ id: 'conv-active', title: 'History 202', message_count: 2 }]);
             }
             if (url.startsWith('/api/chat?conversation_id=')) {
-                return { ok: true, json: async () => [] };
+                return jsonResponse([]);
             }
             if (url === '/api/chat/stream' && opts?.method === 'POST') {
                 await deferredStream.promise;
-                return {
-                    ok: true,
-                    body: createMockSSEStream([
+                return new Response(createMockSSEStream([
                         'data: {"token": "Late arrived text that should be ignored"}\n\n',
                         'data: [DONE]\n\n'
-                    ])
-                };
+                    ]), { status: 200 });
             }
             if (url.startsWith('/api/chat') && opts?.method === 'DELETE') {
                 await deferredClear.promise;
-                return { ok: true, json: async () => ({ success: true }) };
+                return jsonResponse({ success: true });
             }
-            return { ok: true, json: async () => ({}) };
+            return jsonResponse({});
         });
 
         render(
@@ -260,23 +259,20 @@ describe('ChatInterface Real Component Regression Suite', () => {
 
         globalThis.fetch = vi.fn(async (url, opts) => {
             if (url === '/api/conversations') {
-                return { ok: true, json: async () => [] };
+                return jsonResponse([]);
             }
             if (url === '/api/chat/stream' && opts?.method === 'POST') {
                 await deferredStream.promise;
-                return {
-                    ok: true,
-                    body: createMockSSEStream([
+                return new Response(createMockSSEStream([
                         'data: {"token": "Valid AI reply that should not be dropped"}\n\n',
                         'data: [DONE]\n\n'
-                    ])
-                };
+                    ]), { status: 200 });
             }
             if (url.startsWith('/api/chat') && opts?.method === 'DELETE') {
                 await deferredClear.promise;
-                return { ok: false, status: 500, json: async () => ({ detail: 'Database error' }) };
+                return jsonResponse({ detail: 'Database error' }, 500);
             }
-            return { ok: true, json: async () => ({}) };
+            return jsonResponse({});
         });
 
         render(
@@ -317,19 +313,16 @@ describe('ChatInterface Real Component Regression Suite', () => {
     it('Test 6: Server-assigned conversation ID is recognized during streaming', async () => {
         globalThis.fetch = vi.fn(async (url, opts) => {
             if (url === '/api/conversations') {
-                return { ok: true, json: async () => [] };
+                return jsonResponse([]);
             }
             if (url === '/api/chat/stream' && opts?.method === 'POST') {
-                return {
-                    ok: true,
-                    body: createMockSSEStream([
+                return new Response(createMockSSEStream([
                         'data: {"conversation_id": "conv-server-123", "token": "First part of reply. "}\n\n',
                         'data: {"token": "Second part of reply."}\n\n',
                         'data: [DONE]\n\n'
-                    ])
-                };
+                    ]), { status: 200 });
             }
-            return { ok: true, json: async () => ({}) };
+            return jsonResponse({});
         });
 
         render(
@@ -355,31 +348,25 @@ describe('ChatInterface Real Component Regression Suite', () => {
 
         globalThis.fetch = vi.fn(async (url, opts) => {
             if (url === '/api/conversations') {
-                return {
-                    ok: true,
-                    json: async () => [
-                        { id: 'conv-A', title: 'Conversation A', message_count: 1 },
-                        { id: 'conv-B', title: 'Conversation B', message_count: 1 }
-                    ]
-                };
+                return jsonResponse([
+                    { id: 'conv-A', title: 'Conversation A', message_count: 1 },
+                    { id: 'conv-B', title: 'Conversation B', message_count: 1 }
+                ]);
             }
             if (url === '/api/chat?conversation_id=conv-A') {
-                return { ok: true, json: async () => [{ id: 'msg-a', role: 'user', content: 'Message in A' }] };
+                return jsonResponse([{ id: 'msg-a', role: 'user', content: 'Message in A' }]);
             }
             if (url === '/api/chat?conversation_id=conv-B') {
-                return { ok: true, json: async () => [{ id: 'msg-b', role: 'user', content: 'Message in B' }] };
+                return jsonResponse([{ id: 'msg-b', role: 'user', content: 'Message in B' }]);
             }
             if (url === '/api/chat/stream' && opts?.method === 'POST') {
                 await deferredStreamA.promise;
-                return {
-                    ok: true,
-                    body: createMockSSEStream([
+                return new Response(createMockSSEStream([
                         'data: {"token": "Secret leaked from conversation A"}\n\n',
                         'data: [DONE]\n\n'
-                    ])
-                };
+                    ]), { status: 200 });
             }
-            return { ok: true, json: async () => ({}) };
+            return jsonResponse({});
         });
 
         render(

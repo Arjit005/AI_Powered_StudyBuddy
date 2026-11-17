@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Mic, MicOff, Volume2, VolumeX, Sparkles, Bot, RotateCcw, AlertCircle, Headphones } from 'lucide-react';
 import SpotlightCard from '../components/ui/SpotlightCard';
+import { apiRequest } from '../config/apiClient';
 
 const Voice = () => {
     const [isListening, setIsListening] = useState(false);
@@ -163,33 +164,14 @@ const Voice = () => {
         setAiResponse('');
 
         try {
-            const token = localStorage.getItem('auth_token');
-            const headers = { 'Content-Type': 'application/json' };
-            if (token) headers['Authorization'] = `Bearer ${token}`;
-
-            const res = await fetch('/api/chat', {
+            const data = await apiRequest('/api/chat', {
                 method: 'POST',
-                headers,
+                auth: 'optional',
                 signal: abortCtrl.signal,
-                body: JSON.stringify({ message: transcript }),
+                json: { message: transcript },
             });
 
             if (thisAiGen !== aiRequestGenRef.current) return;
-
-            if (!res.ok) {
-                let errDetail = 'AI consultation failed';
-                try {
-                    const errData = await res.json();
-                    errDetail = errData.detail || errDetail;
-                } catch (_) {}
-                throw new Error(errDetail);
-            }
-            let data = null;
-            try {
-                data = await res.json();
-            } catch (_) {
-                throw new Error('Invalid response received from server.');
-            }
             if (!isMountedRef.current || thisAiGen !== aiRequestGenRef.current) return;
             if (!data || typeof data !== 'object') {
                 throw new Error('Unexpected response format from AI tutor.');
@@ -223,7 +205,7 @@ const Voice = () => {
                 }
             }
         } catch (err) {
-            if (err.name === 'AbortError') return;
+            if (err.name === 'AbortError' || err.kind === 'aborted') return;
             console.error("Voice response error:", err);
             if (isMountedRef.current && thisAiGen === aiRequestGenRef.current) {
                 setAiResponse(`⚠️ ${err.message || 'Unable to connect to the AI tutor right now. Please check your connection and try again.'}`);

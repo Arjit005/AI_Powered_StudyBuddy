@@ -2,83 +2,8 @@ import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Brain, Lock, User, Mail, ArrowRight, CheckCircle2, XCircle, Eye, EyeOff } from 'lucide-react';
 import { signInWithGoogle } from '../firebase';
-
-/**
- * Format raw error details from API responses or exceptions into a safe, user-friendly message.
- * Never renders [object Object] or leaks credentials.
- */
-const formatAuthError = (errDetail, fallback = 'Authentication failed. Please try again.') => {
-    if (!errDetail) return fallback;
-    if (typeof errDetail === 'string') {
-        const trimmed = errDetail.trim();
-        return trimmed.length > 0 ? trimmed : fallback;
-    }
-    if (Array.isArray(errDetail)) {
-        const msgs = errDetail
-            .map(d => {
-                if (typeof d === 'string') return d;
-                if (d && typeof d === 'object') return d.msg || d.detail || '';
-                return '';
-            })
-            .filter(Boolean);
-        return msgs.length > 0 ? msgs.join(', ') : fallback;
-    }
-    if (typeof errDetail === 'object') {
-        if (typeof errDetail.msg === 'string' && errDetail.msg.trim()) return errDetail.msg.trim();
-        if (typeof errDetail.detail === 'string' && errDetail.detail.trim()) return errDetail.detail.trim();
-        if (typeof errDetail.message === 'string' && errDetail.message.trim()) return errDetail.message.trim();
-        return fallback;
-    }
-    return fallback;
-};
-
-/**
- * Validates backend authentication response payload.
- * Enforces non-empty string access_token and valid plain object user with required fields.
- */
-const validateAuthPayload = (data) => {
-    if (!data || typeof data !== 'object' || Array.isArray(data)) {
-        throw new Error('Invalid authentication response from server.');
-    }
-    if (typeof data.access_token !== 'string' || !data.access_token.trim()) {
-        throw new Error('Invalid authentication token received. Please try again.');
-    }
-    const user = data.user;
-    if (!user || typeof user !== 'object' || Array.isArray(user)) {
-        throw new Error('Invalid user profile received. Please try again.');
-    }
-    // Verify required user fields based on backend UserResponse (id, username, email)
-    if (user.id === undefined || user.id === null || typeof user.username !== 'string' || !user.username.trim()) {
-        throw new Error('Incomplete user profile received. Please try again.');
-    }
-    return {
-        accessToken: data.access_token.trim(),
-        user
-    };
-};
-
-/**
- * Atomically persists session state into localStorage with full rollback on any failure.
- * Ensures isAuthenticated is never written or left true if any write fails.
- */
-const persistSession = (accessToken, user) => {
-    const clearStorage = () => {
-        try { localStorage.removeItem('auth_token'); } catch (_e) { /* ignore */ }
-        try { localStorage.removeItem('user'); } catch (_e) { /* ignore */ }
-        try { localStorage.removeItem('isAuthenticated'); } catch (_e) { /* ignore */ }
-    };
-
-    try {
-        // Write credentials first before setting the isAuthenticated flag
-        localStorage.setItem('auth_token', accessToken);
-        localStorage.setItem('user', JSON.stringify(user));
-        localStorage.setItem('isAuthenticated', 'true');
-    } catch (storageErr) {
-        console.warn('Storage write failed, rolling back session:', storageErr);
-        clearStorage();
-        throw new Error('Unable to save login session. Please ensure cookies and local storage are enabled in your browser.');
-    }
-};
+import { apiRequest } from '../config/apiClient';
+import { persistSession, validateAuthPayload } from '../config/authSession';
 
 const SignupPage = () => {
     const [username, setUsername] = useState('');
@@ -98,21 +23,11 @@ const SignupPage = () => {
         setIsGoogleLoading(true);
         try {
             const { idToken } = await signInWithGoogle();
-            const res = await fetch('/api/auth/google', {
+            const data = await apiRequest('/api/auth/google', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ id_token: idToken })
+                auth: 'none',
+                json: { id_token: idToken },
             });
-            let data = {};
-            try {
-                data = await res.json();
-            } catch (_) {
-                data = { detail: res.statusText || 'Google sign-up server error' };
-            }
-            if (!res.ok) {
-                const errMessage = formatAuthError(data?.detail, 'Google sign-up failed.');
-                throw new Error(errMessage);
-            }
 
             const { accessToken, user } = validateAuthPayload(data);
             persistSession(accessToken, user);
@@ -190,28 +105,15 @@ const SignupPage = () => {
         setIsLoading(true);
 
         try {
-            const res = await fetch('/api/auth/register', {
+            const data = await apiRequest('/api/auth/register', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
+                auth: 'none',
+                json: {
                     username: username.trim(),
                     email: email.trim(),
                     password: password
-                }),
+                },
             });
-
-            let data = {};
-            try {
-                data = await res.json();
-            } catch (_) {
-                data = { detail: res.statusText || 'Registration server response error' };
-            }
-            if (!res.ok) {
-                const errMessage = formatAuthError(data?.detail, 'Failed to create account.');
-                throw new Error(errMessage);
-            }
 
             const { accessToken, user } = validateAuthPayload(data);
             persistSession(accessToken, user);

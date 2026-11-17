@@ -174,27 +174,29 @@ const MermaidViewer = ({ chart, title = "Architecture Diagram" }) => {
     // Safely insert sanitized SVG node into container element
     useEffect(() => {
         const mount = (targetEl) => {
-            if (!targetEl) return;
+            if (!targetEl) return true;
             while (targetEl.firstChild) {
                 targetEl.removeChild(targetEl.firstChild);
             }
-            if (!svgContent) return;
+            if (!svgContent) return true;
             try {
                 const parser = new DOMParser();
                 const svgDoc = parser.parseFromString(svgContent, 'image/svg+xml');
                 if (svgDoc.documentElement && !svgDoc.querySelector('parsererror')) {
                     targetEl.appendChild(document.importNode(svgDoc.documentElement, true));
-                } else {
-                    targetEl.innerHTML = svgContent;
+                    return true;
                 }
             } catch {
-                targetEl.innerHTML = svgContent;
+                return false;
             }
+            return false;
         };
 
-        mount(containerRef.current);
-        if (isFullscreen) {
-            mount(fullscreenContainerRef.current);
+        const mounted = mount(containerRef.current);
+        const fullscreenMounted = !isFullscreen || mount(fullscreenContainerRef.current);
+        if (!mounted || !fullscreenMounted) {
+            setSvgContent('');
+            setError('Diagram could not be displayed safely.');
         }
     }, [svgContent, isFullscreen]);
 

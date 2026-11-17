@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { BarChart3, Calendar, RotateCcw, Award, Flame, Activity, Clock, Bot, Zap } from 'lucide-react';
+import { apiRequest } from '../config/apiClient';
 
 const Progress = () => {
     const [stats, setStats] = useState({ study_hours: 0, quizzes_taken: 0, streak_days: 0 });
@@ -17,101 +18,69 @@ const Progress = () => {
         if (resetInProgressRef.current) return;
         setLoading(true);
         setFetchError(null);
-        const token = localStorage.getItem('auth_token');
-        const headers = {};
-        if (token) headers['Authorization'] = `Bearer ${token}`;
 
         const thisGen = ++progressRequestGenRef.current;
         try {
             const [progResult, heatResult, dashResult, sessResult] = await Promise.allSettled([
-                fetch('/api/progress', { headers }),
-                fetch('/api/analytics/activity-heatmap', { headers }),
-                fetch('/api/analytics/dashboard', { headers }),
-                fetch('/api/sessions/history', { headers })
+                apiRequest('/api/progress', { auth: 'optional' }),
+                apiRequest('/api/analytics/activity-heatmap', { auth: 'optional' }),
+                apiRequest('/api/analytics/dashboard', { auth: 'required' }),
+                apiRequest('/api/sessions/history', { auth: 'optional' })
             ]);
 
             if (thisGen !== progressRequestGenRef.current || resetInProgressRef.current) return;
 
-            const progRes = progResult.status === 'fulfilled' ? progResult.value : { ok: false };
-            const heatRes = heatResult.status === 'fulfilled' ? heatResult.value : { ok: false };
-            const dashRes = dashResult.status === 'fulfilled' ? dashResult.value : { ok: false };
-            const sessRes = sessResult.status === 'fulfilled' ? sessResult.value : { ok: false };
-
             let hasErrors = false;
-            if (progRes.ok) {
-                try {
-                    const data = await progRes.json();
-                    if (thisGen !== progressRequestGenRef.current || resetInProgressRef.current) return;
-                    if (data && typeof data === 'object') {
-                        const rawHours = Number(data.study_hours);
-                        const rawQuizzes = Number(data.quizzes_taken);
-                        const rawStreak = Number(data.streak_days);
-                        setStats({
-                            study_hours: Number.isFinite(rawHours) && rawHours >= 0 ? rawHours : 0,
-                            quizzes_taken: Number.isFinite(rawQuizzes) && rawQuizzes >= 0 ? Math.floor(rawQuizzes) : 0,
-                            streak_days: Number.isFinite(rawStreak) && rawStreak >= 0 ? Math.floor(rawStreak) : 0
-                        });
-                    } else {
-                        setStats({ study_hours: 0, quizzes_taken: 0, streak_days: 0 });
-                    }
-                } catch {
+            if (progResult.status === 'fulfilled') {
+                const data = progResult.value;
+                if (data && typeof data === 'object') {
+                    const rawHours = Number(data.study_hours);
+                    const rawQuizzes = Number(data.quizzes_taken);
+                    const rawStreak = Number(data.streak_days);
+                    setStats({
+                        study_hours: Number.isFinite(rawHours) && rawHours >= 0 ? rawHours : 0,
+                        quizzes_taken: Number.isFinite(rawQuizzes) && rawQuizzes >= 0 ? Math.floor(rawQuizzes) : 0,
+                        streak_days: Number.isFinite(rawStreak) && rawStreak >= 0 ? Math.floor(rawStreak) : 0
+                    });
+                } else {
                     setStats({ study_hours: 0, quizzes_taken: 0, streak_days: 0 });
-                    hasErrors = true;
                 }
             } else {
                 setStats({ study_hours: 0, quizzes_taken: 0, streak_days: 0 });
                 hasErrors = true;
             }
 
-            if (heatRes.ok) {
-                try {
-                    const data = await heatRes.json();
-                    if (thisGen !== progressRequestGenRef.current) return;
-                    if (data && Array.isArray(data.days)) {
-                        setHeatmapData(data.days);
-                    } else {
-                        setHeatmapData([]);
-                    }
-                } catch {
+            if (heatResult.status === 'fulfilled') {
+                const data = heatResult.value;
+                if (data && Array.isArray(data.days)) {
+                    setHeatmapData(data.days);
+                } else {
                     setHeatmapData([]);
-                    hasErrors = true;
                 }
             } else {
                 setHeatmapData([]);
                 hasErrors = true;
             }
 
-            if (dashRes.ok) {
-                try {
-                    const data = await dashRes.json();
-                    if (thisGen !== progressRequestGenRef.current) return;
-                    if (data && data.chart) {
-                        setChartImage(`data:image/png;base64,${data.chart}`);
-                    } else {
-                        setChartImage(null);
-                    }
-                } catch {
+            if (dashResult.status === 'fulfilled') {
+                const data = dashResult.value;
+                if (data && data.chart) {
+                    setChartImage(`data:image/png;base64,${data.chart}`);
+                } else {
                     setChartImage(null);
-                    hasErrors = true;
                 }
             } else {
                 setChartImage(null);
                 hasErrors = true;
             }
 
-            if (sessRes.ok) {
-                try {
-                    const data = await sessRes.json();
-                    if (thisGen !== progressRequestGenRef.current) return;
-                    if (Array.isArray(data)) {
-                        const validSessions = data.filter(s => s && typeof s === 'object' && s.id !== null && s.id !== undefined);
-                        setSessions(validSessions);
-                    } else {
-                        setSessions([]);
-                    }
-                } catch {
+            if (sessResult.status === 'fulfilled') {
+                const data = sessResult.value;
+                if (Array.isArray(data)) {
+                    const validSessions = data.filter(s => s && typeof s === 'object' && s.id !== null && s.id !== undefined);
+                    setSessions(validSessions);
+                } else {
                     setSessions([]);
-                    hasErrors = true;
                 }
             } else {
                 setSessions([]);
@@ -146,27 +115,24 @@ const Progress = () => {
         setIsResetting(true);
         resetInProgressRef.current = true;
         const thisResetGen = ++progressRequestGenRef.current;
-        const token = localStorage.getItem('auth_token');
-        const headers = {};
-        if (token) headers['Authorization'] = `Bearer ${token}`;
         try {
-            const res = await fetch('/api/progress', { method: 'DELETE', headers });
+            await apiRequest('/api/progress', {
+                method: 'DELETE',
+                auth: 'optional',
+                responseType: 'none',
+            });
             if (thisResetGen !== progressRequestGenRef.current) return;
-            if (res.ok) {
-                setStats({ study_hours: 0, quizzes_taken: 0, streak_days: 0 });
-                setChartImage(null);
-                setSessions([]);
-                setHeatmapData([]);
-                resetInProgressRef.current = false;
-                fetchAnalytics();
-            } else {
-                alert("Failed to reset progress on server.");
-                resetInProgressRef.current = false;
-                fetchAnalytics();
-            }
+            setStats({ study_hours: 0, quizzes_taken: 0, streak_days: 0 });
+            setChartImage(null);
+            setSessions([]);
+            setHeatmapData([]);
+            resetInProgressRef.current = false;
+            fetchAnalytics();
         } catch (err) {
             console.error("Reset error:", err);
-            alert("Network error resetting progress.");
+            alert(err.kind === 'http'
+                ? 'Failed to reset progress on server.'
+                : 'Network error resetting progress.');
             resetInProgressRef.current = false;
             if (thisResetGen === progressRequestGenRef.current) {
                 fetchAnalytics();

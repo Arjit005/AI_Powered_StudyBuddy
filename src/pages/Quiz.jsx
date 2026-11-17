@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { Zap, CheckCircle2, XCircle, Award, RotateCcw, Save, Check } from 'lucide-react';
 import confetti from 'canvas-confetti';
+import { apiRequest } from '../config/apiClient';
 
 const Quiz = () => {
     const [topic, setTopic] = useState('');
@@ -27,21 +28,12 @@ const Quiz = () => {
         setError('');
 
         try {
-            const token = localStorage.getItem('auth_token');
-            const headers = { 'Content-Type': 'application/json' };
-            if (token) headers['Authorization'] = `Bearer ${token}`;
-
-            const response = await fetch('/api/generate-quiz', {
+            const data = await apiRequest('/api/generate-quiz', {
                 method: 'POST',
-                headers,
-                body: JSON.stringify({ topic: topic.trim() })
+                auth: 'optional',
+                json: { topic: topic.trim() }
             });
 
-            if (!response.ok) {
-                const errData = await response.json().catch(() => ({}));
-                throw new Error(errData.detail || 'Failed to generate quiz');
-            }
-            const data = await response.json();
             if (!data || !Array.isArray(data.questions) || data.questions.length === 0) {
                 throw new Error('AI engine returned no questions. Please try another topic.');
             }
@@ -79,7 +71,9 @@ const Quiz = () => {
             quizInstanceRef.current = newInstanceId;
             setQuiz({ ...data, questions: validQuestions, instanceId: newInstanceId });
         } catch (err) {
-            setError(err.message || 'Error creating quiz.');
+            setError(err.kind === 'http' && !err.hasDetail
+                ? 'Failed to generate quiz'
+                : err.message || 'Error creating quiz.');
         } finally {
             setLoading(false);
         }
@@ -126,17 +120,14 @@ const Quiz = () => {
             ? Math.max(10, Math.round((Date.now() - quizStartTimeRef.current) / 1000))
             : 60;
         
-        const token = localStorage.getItem('auth_token');
-        const headers = { 'Content-Type': 'application/json' };
-        if (token) headers['Authorization'] = `Bearer ${token}`;
-
-        fetch('/api/track-activity', {
+        apiRequest('/api/track-activity', {
             method: 'POST',
-            headers,
-            body: JSON.stringify({ activity_type: 'quiz', duration_seconds: elapsedSecs })
-        }).then(actRes => {
+        auth: 'optional',
+        responseType: 'none',
+        json: { activity_type: 'quiz', duration_seconds: elapsedSecs }
+        }).then(() => {
             if (quizInstanceRef.current === thisInstance) {
-                setActivityLogged(actRes.ok);
+            setActivityLogged(true);
             }
         }).catch(() => {
             if (quizInstanceRef.current === thisInstance) {
@@ -150,15 +141,12 @@ const Quiz = () => {
         const currentInstanceId = quiz.instanceId;
         setSaving(true);
         try {
-            const token = localStorage.getItem('auth_token');
-            const headers = { 'Content-Type': 'application/json' };
-            if (token) headers['Authorization'] = `Bearer ${token}`;
-
             const score = calculateScore();
-            const res = await fetch('/api/library', {
+            await apiRequest('/api/library', {
                 method: 'POST',
-                headers,
-                body: JSON.stringify({
+                auth: 'optional',
+                responseType: 'none',
+                json: {
                     material_type: 'quiz',
                     title: `Quiz: ${topic || 'Practice Assessment'} (${score}/${quiz.questions.length})`,
                     topic: topic || 'Quiz',
@@ -170,19 +158,17 @@ const Quiz = () => {
                         user_answers: answers
                     }),
                     tags: 'quiz,mcq,assessment'
-                })
+                }
             });
 
-            if (res.ok) {
-                if (quiz?.instanceId === currentInstanceId) {
-                    setSavedSuccess(true);
-                    setTimeout(() => setSavedSuccess(false), 3000);
-                }
-            } else {
-                alert('Could not save quiz to personal library.');
+            if (quiz?.instanceId === currentInstanceId) {
+                setSavedSuccess(true);
+                setTimeout(() => setSavedSuccess(false), 3000);
             }
         } catch (err) {
-            alert('Failed to save quiz: ' + err.message);
+            alert(err.kind === 'http'
+                ? 'Could not save quiz to personal library.'
+                : 'Failed to save quiz: ' + err.message);
         } finally {
             setSaving(false);
         }

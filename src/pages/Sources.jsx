@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { FileText, Upload, Trash2, RefreshCw, BookOpen, Sparkles, Plus } from 'lucide-react';
+import { apiRequest } from '../config/apiClient';
 
 const Sources = () => {
     const [sources, setSources] = useState([]);
@@ -31,21 +32,13 @@ const Sources = () => {
         setLoading(true);
         setFetchError(null);
         try {
-            const token = localStorage.getItem('auth_token');
-            const headers = {};
-            if (token) headers['Authorization'] = `Bearer ${token}`;
-
-            const res = await fetch('/api/sources', { headers });
-            if (res.ok) {
-                const data = await res.json();
-                setSources(Array.isArray(data) ? data : []);
-            } else {
-                const errData = await res.json().catch(() => ({}));
-                setFetchError(errData.detail || 'Failed to load study sources.');
-            }
+            const data = await apiRequest('/api/sources', { auth: 'optional' });
+            setSources(Array.isArray(data) ? data : []);
         } catch (e) {
             console.error("Error fetching sources:", e);
-            setFetchError('Network error while retrieving sources.');
+            setFetchError(e.kind === 'http'
+                ? (e.hasDetail ? e.message : 'Failed to load study sources.')
+                : 'Network error while retrieving sources.');
         } finally {
             setLoading(false);
         }
@@ -81,30 +74,24 @@ const Sources = () => {
         }
 
         try {
-            const token = localStorage.getItem('auth_token');
-            const headers = {};
-            if (token) headers['Authorization'] = `Bearer ${token}`;
-
-            const res = await fetch('/api/sources', {
+            await apiRequest('/api/sources', {
                 method: 'POST',
-                headers,
-                body: formData
+                auth: 'optional',
+                formData,
+                responseType: 'none',
             });
-            if (res.ok) {
-                setTitleInput('');
-                setTextInput('');
-                setUrlInput('');
-                setSelectedFile(null);
-                if (fileInputRef.current) fileInputRef.current.value = '';
-                setActiveTab('library');
-                await fetchSources();
-            } else {
-                const err = await res.json().catch(() => ({}));
-                alert(err.detail || 'Failed to save study material.');
-            }
+            setTitleInput('');
+            setTextInput('');
+            setUrlInput('');
+            setSelectedFile(null);
+            if (fileInputRef.current) fileInputRef.current.value = '';
+            setActiveTab('library');
+            await fetchSources();
         } catch (err) {
             console.error("Upload error:", err);
-            alert('Error uploading source.');
+            alert(err.kind === 'http'
+                ? (err.hasDetail ? err.message : 'Failed to save study material.')
+                : 'Error uploading source.');
         } finally {
             setUploading(false);
         }
@@ -117,25 +104,15 @@ const Sources = () => {
         setGuideError(null);
         setLoadingGuide(true);
         try {
-            const token = localStorage.getItem('auth_token');
-            const headers = {};
-            if (token) headers['Authorization'] = `Bearer ${token}`;
-
-            const res = await fetch(`/api/sources/${source.id}/guide`, { headers });
+            const data = await apiRequest(`/api/sources/${source.id}/guide`, { auth: 'optional' });
             if (thisGen !== guideRequestGenRef.current) return;
-            if (res.ok) {
-                const data = await res.json();
-                if (thisGen !== guideRequestGenRef.current) return;
-                setSourceGuide(data);
-            } else {
-                const errData = await res.json().catch(() => ({}));
-                if (thisGen !== guideRequestGenRef.current) return;
-                setGuideError(errData.detail || 'Could not generate study guide for this source.');
-            }
+            setSourceGuide(data);
         } catch (e) {
             console.error("Guide fetch error:", e);
             if (thisGen === guideRequestGenRef.current) {
-                setGuideError('Network error retrieving study guide.');
+                setGuideError(e.kind === 'http'
+                    ? (e.hasDetail ? e.message : 'Could not generate study guide for this source.')
+                    : 'Network error retrieving study guide.');
             }
         } finally {
             if (thisGen === guideRequestGenRef.current) {
@@ -147,43 +124,35 @@ const Sources = () => {
     const handleDelete = async (id) => {
         if (!confirm("Are you sure you want to delete this study source?")) return;
         try {
-            const token = localStorage.getItem('auth_token');
-            const headers = {};
-            if (token) headers['Authorization'] = `Bearer ${token}`;
-
-            const res = await fetch(`/api/sources/${id}`, { method: 'DELETE', headers });
-            if (res.ok) {
-                setSources(current => current.filter(s => s.id !== id));
-                if (selectedSource?.id === id) {
-                    guideRequestGenRef.current += 1;
-                    setSelectedSource(null);
-                    setSourceGuide(null);
-                    setLoadingGuide(false);
-                }
-            } else {
-                alert("Failed to delete source.");
+            await apiRequest(`/api/sources/${id}`, {
+                method: 'DELETE',
+                auth: 'optional',
+                responseType: 'none',
+            });
+            setSources(current => current.filter(s => s.id !== id));
+            if (selectedSource?.id === id) {
+                guideRequestGenRef.current += 1;
+                setSelectedSource(null);
+                setSourceGuide(null);
+                setLoadingGuide(false);
             }
         } catch (e) {
             console.error("Delete error:", e);
-            alert("Network error deleting source.");
+            alert(e.kind === 'http' ? 'Failed to delete source.' : 'Network error deleting source.');
         }
     };
 
     const handleReindex = async (id) => {
         try {
-            const token = localStorage.getItem('auth_token');
-            const headers = {};
-            if (token) headers['Authorization'] = `Bearer ${token}`;
-
-            const res = await fetch(`/api/sources/${id}/reindex`, { method: 'POST', headers });
-            if (res.ok) {
-                alert("Source successfully re-chunked and re-embedded!");
-            } else {
-                alert("Failed to reindex source.");
-            }
+            await apiRequest(`/api/sources/${id}/reindex`, {
+                method: 'POST',
+                auth: 'optional',
+                responseType: 'none',
+            });
+            alert("Source successfully re-chunked and re-embedded!");
         } catch (e) {
             console.error("Reindex error:", e);
-            alert("Network error reindexing source.");
+            alert(e.kind === 'http' ? 'Failed to reindex source.' : 'Network error reindexing source.');
         }
     };
 

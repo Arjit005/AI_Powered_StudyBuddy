@@ -1412,8 +1412,11 @@ def get_activity_heatmap(
     }
 
 @app.get("/api/analytics/dashboard", tags=["Analytics"])
-def get_analytics_dashboard(db: Session = Depends(get_db)):
-    chart_base64 = analytics.generate_study_chart(db)
+def get_analytics_dashboard(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.get_current_user_required)
+):
+    chart_base64 = analytics.generate_study_chart(db, current_user.id)
     return {"chart": chart_base64}
 
 # ============================================================================
