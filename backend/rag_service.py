@@ -6,11 +6,15 @@ import hashlib
 import re
 import warnings
 warnings.filterwarnings("ignore", category=FutureWarning)
+import heapq
+import logging
 from typing import List, Dict, Any, Tuple, Optional
 from sqlalchemy.orm import Session
 from backend.models import Source, SourceChunk, MessageSourceLink
-from backend.ai_service import AIService
+from backend.ai_service import AIService, AIServiceError
 from backend.embedding_service import EmbeddingService, EmbeddingProviderError
+
+logger = logging.getLogger(__name__)
 
 # Optional PDF & Web extractors
 try:
@@ -321,17 +325,27 @@ class RAGService:
             elif cleaned.startswith("```"):
                 cleaned = cleaned[3:-3].strip()
             data = json.loads(cleaned)
+            if (
+                not isinstance(data, dict)
+                or not isinstance(data.get("summary"), str)
+                or not isinstance(data.get("key_topics"), list)
+                or not isinstance(data.get("suggested_questions"), list)
+            ):
+                raise ValueError("AI source-guide response did not match the expected structure.")
             return data
-        except Exception as e:
-            print(f"Error generating initial guide: {e}")
+        except AIServiceError:
+            logger.warning("AI source-guide generation was unavailable; the source will be saved without generated metadata.")
             return {
-                "summary": f"Study source covering {title}.",
-                "key_topics": [title, "Core Concepts", "Analysis"],
-                "suggested_questions": [
-                    f"What are the primary findings in {title}?",
-                    "How do these concepts apply practically?",
-                    "What are the key takeaways?"
-                ]
+                "summary": "AI-generated guide unavailable; source content was saved.",
+                "key_topics": [],
+                "suggested_questions": [],
+            }
+        except (json.JSONDecodeError, TypeError, ValueError) as err:
+            logger.warning("AI source-guide response was invalid: %s", err)
+            return {
+                "summary": "AI-generated guide unavailable; source content was saved.",
+                "key_topics": [],
+                "suggested_questions": [],
             }
 
     @staticmethod
@@ -386,7 +400,7 @@ class RAGService:
                 source_id=source.id,
                 chunk_index=idx,
                 text=text,
-                embedding=json.dumps(embedding_1536[:64]), # Keep compact 64-dim in SQLite to prevent storage bloat
+                embedding=json.dumps(embedding_1536),
                 token_count=token_count
             )
             db.add(chunk)
@@ -641,37 +655,48 @@ class RAGService:
                     return scored_results
 
         # 3. Fallback: Database-level cosine similarity + keyword overlap
-        query_emb_fallback = (
-            query_emb_1536[:64] 
-            if query_emb_1536 
-            else RAGService._compute_semantic_embedding(query, dim=1536)[:64]
-        )
+        query_emb_fallback = query_emb_1536 or RAGService._compute_semantic_embedding(query, dim=1536)
 
         chunk_query = db.query(SourceChunk).join(Source, SourceChunk.source_id == Source.id)
         chunk_query = chunk_query.filter(Source.user_id == user_id)
         if source_ids:
             chunk_query = chunk_query.filter(SourceChunk.source_id.in_(source_ids))
 
-        chunks = chunk_query.all()
-        if not chunks:
-            return []
-
-        scored = []
+        top_chunks = []
         query_words = set(re.findall(r'\w+', query.lower()))
 
-        for chunk in chunks:
+        for chunk in chunk_query.yield_per(256):
+            dot = 0.0
             try:
                 emb = json.loads(chunk.embedding)
-                dot = sum(a * b for a, b in zip(query_emb_fallback, emb[:len(query_emb_fallback)]))
-                chunk_words = set(re.findall(r'\w+', chunk.text.lower()))
-                overlap = len(query_words.intersection(chunk_words))
-                score = dot + (0.05 * overlap)
-                scored.append((chunk, score))
-            except Exception:
-                scored.append((chunk, 0.0))
+                if not isinstance(emb, list) or not emb:
+                    raise ValueError("Stored embedding must be a non-empty vector.")
+                dimensions = min(len(query_emb_fallback), len(emb))
+                query_vector = query_emb_fallback[:dimensions]
+                stored_vector = emb[:dimensions]
+                query_norm = math.sqrt(sum(value * value for value in query_vector))
+                stored_norm = math.sqrt(sum(value * value for value in stored_vector))
+                if query_norm and stored_norm:
+                    dot = sum(
+                        query_value * stored_value
+                        for query_value, stored_value in zip(query_vector, stored_vector)
+                    ) / (query_norm * stored_norm)
+            except (json.JSONDecodeError, TypeError, ValueError):
+                pass
 
-        scored.sort(key=lambda x: x[1], reverse=True)
-        return scored[:top_k]
+            chunk_words = set(re.findall(r'\w+', chunk.text.lower()))
+            overlap = len(query_words.intersection(chunk_words))
+            score = dot + (0.05 * overlap)
+            entry = (score, -int(chunk.id or 0), chunk)
+            if len(top_chunks) < top_k:
+                heapq.heappush(top_chunks, entry)
+            elif entry[:2] > top_chunks[0][:2]:
+                heapq.heapreplace(top_chunks, entry)
+
+        return [
+            (chunk, score)
+            for score, _chunk_id, chunk in sorted(top_chunks, key=lambda item: item[:2], reverse=True)
+        ]
 
     @staticmethod
     def generate_source_guide(source: Source) -> Dict[str, Any]:

@@ -38,6 +38,8 @@ const isSafeCss = (cssStr) => {
     const normalized = normalizeCss(cssStr);
 
     // Reject dangerous keywords in any form (@import, behavior, -moz-binding, javascript:, vbscript:)
+    // Control characters are explicitly removed before checking executable CSS tokens.
+    // eslint-disable-next-line no-control-regex
     const stripped = normalized.replace(/[\x00-\x20\x7f-\x9f]+/g, '').toLowerCase();
     if (
         stripped.includes('@import') ||
@@ -103,6 +105,8 @@ const sanitizeSvg = (svgStr) => {
 
                 // Decode and normalize value
                 const normalizedVal = normalizeCss(rawVal);
+                // Control characters are stripped to prevent obfuscated active URI values.
+                // eslint-disable-next-line no-control-regex
                 const compactVal = normalizedVal.replace(/[\x00-\x1f\x7f\s]+/g, '').toLowerCase();
 
                 const isUriAttr = rawName.includes('href') || rawName.includes('src') || rawName === 'action';
@@ -164,8 +168,9 @@ const MermaidViewer = ({ chart, title = "Architecture Diagram" }) => {
     const copyTimeoutRef = useRef(null);
     const modalRef = useRef(null);
     const triggerButtonRef = useRef(null);
-    const [svgContent, setSvgContent] = useState('');
-    const [error, setError] = useState(null);
+    const [svgState, setSvgState] = useState({ chart: null, svg: '', error: null });
+    const svgContent = svgState.chart === chart ? svgState.svg : '';
+    const error = svgState.chart === chart ? svgState.error : null;
     const [copied, setCopied] = useState(false);
     const [copyError, setCopyError] = useState(false);
     const [zoom, setZoom] = useState(1);
@@ -195,8 +200,9 @@ const MermaidViewer = ({ chart, title = "Architecture Diagram" }) => {
         const mounted = mount(containerRef.current);
         const fullscreenMounted = !isFullscreen || mount(fullscreenContainerRef.current);
         if (!mounted || !fullscreenMounted) {
-            setSvgContent('');
-            setError('Diagram could not be displayed safely.');
+            // This effect reports a failure found while synchronizing sanitized SVG with the DOM.
+            // eslint-disable-next-line react-hooks/set-state-in-effect
+            setSvgState((current) => ({ ...current, svg: '', error: 'Diagram could not be displayed safely.' }));
         }
     }, [svgContent, isFullscreen]);
 
@@ -220,24 +226,19 @@ const MermaidViewer = ({ chart, title = "Architecture Diagram" }) => {
     }, [isFullscreen]);
 
     useEffect(() => {
+        const triggerButton = triggerButtonRef.current;
         return () => {
             if (hasOpenedFullscreenRef.current) {
-                triggerButtonRef.current?.focus?.();
+                triggerButton?.focus?.();
             }
         };
     }, []);
 
     useEffect(() => {
-        if (!chart || typeof chart !== 'string' || !chart.trim()) {
-            setSvgContent('');
-            setError(null);
-            return;
-        }
+        if (!chart || typeof chart !== 'string' || !chart.trim()) return;
         initMermaid();
 
         let isCancelled = false;
-        setSvgContent(''); // Clear previous SVG while compiling
-        setError(null);
 
         const renderChart = () => {
             const id = 'mermaid-' + Math.random().toString(36).substring(2, 9);
@@ -259,25 +260,21 @@ const MermaidViewer = ({ chart, title = "Architecture Diagram" }) => {
                     if (!isCancelled) {
                         const sanitized = sanitizeSvg(svg);
                         if (!sanitized) {
-                            setError("Diagram sanitization failed or produced invalid SVG.");
-                            setSvgContent('');
+                            setSvgState({ chart, svg: '', error: 'Diagram sanitization failed or produced invalid SVG.' });
                         } else {
-                            setSvgContent(sanitized);
-                            setError(null);
+                            setSvgState({ chart, svg: sanitized, error: null });
                         }
                     }
                 } catch (err) {
                     console.error("Mermaid Render Error:", err);
                     if (!isCancelled) {
-                        setError(err.message || "Failed to render diagram syntax.");
-                        setSvgContent('');
+                        setSvgState({ chart, svg: '', error: err.message || 'Failed to render diagram syntax.' });
                     }
                 }
             }).catch(queueErr => {
                 console.error("Mermaid Queue Failure:", queueErr);
                 if (!isCancelled) {
-                    setError("Diagram rendering queue encountered an error.");
-                    setSvgContent('');
+                    setSvgState({ chart, svg: '', error: 'Diagram rendering queue encountered an error.' });
                 }
             });
         };

@@ -4,6 +4,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 
 import pytest
 import uuid
+import subprocess
 from fastapi.testclient import TestClient
 from backend.auth import create_access_token
 from backend.database import SessionLocal
@@ -66,6 +67,27 @@ def test_auth_status_headers():
     assert data["shield_active"] is True
     assert "rate_limiting" in data
 
+
+def test_cors_allows_configured_local_origin_but_not_any_render_subdomain():
+    local_response = client.options(
+        "/api/health",
+        headers={
+            "Origin": "http://localhost:5173",
+            "Access-Control-Request-Method": "GET",
+        },
+    )
+    assert local_response.headers["access-control-allow-origin"] == "http://localhost:5173"
+
+    untrusted_response = client.options(
+        "/api/health",
+        headers={
+            "Origin": "https://untrusted.onrender.com",
+            "Access-Control-Request-Method": "GET",
+        },
+    )
+    assert "access-control-allow-origin" not in untrusted_response.headers
+
+
 def test_semantic_embedding_dimension():
     """Verify RAG semantic embedding generates 1536 dimensions matching Pinecone index."""
     from backend.rag_service import RAGService
@@ -83,4 +105,26 @@ def test_database_url_normalization_and_driver_resolution():
     assert not resolved_url.startswith("postgres://")
     assert resolved_url.startswith("postgresql+psycopg://") or resolved_url.startswith("postgresql+psycopg2://")
     assert "sslmode=require" in resolved_url
+
+
+def test_production_database_requires_persistent_database_url(tmp_path):
+    env = os.environ.copy()
+    env["ENVIRONMENT"] = "production"
+    env.pop("DATABASE_URL", None)
+    repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+    env["PYTHONPATH"] = os.pathsep.join(
+        [repo_root, env.get("PYTHONPATH", "")]
+    ).rstrip(os.pathsep)
+
+    result = subprocess.run(
+        [sys.executable, "-c", "import backend.database"],
+        cwd=tmp_path,
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode != 0
+    assert "DATABASE_URL is required in production" in result.stderr
 

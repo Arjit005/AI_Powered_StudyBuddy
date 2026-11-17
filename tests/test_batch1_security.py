@@ -2,9 +2,14 @@ import pytest
 import os
 from unittest.mock import MagicMock, patch
 from fastapi.testclient import TestClient
+from fastapi import HTTPException
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import StaticPool
 
 from backend.main import app, _verify_google_token
 from backend.security import RateLimiter
+from backend.models import Base
 from backend.rag_service import RAGService
 from backend.ai_service import AIService
 
@@ -161,6 +166,55 @@ def test_lockout_resets_upon_successful_login():
     limiter.reset_failed_logins(test_ip)
     assert test_ip not in limiter.lockouts
     assert f"auth_fail:{test_ip}" not in limiter.history
+
+
+@pytest.fixture
+def shared_rate_limiter_factory():
+    engine = create_engine(
+        "sqlite://",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+    Base.metadata.create_all(bind=engine)
+    factory = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+    yield factory
+    engine.dispose()
+
+
+def _request_from_ip(client_ip):
+    request = MagicMock()
+    request.client.host = client_ip
+    request.headers = {}
+    return request
+
+
+def test_shared_rate_limit_is_enforced_across_instances(shared_rate_limiter_factory):
+    first_worker = RateLimiter(shared=True, session_factory=shared_rate_limiter_factory)
+    second_worker = RateLimiter(shared=True, session_factory=shared_rate_limiter_factory)
+    request = _request_from_ip("198.51.100.18")
+
+    first_worker.check_rate_limit(request, "chat", max_requests=1, window_seconds=60)
+    with pytest.raises(HTTPException) as limited:
+        second_worker.check_rate_limit(request, "chat", max_requests=1, window_seconds=60)
+
+    assert limited.value.status_code == 429
+    assert limited.value.headers["Retry-After"]
+
+
+def test_shared_failed_login_lockout_and_reset_across_instances(shared_rate_limiter_factory):
+    first_worker = RateLimiter(shared=True, session_factory=shared_rate_limiter_factory)
+    second_worker = RateLimiter(shared=True, session_factory=shared_rate_limiter_factory)
+    request = _request_from_ip("198.51.100.19")
+    client_ip = request.client.host
+
+    for _ in range(5):
+        first_worker.record_failed_login(client_ip)
+    with pytest.raises(HTTPException) as locked:
+        second_worker.check_rate_limit(request, "chat", max_requests=10, window_seconds=60)
+    assert locked.value.status_code == 429
+
+    second_worker.reset_failed_logins(client_ip)
+    first_worker.check_rate_limit(request, "chat", max_requests=10, window_seconds=60)
 
 
 # ============================================================================

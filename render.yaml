@@ -40,3 +40,5 @@ services:
     envVars:
       - key: NODE_VERSION
         value: 20.12.0
+      - key: VITE_API_BASE_URL
+        value: "https://ai-study-buddy-backend.onrender.com"

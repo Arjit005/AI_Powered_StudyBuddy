@@ -42,7 +42,7 @@ describe('MermaidViewer Real Component Security & Sanitization Suite', () => {
         `;
         mockMermaidSvg(legitimateSvg);
 
-        const { container } = render(<MermaidViewer chart="graph TD; A-->B;" title="Architecture Flow" />);
+        render(<MermaidViewer chart="graph TD; A-->B;" title="Architecture Flow" />);
 
         await waitFor(() => {
             expect(screen.getByText('Node A')).toBeDefined();
@@ -219,7 +219,7 @@ describe('MermaidViewer Real Component Security & Sanitization Suite', () => {
         `;
         mockMermaidSvg(legitimateFragmentSvg);
 
-        const { container } = render(<MermaidViewer chart="graph TD; A-->B;" />);
+        render(<MermaidViewer chart="graph TD; A-->B;" />);
 
         await waitFor(() => {
             expect(screen.getByText('Local Link')).toBeDefined();
@@ -255,7 +255,7 @@ describe('MermaidViewer Real Component Security & Sanitization Suite', () => {
         `;
         mockMermaidSvg(xssSvg);
 
-        const { container } = render(<MermaidViewer chart="graph TD; A;" />);
+        render(<MermaidViewer chart="graph TD; A;" />);
 
         await waitFor(() => {
             expect(screen.getByText('XSS Test Element')).toBeDefined();

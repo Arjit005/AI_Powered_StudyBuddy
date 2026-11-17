@@ -3,7 +3,7 @@ import logging
 import math
 import re
 from typing import Dict, Any, List, Optional
-from backend.ai_service import AIService
+from backend.ai_service import AIService, AIServiceError
 from backend.database import SessionLocal
 from backend.models import Conversation, ChatHistory
 
@@ -286,14 +286,12 @@ class MCPService:
                     parsed["excalidraw_elements"] = cls._convert_to_excalidraw_elements(valid_nodes, valid_edges)
                     parsed["mermaid_code"] = cls._nodes_to_mermaid(valid_nodes, valid_edges)
                     return parsed
-        except Exception as e:
-            print(f"MCP Canvas AI generation note: {e}")
-
-        # Deterministic rich fallback canvas diagram
-        fallback = cls._generate_fallback_canvas_graph(topic)
-        fallback["excalidraw_elements"] = cls._convert_to_excalidraw_elements(fallback["nodes"], fallback["edges"])
-        fallback["mermaid_code"] = cls._nodes_to_mermaid(fallback["nodes"], fallback["edges"])
-        return fallback
+            raise ValueError("Generated canvas diagram did not meet validation criteria.")
+        except AIServiceError:
+            raise
+        except Exception as err:
+            logger.exception("Canvas generation returned an invalid response.")
+            raise AIServiceError() from err
 
     @classmethod
     def _generate_fallback_canvas_graph(cls, topic: str) -> Dict[str, Any]:
@@ -796,8 +794,32 @@ class MCPService:
                     ],
                     "isError": False
                 }
-            except Exception as err:
-                logger.error(f"MCP tool {tool_name} execution error: {err}")
+            except PermissionError as err:
+                logger.info(f"MCP tool {tool_name} requires authentication.")
+                if is_notification:
+                    return None
+                return {
+                    "jsonrpc": "2.0",
+                    "id": rpc_id,
+                    "error": {
+                        "code": -32001,
+                        "message": str(err)
+                    }
+                }
+            except AIServiceError as err:
+                logger.warning("MCP tool %s could not complete because AI service is unavailable.", tool_name)
+                if is_notification:
+                    return None
+                return {
+                    "jsonrpc": "2.0",
+                    "id": rpc_id,
+                    "error": {
+                        "code": -32002,
+                        "message": err.user_message,
+                    }
+                }
+            except Exception:
+                logger.exception("MCP tool %s execution failed.", tool_name)
                 if is_notification:
                     return None
                 return {
@@ -805,7 +827,7 @@ class MCPService:
                     "id": rpc_id,
                     "error": {
                         "code": -32603,
-                        "message": f"Tool execution encountered an internal error: {err}"
+                        "message": "Tool execution encountered an internal error. Please try again."
                     }
                 }
 

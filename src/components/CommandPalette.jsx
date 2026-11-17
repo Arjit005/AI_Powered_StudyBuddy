@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Search, 
@@ -18,7 +18,7 @@ import {
 
 export default function CommandPalette({ isOpen, onClose }) {
   const [query, setQuery] = useState('');
-  const [selectedIndex, setSelectedIndex] = useState(0);
+  const [selection, setSelection] = useState({ query: '', index: 0 });
   const navigate = useNavigate();
   const previousFocusRef = useRef(null);
   const modalRef = useRef(null);
@@ -117,24 +117,15 @@ export default function CommandPalette({ isOpen, onClose }) {
     }
   ];
 
-  const filtered = useMemo(() => {
-    const q = query.toLowerCase();
-    return commands.filter(cmd => 
+  const q = query.toLowerCase();
+  const filtered = commands.filter(cmd =>
       cmd.title.toLowerCase().includes(q) ||
       cmd.description.toLowerCase().includes(q) ||
       cmd.category.toLowerCase().includes(q)
     );
-  }, [query]);
 
+  const selectedIndex = selection.query === query ? selection.index : 0;
   const activeIndex = Math.min(selectedIndex, Math.max(filtered.length - 1, 0));
-  const filteredRef = useRef(filtered);
-  filteredRef.current = filtered;
-  const selectedIndexRef = useRef(activeIndex);
-  selectedIndexRef.current = activeIndex;
-
-  useEffect(() => {
-    setSelectedIndex(0);
-  }, [query]);
 
   useEffect(() => {
     if (isOpen) {
@@ -196,15 +187,15 @@ export default function CommandPalette({ isOpen, onClose }) {
         }
       } else if (e.key === 'ArrowDown') {
         e.preventDefault();
-        const len = filteredRef.current.length || 1;
-        setSelectedIndex(prev => (prev + 1) % len);
+        const len = filtered.length || 1;
+        setSelection({ query, index: (activeIndex + 1) % len });
       } else if (e.key === 'ArrowUp') {
         e.preventDefault();
-        const len = filteredRef.current.length || 1;
-        setSelectedIndex(prev => (prev - 1 + len) % len);
+        const len = filtered.length || 1;
+        setSelection({ query, index: (activeIndex - 1 + len) % len });
       } else if (e.key === 'Enter') {
         e.preventDefault();
-        const active = filteredRef.current[selectedIndexRef.current];
+        const active = filtered[activeIndex];
         if (active) {
           active.action();
           onClose();
@@ -214,7 +205,7 @@ export default function CommandPalette({ isOpen, onClose }) {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, onClose]);
+  }, [isOpen, onClose, filtered, activeIndex, query]);
 
   if (!isOpen) return null;
 
@@ -278,7 +269,7 @@ export default function CommandPalette({ isOpen, onClose }) {
                     cmd.action();
                     onClose();
                   }}
-                  onMouseEnter={() => setSelectedIndex(idx)}
+                  onMouseEnter={() => setSelection({ query, index: idx })}
                   className={`flex items-center justify-between p-3 rounded-xl cursor-pointer transition-all ${
                     isSelected 
                       ? 'bg-emerald-500/20 border border-emerald-500/40 text-white shadow-lg shadow-emerald-950/40' 

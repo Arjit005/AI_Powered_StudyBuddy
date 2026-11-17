@@ -58,7 +58,7 @@ const SignupPage = () => {
             hasUpper: /[A-Z]/.test(password),
             hasLower: /[a-z]/.test(password),
             hasNumber: /[0-9]/.test(password),
-            hasSpecial: /[!@#$%^&*(),.?":{}|<>\-_=+/\\\[\]]/.test(password),
+            hasSpecial: /[!@#$%^&*(),.?":{}|<>\-_=+/\\\x5B\x5D]/.test(password),
         };
     }, [password]);
 

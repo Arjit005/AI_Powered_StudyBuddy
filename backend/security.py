@@ -2,10 +2,17 @@ import os
 import re
 import time
 import html
+import hashlib
+import hmac
+import logging
 import threading
 from typing import Dict, List, Tuple, Optional
 from fastapi import Request, HTTPException, status
 from starlette.middleware.base import BaseHTTPMiddleware
+from sqlalchemy import delete
+from sqlalchemy.exc import SQLAlchemyError
+
+logger = logging.getLogger(__name__)
 
 # ============================================================================
 # 1. HTTP SECURITY HEADERS MIDDLEWARE
@@ -34,13 +41,114 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 # 2. IN-MEMORY RATE LIMITER & BRUTE-FORCE PROTECTION
 # ============================================================================
 class RateLimiter:
-    def __init__(self):
+    def __init__(self, shared: bool = False, session_factory=None):
         # Maps "category:client_ip" -> list of epoch timestamps
         self.history: Dict[str, List[float]] = {}
         # Maps "client_ip" -> lockout until epoch
         self.lockouts: Dict[str, float] = {}
         self._last_global_cleanup: float = time.time()
         self._lock = threading.Lock()
+        self.shared = shared
+        self._session_factory = session_factory
+
+    def _get_session_factory(self):
+        if self._session_factory is not None:
+            return self._session_factory
+        from .database import SessionLocal
+        return SessionLocal
+
+    @staticmethod
+    def _shared_client_key(client_ip: str) -> str:
+        secret = os.getenv("JWT_SECRET_KEY", "").encode("utf-8")
+        return hmac.new(secret, client_ip.encode("utf-8"), hashlib.sha256).hexdigest()
+
+    @staticmethod
+    def _dialect_insert(db, table):
+        dialect = db.get_bind().dialect.name
+        if dialect == "sqlite":
+            from sqlalchemy.dialects.sqlite import insert
+        elif dialect == "postgresql":
+            from sqlalchemy.dialects.postgresql import insert
+        else:
+            raise RuntimeError(f"Shared rate limiting does not support database dialect {dialect}.")
+        return insert(table)
+
+    def _should_clean_shared(self, now: float) -> bool:
+        with self._lock:
+            if now - self._last_global_cleanup <= 300:
+                return False
+            self._last_global_cleanup = now
+            return True
+
+    def _check_shared_rate_limit(
+        self, client_ip: str, category: str, max_requests: int, window_seconds: int, now: float
+    ):
+        from .models import RateLimitBucket, SecurityLockout
+
+        client_key = self._shared_client_key(client_ip)
+        bucket_number = int(now // window_seconds)
+        bucket_key = f"{category}:{client_key}:{bucket_number}"
+        expires_at = (bucket_number + 1) * window_seconds
+        db = self._get_session_factory()()
+        try:
+            lockout = db.get(SecurityLockout, client_key)
+            if lockout and lockout.expires_at > now:
+                remaining = max(1, int(lockout.expires_at - now))
+                raise HTTPException(
+                    status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                    detail=f"Security Alert: Too many failed attempts. Temporary lockout for {remaining} more seconds.",
+                    headers={"Retry-After": str(remaining)},
+                )
+            if lockout:
+                db.delete(lockout)
+
+            insert = self._dialect_insert(db, RateLimitBucket.__table__)
+            statement = insert.values(
+                key=bucket_key,
+                count=1,
+                expires_at=expires_at,
+            ).on_conflict_do_update(
+                index_elements=[RateLimitBucket.key],
+                set_={"count": RateLimitBucket.count + 1},
+            ).returning(RateLimitBucket.count)
+            request_count = db.execute(statement).scalar_one()
+
+            if request_count > max_requests and category == "auth":
+                lockout_insert = self._dialect_insert(db, SecurityLockout.__table__)
+                lockout_statement = lockout_insert.values(
+                    client_key=client_key,
+                    expires_at=now + 60,
+                ).on_conflict_do_update(
+                    index_elements=[SecurityLockout.client_key],
+                    set_={"expires_at": now + 60},
+                    where=SecurityLockout.expires_at <= now,
+                )
+                db.execute(lockout_statement)
+
+            if self._should_clean_shared(now):
+                db.execute(delete(RateLimitBucket).where(RateLimitBucket.expires_at <= now))
+                db.execute(delete(SecurityLockout).where(SecurityLockout.expires_at <= now))
+
+            db.commit()
+            if request_count > max_requests:
+                retry_after = max(1, int(expires_at - now))
+                raise HTTPException(
+                    status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                    detail=f"Rate limit exceeded: Maximum {max_requests} requests per {window_seconds}s for {category}. Please slow down.",
+                    headers={"Retry-After": str(retry_after)},
+                )
+        except HTTPException:
+            db.rollback()
+            raise
+        except (SQLAlchemyError, RuntimeError) as err:
+            db.rollback()
+            logger.exception("Shared rate-limit storage failed.")
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Rate limiting is temporarily unavailable. Please retry shortly.",
+            ) from err
+        finally:
+            db.close()
 
     def _clean_old_requests(self, key: str, window_seconds: int, current_time: float):
         if key in self.history:
@@ -126,6 +234,10 @@ class RateLimiter:
         client_ip = self._get_client_ip(request)
         current_time = time.time()
 
+        if self.shared:
+            self._check_shared_rate_limit(client_ip, category, max_requests, window_seconds, current_time)
+            return
+
         with self._lock:
             # Check if IP is currently under lockout (e.g. from repeated login failures)
             if client_ip in self.lockouts:
@@ -159,6 +271,51 @@ class RateLimiter:
 
     def record_failed_login(self, client_ip: str):
         current_time = time.time()
+        if self.shared:
+            from .models import RateLimitBucket, SecurityLockout
+
+            client_key = self._shared_client_key(client_ip)
+            bucket_number = int(current_time // 300)
+            bucket_key = f"auth_fail:{client_key}:{bucket_number}"
+            expires_at = (bucket_number + 1) * 300
+            db = self._get_session_factory()()
+            try:
+                insert = self._dialect_insert(db, RateLimitBucket.__table__)
+                statement = insert.values(
+                    key=bucket_key,
+                    count=1,
+                    expires_at=expires_at,
+                ).on_conflict_do_update(
+                    index_elements=[RateLimitBucket.key],
+                    set_={"count": RateLimitBucket.count + 1},
+                ).returning(RateLimitBucket.count)
+                failure_count = db.execute(statement).scalar_one()
+                if failure_count >= 5:
+                    lockout_insert = self._dialect_insert(db, SecurityLockout.__table__)
+                    lockout_statement = lockout_insert.values(
+                        client_key=client_key,
+                        expires_at=current_time + 180,
+                    ).on_conflict_do_update(
+                        index_elements=[SecurityLockout.client_key],
+                        set_={"expires_at": current_time + 180},
+                        where=SecurityLockout.expires_at <= current_time,
+                    )
+                    db.execute(lockout_statement)
+                if self._should_clean_shared(current_time):
+                    db.execute(delete(RateLimitBucket).where(RateLimitBucket.expires_at <= current_time))
+                    db.execute(delete(SecurityLockout).where(SecurityLockout.expires_at <= current_time))
+                db.commit()
+            except (SQLAlchemyError, RuntimeError) as err:
+                db.rollback()
+                logger.exception("Shared login-failure storage failed.")
+                raise HTTPException(
+                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                    detail="Login protection is temporarily unavailable. Please retry shortly.",
+                ) from err
+            finally:
+                db.close()
+            return
+
         with self._lock:
             key = f"auth_fail:{client_ip}"
             self._clean_old_requests(key, 300, current_time)
@@ -171,6 +328,27 @@ class RateLimiter:
                 self.lockouts[client_ip] = current_time + 180
 
     def reset_failed_logins(self, client_ip: str):
+        if self.shared:
+            from .models import RateLimitBucket, SecurityLockout
+
+            client_key = self._shared_client_key(client_ip)
+            prefix = f"auth_fail:{client_key}:"
+            db = self._get_session_factory()()
+            try:
+                db.execute(delete(RateLimitBucket).where(RateLimitBucket.key.like(f"{prefix}%")))
+                db.execute(delete(SecurityLockout).where(SecurityLockout.client_key == client_key))
+                db.commit()
+            except (SQLAlchemyError, RuntimeError) as err:
+                db.rollback()
+                logger.exception("Shared login-failure reset failed.")
+                raise HTTPException(
+                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                    detail="Login protection is temporarily unavailable. Please retry shortly.",
+                ) from err
+            finally:
+                db.close()
+            return
+
         with self._lock:
             key = f"auth_fail:{client_ip}"
             if key in self.history:
@@ -179,8 +357,8 @@ class RateLimiter:
                 del self.lockouts[client_ip]
 
 
-# Global rate limiter instance
-limiter = RateLimiter()
+# Production workers share atomic counters and lockouts through the application database.
+limiter = RateLimiter(shared=os.getenv("ENVIRONMENT", "development").lower() == "production")
 
 
 # ============================================================================

@@ -56,8 +56,8 @@ const ProtectedRoute = ({ children }) => {
     const handleAuthChange = () => {
       const freshToken = localStorage.getItem('auth_token');
       verificationGenRef.current += 1;
-      setFailedToken(null);
-      setAuthStatus('checking');
+      setFailedToken(freshToken && !isTokenValid(freshToken) ? freshToken : null);
+      setAuthStatus(freshToken && isTokenValid(freshToken) ? 'checking' : 'unauthorized');
       setNetworkError(false);
       setCurrentToken(freshToken);
     };
@@ -75,13 +75,8 @@ const ProtectedRoute = ({ children }) => {
     const abortCtrl = new AbortController();
 
     if (!currentToken || !isTokenValid(currentToken)) {
-      setAuthStatus('unauthorized');
-      if (currentToken) setFailedToken(currentToken);
       return;
     }
-    setAuthStatus('checking');
-    setNetworkError(false);
-
     // Cryptographic validation against server session endpoint
     apiRequest('/api/auth/me', {
       auth: 'required',
@@ -135,8 +130,12 @@ const ProtectedRoute = ({ children }) => {
           <p className="text-slate-400 text-xs">Unable to verify session with server. Please check your connection and try again.</p>
           <button 
             onClick={() => {
+                const freshToken = localStorage.getItem('auth_token');
               setRetryCount(c => c + 1);
-              setCurrentToken(localStorage.getItem('auth_token'));
+                setFailedToken(freshToken && !isTokenValid(freshToken) ? freshToken : null);
+                setAuthStatus(freshToken && isTokenValid(freshToken) ? 'checking' : 'unauthorized');
+                setNetworkError(false);
+                setCurrentToken(freshToken);
             }} 
             className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold"
           >

@@ -45,6 +45,23 @@ def test_mcp_study_memory_requires_an_authenticated_user():
         MCPService.execute_tool("query_study_memory", {})
 
 
+def test_mcp_internal_errors_do_not_expose_exception_details(monkeypatch):
+    def fail(*_args, **_kwargs):
+        raise RuntimeError("sensitive provider details")
+
+    monkeypatch.setattr(MCPService, "execute_tool", fail)
+    response = MCPService.handle_jsonrpc({
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "tools/call",
+        "params": {"name": "generate_canvas_diagram", "arguments": {"topic": "systems"}},
+    })
+
+    assert response["error"]["code"] == -32603
+    assert response["error"]["message"] == "Tool execution encountered an internal error. Please try again."
+    assert "sensitive provider details" not in response["error"]["message"]
+
+
 def test_mcp_http_study_memory_requires_authentication():
     response = client.post(
         "/api/mcp/tools/call",

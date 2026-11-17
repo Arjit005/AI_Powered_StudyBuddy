@@ -4,10 +4,23 @@ import re
 import time 
 import requests
 import warnings
+import logging
 from typing import Optional, List, Dict, Any
 warnings.filterwarnings("ignore", category=FutureWarning)
 import google.generativeai as genai
 from dotenv import load_dotenv
+
+logger = logging.getLogger(__name__)
+
+
+class AIServiceError(Exception):
+    status_code = 502
+    user_message = "The AI service returned an unusable response. Please try again."
+
+
+class AIServiceUnavailable(AIServiceError):
+    status_code = 503
+    user_message = "AI services are temporarily unavailable. Please try again shortly."
 
 # Try importing AI Gateways (LiteLLM & Portkey) lazily or conditionally
 litellm = None
@@ -460,10 +473,11 @@ class AIService:
             except Exception as poll_e:
                 error_log.append(f"Pollinations Error: {poll_e}")
             
-        error_msg = "; ".join(error_log)
-        if "429" in error_msg:
-            raise Exception(f"ALL AI SYSTEMS BUSY (Quota Exceeded). Errors: {error_msg}")
-        raise Exception(f"All AI Providers Failed. Details: {error_msg}")
+        if error_log:
+            logger.error("All configured AI providers failed: %s", "; ".join(error_log))
+        else:
+            logger.error("No AI provider was available for generation.")
+        raise AIServiceUnavailable()
 
     @staticmethod
     def _generate_stream_with_openrouter(prompt: str):
@@ -663,41 +677,11 @@ class AIService:
         Synthesizes Tier-1 Short-Term Buffer + Tier-2 Episodic Long-Term Memory
         into a unified response.
         """
-        try:
-            full_prompt = AIService.build_hybrid_prompt(prompt, recent_turns, long_term_summary)
-            response = AIService._generate_content_safe(full_prompt, user_id=user_id)
-            return response.text
-        except Exception as e:
-            error_msg = str(e)
-            print(f"Hybrid AI Internal Error: {error_msg}")
-            
-            # Clean pedagogical fallback (Never leak provider API errors or stack traces to end-user)
-            safe_title = prompt.strip().title()
-            fallback_response = f"""### Conceptual Architecture: {safe_title}
-
-Here is a structured breakdown of **{safe_title}** while the system synchronizes:
-
-1. **Foundational Concept**: {safe_title} establishes modular, testable components designed for high-throughput and reliable state transitions.
-2. **Key Architectural Pillars**:
-   - **Interface Segregation**: Distinct contracts between clients, business handlers, and storage.
-   - **State Guarantees**: ACID transactions and predictable lifecycle management.
-   - **Resilience & Observability**: Active health checks, rate limiting, and telemetry monitoring.
-3. **Best Practices**:
-   - Always decouple external I/O from core computational logic.
-   - Employ idempotency and defensive validation at system boundaries.
-
-```mermaid
-flowchart TD
-    subgraph Architecture ["System Architecture: {safe_title}"]
-        Client["🖥️ Client Interface"] -->|"Action / Request"| Controller["⚡ Core Controller"]
-        Controller -->|"State & Validation"| BusinessLogic["🧠 Business Logic Engine"]
-        BusinessLogic -->|"Persistent Store"| Database[("🗄️ Relational Store")]
-        BusinessLogic -.->|"Metrics & Events"| Telemetry["📊 Observability Bus"]
-    end
-```
-
-*What specific aspect of {safe_title} would you like to explore further?*"""
-            return fallback_response
+        full_prompt = AIService.build_hybrid_prompt(prompt, recent_turns, long_term_summary)
+        response = AIService._generate_content_safe(full_prompt, user_id=user_id)
+        if not isinstance(response.text, str) or not response.text.strip():
+            raise AIServiceError()
+        return response.text
 
     @staticmethod
     def consolidate_hybrid_memory(existing_summary: str, older_messages: list) -> str:
@@ -747,22 +731,11 @@ flowchart TD
 
     @staticmethod
     def summarize_topic(topic: str) -> str:
-        try:
-            prompt = f"Provide a comprehensive, continuous, and clear summary of the following topic: '{topic}'. Focus on key concepts, importance, and main details. Keep it under 300 words. Format it as a clean paragraph."
-            response = AIService._generate_content_safe(prompt)
-            if response.parts:
-                return response.text
-            else:
-                return f"The AI could not generate a summary for '{topic}' due to safety filters."
-        except Exception as e:
-            print(f"Summarizer fallback note: {e}")
-            safe_title = topic.strip().title()
-            return (
-                f"{safe_title} is a foundational concept characterized by structured modularity, clear interface boundaries, "
-                f"and verifiable state integrity. In modern engineering and academic analysis, understanding {safe_title} allows practitioners "
-                f"to decompose complex domain challenges into manageable subsystems, ensuring scalability, deterministic performance, "
-                f"and robust error resilience across multi-tier environments."
-            )
+        prompt = f"Provide a comprehensive, continuous, and clear summary of the following topic: '{topic}'. Focus on key concepts, importance, and main details. Keep it under 300 words. Format it as a clean paragraph."
+        response = AIService._generate_content_safe(prompt)
+        if not response.parts or not isinstance(response.text, str) or not response.text.strip():
+            raise AIServiceError()
+        return response.text
 
     @staticmethod
     def generate_quiz(topic: str) -> dict:
@@ -829,24 +802,11 @@ flowchart TD
                     raise ValueError(f"Question {qid} answer does not match any available option")
 
             return quiz_data
-        except Exception as e:
-            print(f"Quiz generation note: {e}")
-
-        return {
-            "topic": topic,
-            "questions": [
-                {"id": 1, "question": f"What is a primary characteristic of {topic}?", "options": [f"Fundamental theory of {topic}", "An unrelated biological construct", "A graphical layout language", "A network routing protocol"], "answer": f"Fundamental theory of {topic}", "explanation": f"Core knowledge definition for {topic}."},
-                {"id": 2, "question": f"Which field is {topic} most prominently utilized in?", "options": ["Computer Science & Engineering", "Classical Literature", "Olympic Sports", "Meteorology"], "answer": "Computer Science & Engineering", "explanation": f"{topic} is a key concept within technological frameworks."},
-                {"id": 3, "question": f"Why is understanding {topic} essential for developers?", "options": ["Enables robust architecture design", "Only needed for certification exams", "Has no practical modern utility", "Slows down debugging execution"], "answer": "Enables robust architecture design", "explanation": "Mastery provides conceptual foundation for system scalability."},
-                {"id": 4, "question": f"What is a common best practice when implementing {topic}?", "options": ["Modularity and separation of concerns", "Hardcoding variables globally", "Disabling error logging", "Ignoring data integrity"], "answer": "Modularity and separation of concerns", "explanation": "Clean architecture dictates loose coupling and high cohesion."},
-                {"id": 5, "question": f"How do you test implementations related to {topic}?", "options": ["Automated unit and integration test suites", "Guessing without test cases", "Only checking during production outages", "None of the above"], "answer": "Automated unit and integration test suites", "explanation": "Comprehensive testing prevents regressions and validates edge cases."},
-                {"id": 6, "question": f"What is a typical scalability bottleneck in {topic}?", "options": ["Unbounded resource consumption", "Using version control systems", "Writing automated documentation", "Following syntax standards"], "answer": "Unbounded resource consumption", "explanation": "System resources must be throttled and pooled to avoid memory or CPU exhaustion."},
-                {"id": 7, "question": f"How does error handling safeguard {topic} workflows?", "options": ["Prevents cascading application crashes", "Slows down development intentionally", "Encrypts local databases", "Increases network latency"], "answer": "Prevents cascading application crashes", "explanation": "Defensive programming and graceful degradation preserve system stability."},
-                {"id": 8, "question": f"Which protocol or pattern is commonly associated with {topic}?", "options": ["Client-server request/response or event-driven streaming", "Manual paper index tracking", "Analog radio signals", "Single-threaded blocking execution only"], "answer": "Client-server request/response or event-driven streaming", "explanation": "Modern systems communicate over structured network protocols and event buses."},
-                {"id": 9, "question": f"What security principle must always be enforced in {topic}?", "options": ["Principle of least privilege and strict input validation", "Trusting all client input implicitly", "Exposing raw stack traces to users", "Disabling authentication in production"], "answer": "Principle of least privilege and strict input validation", "explanation": "Sanitizing input and enforcing minimal permissions stops injection attacks."},
-                {"id": 10, "question": f"What is the ultimate goal of mastering {topic}?", "options": ["Building resilient, maintainable, and efficient solutions", "Memorizing definitions without application", "Deprecating all legacy software overnight", "Avoiding teamwork and collaboration"], "answer": "Building resilient, maintainable, and efficient solutions", "explanation": "Engineering mastery focuses on sustainable and reliable real-world systems."}
-            ]
-        }
+        except AIServiceError:
+            raise
+        except Exception as err:
+            logger.exception("Quiz generation returned an invalid response.")
+            raise AIServiceError() from err
 
     @staticmethod
     def generate_flashcards(topic: str, count: int = 5) -> dict:
@@ -871,18 +831,12 @@ flowchart TD
                 ]
                 if len(valid_cards) >= 3:
                     return {"flashcards": valid_cards[:num]}
-        except Exception as e:
-            print(f"Flashcards note: {e}")
-
-        return {
-            "flashcards": [
-                {"front": f"Core Definition of {topic}", "back": f"{topic} refers to the foundational structures, methodologies, and rules governing this domain."},
-                {"front": "Primary Architectural Advantage", "back": "Increases maintainability, developer throughput, and conceptual modularity."},
-                {"front": "Common Trade-off / Pitfall", "back": "Over-engineering or premature optimization without profiling real system bottlenecks."},
-                {"front": "Key Component 1", "back": "Data abstraction layer and interface segregation."},
-                {"front": "Key Component 2", "back": "Deterministic state management and lifecycle hooks."}
-            ]
-        }
+            raise ValueError("Generated flashcards did not meet validation criteria.")
+        except AIServiceError:
+            raise
+        except Exception as err:
+            logger.exception("Flashcard generation returned an invalid response.")
+            raise AIServiceError() from err
 
     @staticmethod
     def _clean_json_response(response_text: str) -> str:
@@ -898,7 +852,6 @@ flowchart TD
 
     @staticmethod
     def generate_concept_map_data(topic: str) -> dict:
-        clean_topic = topic.lower().strip()
         try:
             prompt = f"""
             Task: Generate a hierarchical concept map for: "{topic}".
@@ -927,20 +880,12 @@ flowchart TD
                         "root": data["root"].strip(),
                         "edges": valid_edges
                     }
-        except Exception as e:
-            print(f"Concept map note: {e}")
-
-        return {
-            "layout": "tree",
-            "root": topic,
-            "edges": [
-                {"source": topic, "target": "Core Principles", "relationship": "defines"},
-                {"source": topic, "target": "Architecture", "relationship": "structures"},
-                {"source": "Core Principles", "target": "Theory & Rules", "relationship": "comprises"},
-                {"source": "Architecture", "target": "Components & Patterns", "relationship": "implements"},
-                {"source": topic, "target": "Real-World Application", "relationship": "applies"}
-            ]
-        }
+            raise ValueError("Generated concept map did not meet validation criteria.")
+        except AIServiceError:
+            raise
+        except Exception as err:
+            logger.exception("Concept-map generation returned an invalid response.")
+            raise AIServiceError() from err
 
     @staticmethod
     def generate_detailed_mermaid_diagram(topic: str, diagram_type: str = "flowchart") -> dict:
@@ -981,46 +926,9 @@ flowchart TD
                     "mermaid_code": data["mermaid_code"].strip(),
                     "key_components": components
                 }
-        except Exception as e:
-            print(f"Mermaid generation note: {e}")
-
-        safe_title = topic.title()
-        return {
-            "title": f"System Architecture: {safe_title}",
-            "description": f"Architectural breakdown, data lifecycle, and subsystem boundaries for {safe_title}.",
-            "mermaid_code": f"""flowchart TD
-    subgraph Ingress ["1. Ingress & Client Interface"]
-        Client["🖥️ Client Applications (Web / Mobile / CLI)"]
-        Gateway["⚡ API Gateway & Reverse Proxy"]
-        Client -->|"HTTP / REST / WebSocket"| Gateway
-    end
-
-    subgraph Core ["2. Core Processing Engine"]
-        Auth["🛡️ Auth & Security Guard"]
-        Business["🧠 {safe_title} Core Domain Logic"]
-        Memory["💾 Hybrid Context Memory Manager"]
-        Gateway -->|"Validate Bearer JWT"| Auth
-        Auth -->|"Authorized Request"| Business
-        Business <-->|"Short-Term & Long-Term Context"| Memory
-    end
-
-    subgraph Data ["3. Persistence & Storage Layer"]
-        DB[("🗄️ Relational Database (SQLite / Postgres)")]
-        Cache[("⚡ In-Memory Cache (Redis)")]
-        Business -->|"ACID Transactions"| DB
-        Business -->|"Sub-millisecond State"| Cache
-    end
-
-    subgraph Telemetry ["4. Observability & Monitoring"]
-        Logs["📊 Structured Logs & Audit Trails"]
-        Metrics["📈 Performance Metrics & Alerts"]
-        Business -.-> Logs
-        Business -.-> Metrics
-    end""",
-            "key_components": [
-                f"Ingress Layer: High-throughput entry point routing requests into {safe_title}",
-                "Core Processing Engine: Implements business constraints, security validation, and context assembly",
-                "Persistence Layer: Guarantees durability and transactional integrity",
-                "Telemetry Layer: Provides continuous observability, logging, and error tracking"
-            ]
-        }
+            raise ValueError("Generated diagram did not meet validation criteria.")
+        except AIServiceError:
+            raise
+        except Exception as err:
+            logger.exception("Diagram generation returned an invalid response.")
+            raise AIServiceError() from err

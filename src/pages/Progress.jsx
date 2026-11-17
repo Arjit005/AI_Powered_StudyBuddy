@@ -104,8 +104,9 @@ const Progress = () => {
 
     useEffect(() => {
         fetchAnalytics();
+        const requestGeneration = progressRequestGenRef;
         return () => {
-            progressRequestGenRef.current++;
+            requestGeneration.current++;
         };
     }, []);
 

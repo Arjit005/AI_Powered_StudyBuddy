@@ -22,8 +22,9 @@ const Header = () => {
     const navigate = useNavigate();
     const location = useLocation();
     const [user, setUser] = useState(null);
-    const [toolsOpen, setToolsOpen] = useState(false);
-    const [workspaceOpen, setWorkspaceOpen] = useState(false);
+    const [openMenu, setOpenMenu] = useState(null);
+    const toolsOpen = openMenu?.name === 'tools' && openMenu.locationKey === location.key;
+    const workspaceOpen = openMenu?.name === 'workspace' && openMenu.locationKey === location.key;
     const toolsRef = useRef(null);
     const workspaceRef = useRef(null);
 
@@ -54,17 +55,16 @@ const Header = () => {
 
         const handleClickOutside = (e) => {
             if (toolsRef.current && !toolsRef.current.contains(e.target)) {
-                setToolsOpen(false);
+                setOpenMenu(null);
             }
             if (workspaceRef.current && !workspaceRef.current.contains(e.target)) {
-                setWorkspaceOpen(false);
+                setOpenMenu(null);
             }
         };
 
         const handleKeyDown = (e) => {
             if (e.key === 'Escape') {
-                setToolsOpen(false);
-                setWorkspaceOpen(false);
+                setOpenMenu(null);
             }
         };
 
@@ -78,12 +78,6 @@ const Header = () => {
             document.removeEventListener('keydown', handleKeyDown);
         };
     }, []);
-
-    // Close dropdowns on route navigation
-    useEffect(() => {
-        setToolsOpen(false);
-        setWorkspaceOpen(false);
-    }, [location.pathname]);
 
     const handleLogout = () => {
         localStorage.removeItem('isAuthenticated');
@@ -144,8 +138,7 @@ const Header = () => {
                             <div className="relative" ref={toolsRef}>
                                 <button
                                     onClick={() => {
-                                        setToolsOpen(!toolsOpen);
-                                        setWorkspaceOpen(false);
+                                        setOpenMenu(toolsOpen ? null : { name: 'tools', locationKey: location.key });
                                     }}
                                     aria-expanded={toolsOpen}
                                     aria-haspopup="true"
@@ -199,8 +192,7 @@ const Header = () => {
                             <div className="relative" ref={workspaceRef}>
                                 <button
                                     onClick={() => {
-                                        setWorkspaceOpen(!workspaceOpen);
-                                        setToolsOpen(false);
+                                        setOpenMenu(workspaceOpen ? null : { name: 'workspace', locationKey: location.key });
                                     }}
                                     aria-expanded={workspaceOpen}
                                     aria-haspopup="true"

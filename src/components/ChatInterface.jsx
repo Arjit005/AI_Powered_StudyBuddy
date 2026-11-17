@@ -24,6 +24,7 @@ const DEFAULT_GREETING = {
 const ChatInterface = () => {
     // Session state
     const [conversations, setConversations] = useState([]);
+    const [conversationsLoaded, setConversationsLoaded] = useState(false);
     const [activeConvId, setActiveConvId] = useState(null);
     const [sidebarOpen, setSidebarOpen] = useState(true);
     const [memoryModalOpen, setMemoryModalOpen] = useState(false);
@@ -40,7 +41,7 @@ const ChatInterface = () => {
     const activeConvIdRef = useRef(activeConvId);
     useEffect(() => {
         activeConvIdRef.current = activeConvId;
-    }, [activeConvId]);
+    }, [activeConvId, conversations.length]);
     const historyRequestGenRef = useRef(0);
     const location = useLocation();
 
@@ -75,6 +76,10 @@ const ChatInterface = () => {
             }
         } catch (err) {
             console.error("Error loading conversations:", err);
+        } finally {
+            if (thisFetchGen === fetchConversationsGenRef.current) {
+                setConversationsLoaded(true);
+            }
         }
     };
 
@@ -119,6 +124,7 @@ const ChatInterface = () => {
     }, []);
 
     useEffect(() => {
+        if (!conversationsLoaded) return;
         if (activeConvId) {
             fetchChatHistory(activeConvId);
         } else {
@@ -130,7 +136,7 @@ const ChatInterface = () => {
                 setMessages([DEFAULT_GREETING]);
             }
         }
-    }, [activeConvId]);
+    }, [activeConvId, conversationsLoaded, conversations.length]);
 
     useEffect(() => {
         if (!loadingHistory) {

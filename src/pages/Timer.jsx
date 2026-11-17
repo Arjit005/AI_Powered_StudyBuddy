@@ -21,10 +21,6 @@ const StudyTimer = () => {
             return;
         }
 
-        if (targetEndTimeRef.current === null) {
-            targetEndTimeRef.current = Date.now() + timeLeft * 1000;
-        }
-
         const interval = setInterval(() => {
             const now = Date.now();
             const diff = targetEndTimeRef.current - now;

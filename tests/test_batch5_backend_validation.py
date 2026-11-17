@@ -1,7 +1,7 @@
 import pytest
 from unittest.mock import patch, MagicMock
 from backend.embedding_service import EmbeddingService, EmbeddingProviderError
-from backend.ai_service import AIService
+from backend.ai_service import AIService, AIServiceError
 from backend.maps import generate_network_graph
 
 
@@ -87,11 +87,8 @@ def test_generate_quiz_duplicate_question_ids_rejected(mock_gen):
     ]) + ']}'
     mock_gen.return_value = mock_response
 
-    # Should catch duplicate ID and gracefully return the deterministic fallback quiz
-    res = AIService.generate_quiz("Operating Systems")
-    assert len(res["questions"]) == 10
-    # Fallback has distinct sequential IDs 1..10
-    assert len(set(q["id"] for q in res["questions"])) == 10
+    with pytest.raises(AIServiceError):
+        AIService.generate_quiz("Operating Systems")
 
 
 @patch("backend.ai_service.AIService._generate_content_safe")
@@ -103,9 +100,8 @@ def test_generate_quiz_string_question_id_rejected(mock_gen):
     ]) + ']}'
     mock_gen.return_value = mock_response
 
-    res = AIService.generate_quiz("Databases")
-    assert len(res["questions"]) == 10
-    assert all(isinstance(q["id"], int) for q in res["questions"])
+    with pytest.raises(AIServiceError):
+        AIService.generate_quiz("Databases")
 
 
 # --- C. Maps Graph Validation Tests ---

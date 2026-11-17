@@ -1,4 +1,6 @@
-from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, Boolean, Float, text
+from pathlib import Path
+
+from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, Boolean, Float, inspect, text
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from .database import Base, engine
@@ -149,19 +151,84 @@ class Feedback(Base):
     user = relationship("User", backref="feedback_items")
 
 
-def run_migrations():
-    """Safely apply schema migrations."""
-    Base.metadata.create_all(bind=engine)
-    if engine.dialect.name == "sqlite":
-        with engine.connect() as conn:
-            try:
-                res = conn.execute(text("PRAGMA table_info(chat_history)")).fetchall()
-                col_names = [r[1] for r in res]
-                if "conversation_id" not in col_names:
-                    conn.execute(text("ALTER TABLE chat_history ADD COLUMN conversation_id INTEGER REFERENCES conversations(id)"))
-                    conn.commit()
-                if "citations_json" not in col_names:
-                    conn.execute(text("ALTER TABLE chat_history ADD COLUMN citations_json TEXT"))
-                    conn.commit()
-            except Exception as e:
-                print(f"Migration note: {e}")
+class RateLimitBucket(Base):
+    __tablename__ = "rate_limit_buckets"
+
+    key = Column(String(256), primary_key=True)
+    count = Column(Integer, nullable=False, default=0)
+    expires_at = Column(Float, nullable=False, index=True)
+
+
+class SecurityLockout(Base):
+    __tablename__ = "security_lockouts"
+
+    client_key = Column(String(64), primary_key=True)
+    expires_at = Column(Float, nullable=False, index=True)
+
+
+def run_migrations(target_engine=None):
+    """Adopt an existing schema or apply versioned Alembic migrations."""
+    from alembic import command
+    from alembic.config import Config
+
+    migration_engine = target_engine or engine
+    config = Config(str(Path(__file__).resolve().parents[1] / "alembic.ini"))
+    connection = migration_engine.connect()
+    postgres_lock_acquired = False
+
+    try:
+        if migration_engine.dialect.name == "postgresql":
+            connection.execute(text("SELECT pg_advisory_lock(1476395001)"))
+            connection.commit()
+            postgres_lock_acquired = True
+
+        table_names = set(inspect(connection).get_table_names())
+        connection.rollback()
+        is_unversioned_legacy_database = "alembic_version" not in table_names and bool(table_names)
+
+        if is_unversioned_legacy_database:
+            with connection.begin():
+                inspector = inspect(connection)
+                if "chat_history" in inspector.get_table_names():
+                    columns = {column["name"] for column in inspector.get_columns("chat_history")}
+                    if "conversation_id" not in columns:
+                        connection.execute(text(
+                            "ALTER TABLE chat_history ADD COLUMN conversation_id "
+                            "INTEGER REFERENCES conversations(id)"
+                        ))
+                    if "citations_json" not in columns:
+                        connection.execute(text(
+                            "ALTER TABLE chat_history ADD COLUMN citations_json TEXT"
+                        ))
+
+            Base.metadata.create_all(bind=connection)
+            connection.commit()
+
+            inspector = inspect(connection)
+            missing_columns = []
+            for table in Base.metadata.sorted_tables:
+                existing = {column["name"] for column in inspector.get_columns(table.name)}
+                absent = {column.name for column in table.columns} - existing
+                if absent:
+                    missing_columns.append(f"{table.name}: {', '.join(sorted(absent))}")
+            if missing_columns:
+                raise RuntimeError(
+                    "Legacy database schema is incomplete and could not be adopted: "
+                    + "; ".join(missing_columns)
+                )
+            connection.rollback()
+
+            config.attributes["connection"] = connection
+            command.stamp(config, "head")
+            connection.commit()
+        else:
+            config.attributes["connection"] = connection
+            command.upgrade(config, "head")
+            connection.commit()
+    finally:
+        if postgres_lock_acquired:
+            if connection.in_transaction():
+                connection.rollback()
+            connection.execute(text("SELECT pg_advisory_unlock(1476395001)"))
+            connection.commit()
+        connection.close()

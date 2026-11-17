@@ -21,7 +21,7 @@ import { apiRequest } from '../config/apiClient';
 export default function CanvasStudio() {
   const [topic, setTopic] = useState('Distributed Microservices with Event Sourcing');
   const [detailLevel, setDetailLevel] = useState('standard');
-  const [diagramType, setDiagramType] = useState('architecture');
+  const [diagramType] = useState('architecture');
   const [loading, setLoading] = useState(false);
   const [canvasData, setCanvasData] = useState(null);
   const [selectedNode, setSelectedNode] = useState(null);

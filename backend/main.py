@@ -6,7 +6,7 @@ import time
 import json
 from typing import List, Optional, Any
 from fastapi import FastAPI, Depends, HTTPException, Request, status, UploadFile, File, Form, BackgroundTasks
-from fastapi.responses import StreamingResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import func
 from sqlalchemy.orm import Session
@@ -24,6 +24,17 @@ app = FastAPI(
     version="1.4.0"
 )
 
+
+@app.exception_handler(ai_service.AIServiceError)
+async def handle_ai_service_error(_request: Request, exc: ai_service.AIServiceError):
+    headers = {"Retry-After": "30"} if exc.status_code == status.HTTP_503_SERVICE_UNAVAILABLE else None
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"detail": exc.user_message},
+        headers=headers,
+    )
+
+
 # 1. Security Headers Middleware
 app.add_middleware(security.SecurityHeadersMiddleware)
 
@@ -40,7 +51,6 @@ if custom_cors:
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
-    allow_origin_regex=r"https://.*\.onrender\.com",
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
@@ -1414,6 +1424,8 @@ def execute_mcp_tool_direct(
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(pe))
     except ValueError as ve:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(ve))
+    except ai_service.AIServiceError:
+        raise
     except Exception as e:
         print(f"Tool execution internal error: {e}")
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Tool execution encountered an internal error. Please try again.")

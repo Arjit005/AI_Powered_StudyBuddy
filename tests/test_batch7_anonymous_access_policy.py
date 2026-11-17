@@ -103,6 +103,11 @@ def _auth_headers(user):
                 "content_json": "{}",
             },
         ),
+        (
+            "POST",
+            "/api/mcp/tools/call",
+            {"name": "query_study_memory", "arguments": {}},
+        ),
         ("GET", "/api/library/1", None),
         ("PUT", "/api/library/1/favorite", None),
         ("DELETE", "/api/library/1", None),
@@ -240,6 +245,73 @@ def test_expired_bearer_is_rejected(private_data_app):
         )
 
     assert response.status_code == 401
+
+
+def test_authenticated_mcp_memory_query_is_scoped_to_the_owner(
+    private_data_app, monkeypatch
+):
+    test_client, session_factory = private_data_app
+    with session_factory() as db:
+        owner = _create_user(db, "mcp_memory_owner")
+        other_user = _create_user(db, "mcp_memory_other")
+        owner_conversation = Conversation(user_id=owner.id, title="Owner memory")
+        other_conversation = Conversation(user_id=other_user.id, title="Other memory")
+        db.add_all([owner_conversation, other_conversation])
+        db.commit()
+        db.refresh(owner_conversation)
+        db.refresh(other_conversation)
+        db.add_all(
+            [
+                ChatHistory(
+                    user_id=owner.id,
+                    conversation_id=owner_conversation.id,
+                    role="user",
+                    content="Owner-only memory",
+                ),
+                ChatHistory(
+                    user_id=other_user.id,
+                    conversation_id=other_conversation.id,
+                    role="user",
+                    content="Other user's memory",
+                ),
+            ]
+        )
+        db.commit()
+        other_conversation_id = other_conversation.id
+
+    monkeypatch.setattr("backend.mcp_service.SessionLocal", session_factory)
+    with test_client(app) as client:
+        response = client.post(
+            "/api/mcp/tools/call",
+            json={"name": "query_study_memory", "arguments": {}},
+            headers=_auth_headers(owner),
+        )
+        assert response.status_code == 200
+        messages = response.json()["data"]["active_conversations"]
+        assert [item["title"] for item in messages] == ["Owner memory"]
+
+        other_memory = client.post(
+            "/api/mcp/tools/call",
+            json={
+                "name": "query_study_memory",
+                "arguments": {"conversation_id": other_conversation_id},
+            },
+            headers=_auth_headers(owner),
+        )
+        assert other_memory.status_code == 200
+        assert other_memory.json()["data"]["status"] == "not_found"
+
+        rpc_response = client.post(
+            "/api/mcp",
+            json={
+                "jsonrpc": "2.0",
+                "id": 7,
+                "method": "tools/call",
+                "params": {"name": "query_study_memory", "arguments": {}},
+            },
+        )
+        assert rpc_response.status_code == 200
+        assert rpc_response.json()["error"]["code"] == -32001
 
 
 def test_public_stateless_summarization_remains_available(private_data_app, monkeypatch):

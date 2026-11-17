@@ -111,7 +111,9 @@ const Quiz = () => {
                     spread: 70,
                     origin: { y: 0.6 }
                 });
-            } catch (_) {}
+            } catch (error) {
+                console.error('Quiz celebration failed:', error);
+            }
         }
 
         // Track activity non-blocking with true measured elapsed time
@@ -259,9 +261,6 @@ const Quiz = () => {
                                 const correctAnswer = q.answer || q.correct_answer;
                                 const selectedOption = answers[idx];
                                 const norm = (val) => String(val || '').trim().toLowerCase();
-                                const isCorrect = submitted && norm(selectedOption) === norm(correctAnswer);
-                                const isWrong = submitted && selectedOption && norm(selectedOption) !== norm(correctAnswer);
-
                                 return (
                                     <div key={idx} className="glass-panel p-6 rounded-3xl border border-white/5 space-y-4">
                                         <div className="flex items-start gap-3">

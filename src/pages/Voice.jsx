@@ -33,7 +33,9 @@ const Voice = () => {
                 } else if (typeof rec.stop === 'function') {
                     rec.stop();
                 }
-            } catch (_) {}
+            } catch {
+                // Speech recognition may already have stopped during cleanup.
+            }
         }
     };
 
@@ -51,7 +53,7 @@ const Voice = () => {
             cleanupActiveRecognition();
 
             if (aiAbortControllerRef.current) {
-                try { aiAbortControllerRef.current.abort(); } catch (_) {}
+                aiAbortControllerRef.current.abort();
             }
             if ('speechSynthesis' in window) {
                 window.speechSynthesis.cancel();
@@ -184,7 +186,7 @@ const Voice = () => {
                 window.speechSynthesis.cancel();
                 setIsSpeaking(false);
                 const thisPlayback = ++playbackGenRef.current;
-                const cleanText = reply.replace(/[#*`_\[\]()]/g, '');
+                const cleanText = reply.replace(/[#*`_\x5B\x5D()]/g, '');
                 const utterance = new SpeechSynthesisUtterance(cleanText);
                 utterance.rate = 1.0;
                 utterance.onend = () => {
@@ -200,7 +202,8 @@ const Voice = () => {
                 try {
                     window.speechSynthesis.speak(utterance);
                     setIsSpeaking(true);
-                } catch (_) {
+                } catch (error) {
+                    console.error('Speech playback failed:', error);
                     setIsSpeaking(false);
                 }
             }
@@ -226,7 +229,7 @@ const Voice = () => {
             setIsSpeaking(false);
         } else {
             const thisPlayback = ++playbackGenRef.current;
-            const cleanText = aiResponse.replace(/[#*`_\[\]()]/g, '');
+            const cleanText = aiResponse.replace(/[#*`_\x5B\x5D()]/g, '');
             const utterance = new SpeechSynthesisUtterance(cleanText);
             utterance.rate = 1.0;
             utterance.onend = () => {

@@ -1,10 +1,9 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { 
   BookOpen, 
   Search, 
   Star, 
   Trash2, 
-  ExternalLink, 
   FileText, 
   Layers, 
   HelpCircle, 
@@ -31,14 +30,7 @@ export default function Library() {
   const pendingFavoritesRef = useRef(new Set());
   const itemFavoriteEpochRef = useRef(new Map());
 
-  useEffect(() => {
-    fetchLibrary();
-    return () => {
-      requestGenRef.current++;
-    };
-  }, [activeTab, search]);
-
-  const fetchLibrary = async () => {
+  const fetchLibrary = useCallback(async () => {
     setLoading(true);
     setError(null);
     const thisGen = ++requestGenRef.current;
@@ -80,7 +72,14 @@ export default function Library() {
         setLoading(false);
       }
     }
-  };
+  }, [activeTab, search]);
+
+  useEffect(() => {
+    fetchLibrary();
+    return () => {
+      requestGenRef.current++;
+    };
+  }, [fetchLibrary]);
 
   const handleToggleFavorite = async (e, id) => {
     e.stopPropagation();

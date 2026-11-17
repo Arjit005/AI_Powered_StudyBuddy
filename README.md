@@ -209,6 +209,13 @@ Create a `.env` file in the project root or configure these variables in your cl
 | `DATABASE_URL` | Required in production; optional locally | PostgreSQL connection string (local development defaults to SQLite) | `postgresql://user:pass@ep-xyz.neon.tech/neondb` |
 | `JWT_SECRET_KEY` | Required outside development | Secret used to sign application JWT session tokens | Generate a long random value |
 | `CORS_ORIGINS` | Optional | Comma-separated list of allowed web origins | `https://my-domain.com,http://localhost:5173` |
+| `VITE_API_BASE_URL` | Required for separate frontend/backend deployments | Backend origin compiled into the frontend build | `https://ai-study-buddy-backend.onrender.com` |
+
+### Database schema changes
+
+The backend uses Alembic revisions. For a new database, run `python -m alembic upgrade head`; the backend also applies pending revisions during startup. Existing unversioned databases are preserved and adopted at the current baseline after the known chat-history columns are checked. Back up the database before the first upgraded startup; startup fails rather than stamping an incomplete legacy schema.
+
+For future schema changes, generate and review a revision with `python -m alembic revision --autogenerate -m "describe change"`, then apply it with `python -m alembic upgrade head`. The initial baseline intentionally has no downgrade because dropping it would delete user data.
 
 ---
 
@@ -258,9 +265,10 @@ The [Render blueprint](render.yaml) deploys a Python backend and a separate stat
 2. In Render, create a Blueprint instance from the repository and review both services.
 3. Set `DATABASE_URL` for the backend to a persistent PostgreSQL database before deploying. The backend refuses to start in production without it.
 4. Render generates `JWT_SECRET_KEY` from the blueprint. Add `GEMINI_API_KEY` and any optional provider keys as needed.
-5. Confirm the frontend URL matches the backend's `CORS_ORIGINS` value.
+5. Confirm the frontend's `VITE_API_BASE_URL` points to the backend and the backend's `CORS_ORIGINS` includes the frontend URL.
 
 Private study data (sources, conversations, chat history, library materials, and progress) requires a signed-in account. Stateless AI generation endpoints remain available without signing in.
+Production rate-limit counters and login lockouts are shared across backend workers through the configured PostgreSQL database.
 
 ---
 

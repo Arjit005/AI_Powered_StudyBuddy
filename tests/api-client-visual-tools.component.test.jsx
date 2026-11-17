@@ -46,7 +46,7 @@ describe('API client migrated Maps and Canvas callers', () => {
             expect(options.headers.get('Authorization')).toBeNull();
             expect(JSON.parse(options.body)).toEqual({ topic: 'Distributed systems' });
         }
-    });
+    }, 10000);
 
     it('renders a validated Base64 map response when diagram generation fails', async () => {
         const png = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=';

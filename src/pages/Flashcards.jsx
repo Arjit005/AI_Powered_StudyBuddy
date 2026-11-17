@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import FlipCard3D from '../components/ui/FlipCard3D';
 import { apiRequest } from '../config/apiClient';
 import { 
@@ -103,7 +103,7 @@ const Flashcards = () => {
         }
     };
 
-    const nextCard = () => {
+    const nextCard = useCallback(() => {
         if (cards.length === 0) return;
         if (advanceTimeoutRef.current) {
             clearTimeout(advanceTimeoutRef.current);
@@ -113,9 +113,9 @@ const Flashcards = () => {
         if ('speechSynthesis' in window) window.speechSynthesis.cancel();
         setIsSpeaking(false);
         setCurrentCard((prev) => (prev + 1) % cards.length);
-    };
+    }, [cards.length]);
 
-    const prevCard = () => {
+    const prevCard = useCallback(() => {
         if (cards.length === 0) return;
         if (advanceTimeoutRef.current) {
             clearTimeout(advanceTimeoutRef.current);
@@ -125,10 +125,10 @@ const Flashcards = () => {
         if ('speechSynthesis' in window) window.speechSynthesis.cancel();
         setIsSpeaking(false);
         setCurrentCard((prev) => (prev - 1 + cards.length) % cards.length);
-    };
+    }, [cards.length]);
 
     // Rate mastery for active recall (requires flipped card)
-    const handleRateMastery = (rating) => {
+    const handleRateMastery = useCallback((rating) => {
         if (!isFlipped) return;
         const activeCard = cards[currentCard];
         if (!activeCard) return;
@@ -141,7 +141,7 @@ const Flashcards = () => {
         advanceTimeoutRef.current = setTimeout(() => {
             nextCard();
         }, 300);
-    };
+    }, [isFlipped, cards, currentCard, nextCard]);
 
     // Text to Speech
     const handleReadCard = (e) => {
