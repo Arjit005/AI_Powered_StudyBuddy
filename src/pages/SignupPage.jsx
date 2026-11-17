@@ -3,6 +3,83 @@ import { useNavigate, Link } from 'react-router-dom';
 import { Brain, Lock, User, Mail, ArrowRight, CheckCircle2, XCircle, Eye, EyeOff } from 'lucide-react';
 import { signInWithGoogle } from '../firebase';
 
+/**
+ * Format raw error details from API responses or exceptions into a safe, user-friendly message.
+ * Never renders [object Object] or leaks credentials.
+ */
+const formatAuthError = (errDetail, fallback = 'Authentication failed. Please try again.') => {
+    if (!errDetail) return fallback;
+    if (typeof errDetail === 'string') {
+        const trimmed = errDetail.trim();
+        return trimmed.length > 0 ? trimmed : fallback;
+    }
+    if (Array.isArray(errDetail)) {
+        const msgs = errDetail
+            .map(d => {
+                if (typeof d === 'string') return d;
+                if (d && typeof d === 'object') return d.msg || d.detail || '';
+                return '';
+            })
+            .filter(Boolean);
+        return msgs.length > 0 ? msgs.join(', ') : fallback;
+    }
+    if (typeof errDetail === 'object') {
+        if (typeof errDetail.msg === 'string' && errDetail.msg.trim()) return errDetail.msg.trim();
+        if (typeof errDetail.detail === 'string' && errDetail.detail.trim()) return errDetail.detail.trim();
+        if (typeof errDetail.message === 'string' && errDetail.message.trim()) return errDetail.message.trim();
+        return fallback;
+    }
+    return fallback;
+};
+
+/**
+ * Validates backend authentication response payload.
+ * Enforces non-empty string access_token and valid plain object user with required fields.
+ */
+const validateAuthPayload = (data) => {
+    if (!data || typeof data !== 'object' || Array.isArray(data)) {
+        throw new Error('Invalid authentication response from server.');
+    }
+    if (typeof data.access_token !== 'string' || !data.access_token.trim()) {
+        throw new Error('Invalid authentication token received. Please try again.');
+    }
+    const user = data.user;
+    if (!user || typeof user !== 'object' || Array.isArray(user)) {
+        throw new Error('Invalid user profile received. Please try again.');
+    }
+    // Verify required user fields based on backend UserResponse (id, username, email)
+    if (user.id === undefined || user.id === null || typeof user.username !== 'string' || !user.username.trim()) {
+        throw new Error('Incomplete user profile received. Please try again.');
+    }
+    return {
+        accessToken: data.access_token.trim(),
+        user
+    };
+};
+
+/**
+ * Atomically persists session state into localStorage with full rollback on any failure.
+ * Ensures isAuthenticated is never written or left true if any write fails.
+ */
+const persistSession = (accessToken, user) => {
+    const clearStorage = () => {
+        try { localStorage.removeItem('auth_token'); } catch (_e) { /* ignore */ }
+        try { localStorage.removeItem('user'); } catch (_e) { /* ignore */ }
+        try { localStorage.removeItem('isAuthenticated'); } catch (_e) { /* ignore */ }
+    };
+
+    try {
+        // Write credentials first before setting the isAuthenticated flag
+        localStorage.setItem('auth_token', accessToken);
+        localStorage.setItem('user', JSON.stringify(user));
+        localStorage.setItem('isAuthenticated', 'true');
+    } catch (storageErr) {
+        console.warn('Storage write failed, rolling back session:', storageErr);
+        clearStorage();
+        throw new Error('Unable to save login session. Please ensure cookies and local storage are enabled in your browser.');
+    }
+};
+
 const SignupPage = () => {
     const [username, setUsername] = useState('');
     const [email, setEmail] = useState('');
@@ -33,32 +110,12 @@ const SignupPage = () => {
                 data = { detail: res.statusText || 'Google sign-up server error' };
             }
             if (!res.ok) {
-                const rawDetail = data?.detail;
-                const errMessage = typeof rawDetail === 'string' 
-                    ? rawDetail 
-                    : Array.isArray(rawDetail)
-                        ? rawDetail.map(d => d.msg || JSON.stringify(d)).join(', ')
-                        : (rawDetail && typeof rawDetail === 'object')
-                            ? JSON.stringify(rawDetail)
-                            : 'Google sign-up failed';
+                const errMessage = formatAuthError(data?.detail, 'Google sign-up failed.');
                 throw new Error(errMessage);
             }
-            if (!data.access_token || !data.user) {
-                throw new Error('Account setup failed. Please try again.');
-            }
-            try {
-                localStorage.setItem('isAuthenticated', 'true');
-                localStorage.setItem('auth_token', data.access_token);
-                localStorage.setItem('user', JSON.stringify(data.user));
-            } catch (storageErr) {
-                console.warn("Storage write failed:", storageErr);
-                try {
-                    localStorage.removeItem('auth_token');
-                    localStorage.removeItem('isAuthenticated');
-                    localStorage.removeItem('user');
-                } catch (_) {}
-                throw new Error("Unable to save login session. Please ensure local storage is enabled.");
-            }
+
+            const { accessToken, user } = validateAuthPayload(data);
+            persistSession(accessToken, user);
             navigate('/');
         } catch (err) {
             console.error("Google auth error:", err);
@@ -152,35 +209,12 @@ const SignupPage = () => {
                 data = { detail: res.statusText || 'Registration server response error' };
             }
             if (!res.ok) {
-                const rawDetail = data?.detail;
-                let errMessage = 'Failed to create account.';
-                if (typeof rawDetail === 'string') {
-                    errMessage = rawDetail;
-                } else if (Array.isArray(rawDetail)) {
-                    errMessage = rawDetail.map(d => d.msg || JSON.stringify(d)).join(', ');
-                } else if (rawDetail && typeof rawDetail === 'object') {
-                    errMessage = JSON.stringify(rawDetail);
-                }
+                const errMessage = formatAuthError(data?.detail, 'Failed to create account.');
                 throw new Error(errMessage);
             }
 
-            if (!data.access_token || !data.user) {
-                throw new Error('Account setup failed. Please try again.');
-            }
-
-            try {
-                localStorage.setItem('isAuthenticated', 'true');
-                localStorage.setItem('auth_token', data.access_token);
-                localStorage.setItem('user', JSON.stringify(data.user));
-            } catch (storageErr) {
-                console.warn("Storage write failed:", storageErr);
-                try {
-                    localStorage.removeItem('auth_token');
-                    localStorage.removeItem('isAuthenticated');
-                    localStorage.removeItem('user');
-                } catch (_) {}
-                throw new Error("Unable to save login session. Please ensure local storage is enabled.");
-            }
+            const { accessToken, user } = validateAuthPayload(data);
+            persistSession(accessToken, user);
 
             setIsSuccess(true);
             redirectTimerRef.current = setTimeout(() => {

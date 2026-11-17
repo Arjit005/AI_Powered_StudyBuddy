@@ -7,17 +7,70 @@ let globalRenderQueue = Promise.resolve();
 
 const decodeCssEscapes = (str) => {
     if (!str || typeof str !== 'string') return '';
-    // Decode CSS hex escapes (\6a\61\76\61... or \75\72\6c) and generic backslash escapes (\:)
-    return str.replace(/\\([0-9a-fA-F]{1,6})\s?|\\(.)/g, (_, hex, char) => {
+    // Decode CSS hex escapes (\6a\61\76\61... or \75\72\6c) and generic backslash escapes (\: or \/)
+    return str.replace(/\\(?:([0-9a-fA-F]{1,6})[ \t\r\n\f]?|([^0-9a-fA-F]))/g, (_, hex, char) => {
         if (hex) {
             try {
-                return String.fromCodePoint(parseInt(hex, 16));
+                const code = parseInt(hex, 16);
+                if (code === 0 || isNaN(code)) return '';
+                return String.fromCodePoint(code);
             } catch {
                 return '';
             }
         }
         return char || '';
     });
+};
+
+const normalizeCss = (str) => {
+    let prev = '';
+    let cur = str || '';
+    // Unwind iterative or nested comments and escapes
+    for (let i = 0; i < 5 && cur !== prev; i++) {
+        prev = cur;
+        cur = decodeCssEscapes(cur.replace(/\/\*[\s\S]*?\*\//g, ''));
+    }
+    return cur;
+};
+
+const isSafeCss = (cssStr) => {
+    if (!cssStr || typeof cssStr !== 'string') return true;
+    const normalized = normalizeCss(cssStr);
+
+    // Reject dangerous keywords in any form (@import, behavior, -moz-binding, javascript:, vbscript:)
+    const stripped = normalized.replace(/[\x00-\x20\x7f-\x9f]+/g, '').toLowerCase();
+    if (
+        stripped.includes('@import') ||
+        stripped.includes('behavior') ||
+        stripped.includes('-moz-binding') ||
+        stripped.includes('javascript:') ||
+        stripped.includes('vbscript:')
+    ) {
+        return false;
+    }
+
+    // Inspect all url(...) occurrences in normalized text
+    const urlPattern = /url\s*\(([\s\S]*?)\)/gi;
+    let match;
+    while ((match = urlPattern.exec(normalized)) !== null) {
+        const rawTarget = match[1];
+        const target = rawTarget.trim().replace(/^['"]|['"]$/g, '').trim();
+        // Target must strictly start with '#' followed by safe identifier characters
+        if (!/^#[a-zA-Z0-9_\-.:]+$/.test(target)) {
+            return false;
+        }
+    }
+
+    // If there are unclosed or malformed url( occurrences in stripped, reject
+    if (stripped.includes('url(')) {
+        const openCount = (normalized.match(/url\s*\(/gi) || []).length;
+        const fullCount = (normalized.match(/url\s*\(([\s\S]*?)\)/gi) || []).length;
+        if (openCount !== fullCount) {
+            return false;
+        }
+    }
+
+    return true;
 };
 
 const sanitizeSvg = (svgStr) => {
@@ -48,36 +101,34 @@ const sanitizeSvg = (svgStr) => {
                 const rawName = (attr.localName || attr.name).toLowerCase();
                 const rawVal = attr.value;
 
-                // Fully decode CSS escapes and strip control characters to prevent evasion
-                const decodedVal = decodeCssEscapes(rawVal);
-                const compactVal = decodedVal.replace(/[\x00-\x1f\x7f\s]+/g, '').toLowerCase();
+                // Decode and normalize value
+                const normalizedVal = normalizeCss(rawVal);
+                const compactVal = normalizedVal.replace(/[\x00-\x1f\x7f\s]+/g, '').toLowerCase();
 
                 const isUriAttr = rawName.includes('href') || rawName.includes('src') || rawName === 'action';
                 const hasExecutableScheme = /^(javascript|vbscript|data):/i.test(compactVal);
-                const isNonFragmentUri = isUriAttr && !compactVal.startsWith('#') && (compactVal.includes(':') || compactVal.startsWith('//'));
+                const isNonFragmentUri = isUriAttr && !compactVal.startsWith('#') && (compactVal.includes(':') || compactVal.startsWith('//') || compactVal.startsWith('/'));
 
                 if (rawName.startsWith('on') || hasExecutableScheme || isNonFragmentUri) {
                     el.removeAttribute(attr.name);
                     continue;
                 }
 
-                // Check for CSS url(...) in attributes: only allow safe local fragments like url(#gradient-1)
-                // Evaluate against both raw and decoded strings
-                if (/url\s*\(/i.test(decodedVal) || /url\s*\(/i.test(rawVal)) {
-                    const isSafeLocalFragment = /^url\s*\(\s*['"]?#[a-zA-Z0-9_\-\.:]+\s*['"]?\s*\)$/i.test(decodedVal.trim());
-                    if (!isSafeLocalFragment) {
-                        el.removeAttribute(attr.name);
-                    }
+                // Check for CSS url(...) in style or presentational attributes
+                if (!isSafeCss(rawVal) || !isSafeCss(normalizedVal)) {
+                    el.removeAttribute(attr.name);
                 }
             }
         });
-        // Remove style elements containing @import, behavior, or non-fragment url()
+
+        // Inspect and sanitize style elements
         doc.querySelectorAll('style').forEach(el => {
-            const cssText = decodeCssEscapes(el.textContent || '');
-            if (/@import|behavior|url\s*\(\s*['"]?(?!#[a-zA-Z0-9_\-\.:]+['"]?\s*\))/i.test(cssText)) {
+            const rawCss = el.textContent || '';
+            if (!isSafeCss(rawCss)) {
                 el.remove();
             }
         });
+
         return doc.documentElement ? new XMLSerializer().serializeToString(doc.documentElement) : '';
     } catch {
         return '';
@@ -109,6 +160,7 @@ const initMermaid = () => {
 
 const MermaidViewer = ({ chart, title = "Architecture Diagram" }) => {
     const containerRef = useRef(null);
+    const fullscreenContainerRef = useRef(null);
     const copyTimeoutRef = useRef(null);
     const modalRef = useRef(null);
     const triggerButtonRef = useRef(null);
@@ -118,6 +170,33 @@ const MermaidViewer = ({ chart, title = "Architecture Diagram" }) => {
     const [copyError, setCopyError] = useState(false);
     const [zoom, setZoom] = useState(1);
     const [isFullscreen, setIsFullscreen] = useState(false);
+
+    // Safely insert sanitized SVG node into container element
+    useEffect(() => {
+        const mount = (targetEl) => {
+            if (!targetEl) return;
+            while (targetEl.firstChild) {
+                targetEl.removeChild(targetEl.firstChild);
+            }
+            if (!svgContent) return;
+            try {
+                const parser = new DOMParser();
+                const svgDoc = parser.parseFromString(svgContent, 'image/svg+xml');
+                if (svgDoc.documentElement && !svgDoc.querySelector('parsererror')) {
+                    targetEl.appendChild(document.importNode(svgDoc.documentElement, true));
+                } else {
+                    targetEl.innerHTML = svgContent;
+                }
+            } catch {
+                targetEl.innerHTML = svgContent;
+            }
+        };
+
+        mount(containerRef.current);
+        if (isFullscreen) {
+            mount(fullscreenContainerRef.current);
+        }
+    }, [svgContent, isFullscreen]);
 
     useEffect(() => {
         return () => {
@@ -312,6 +391,7 @@ const MermaidViewer = ({ chart, title = "Architecture Diagram" }) => {
                             <AlertCircle className="w-4 h-4 shrink-0" />
                             <span>Diagram Display Notice</span>
                         </div>
+                        <p className="text-[11px] text-rose-200/90">{error}</p>
                         <p className="text-[11px] text-slate-400">Raw source code is displayed below:</p>
                         <pre className="p-2.5 rounded bg-black/60 overflow-x-auto text-[11px] text-emerald-400">
                             {chart}
@@ -322,7 +402,6 @@ const MermaidViewer = ({ chart, title = "Architecture Diagram" }) => {
                         ref={containerRef}
                         style={{ transform: `scale(${zoom})`, transformOrigin: 'center center' }}
                         className="transition-transform duration-200 flex items-center justify-center w-full"
-                        dangerouslySetInnerHTML={{ __html: svgContent }}
                     />
                 ) : (!chart || !chart.trim()) ? (
                     <div className="flex items-center gap-2 text-xs font-mono text-slate-500">
@@ -398,9 +477,9 @@ const MermaidViewer = ({ chart, title = "Architecture Diagram" }) => {
                             </div>
                         ) : svgContent ? (
                             <div
+                                ref={fullscreenContainerRef}
                                 style={{ transform: `scale(${zoom * 1.3})`, transformOrigin: 'center center' }}
                                 className="transition-transform duration-200 max-w-full"
-                                dangerouslySetInnerHTML={{ __html: svgContent }}
                             />
                         ) : (!chart || !chart.trim()) ? (
                             <div className="text-slate-400 font-mono text-sm">No diagram code provided.</div>

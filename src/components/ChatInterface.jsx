@@ -58,8 +58,11 @@ const ChatInterface = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     };
 
+    const fetchConversationsGenRef = useRef(0);
+
     // 1. Fetch Conversations List on Mount
     const fetchConversations = async () => {
+        const thisFetchGen = ++fetchConversationsGenRef.current;
         try {
             const token = localStorage.getItem('auth_token');
             const headers = {};
@@ -68,8 +71,11 @@ const ChatInterface = () => {
             const res = await fetch('/api/conversations', { headers });
             if (res.ok) {
                 const data = await res.json();
+                if (thisFetchGen !== fetchConversationsGenRef.current) return;
                 setConversations(data);
+                // Only select the default first conversation if the user has NOT selected or created one
                 if (data.length > 0 && !activeConvIdRef.current) {
+                    activeConvIdRef.current = data[0].id;
                     setActiveConvId(data[0].id);
                 }
             }
@@ -189,16 +195,20 @@ const ChatInterface = () => {
             });
 
             if (res.ok) {
-                const remaining = conversations.filter(c => c.id !== convId);
-                setConversations(remaining);
-                if (activeConvId === convId) {
-                    if (remaining.length > 0) {
-                        setActiveConvId(remaining[0].id);
-                    } else {
-                        setActiveConvId(null);
-                        setMessages([DEFAULT_GREETING]);
+                setConversations(prev => {
+                    const remaining = prev.filter(c => c.id !== convId);
+                    if (activeConvIdRef.current === convId) {
+                        if (remaining.length > 0) {
+                            activeConvIdRef.current = remaining[0].id;
+                            setActiveConvId(remaining[0].id);
+                        } else {
+                            activeConvIdRef.current = null;
+                            setActiveConvId(null);
+                            setMessages([DEFAULT_GREETING]);
+                        }
                     }
-                }
+                    return remaining;
+                });
             }
         } catch (err) {
             console.error("Error deleting session:", err);
@@ -228,8 +238,6 @@ const ChatInterface = () => {
         if (!confirm("Clear messages in this current study session?")) return;
         const targetConv = activeConvId;
         const clearKey = targetConv || 'current';
-        invalidatedConvsRef.current.add(clearKey);
-        sendGenerationRef.current += 1;
         try {
             const token = localStorage.getItem('auth_token');
             const headers = {};
@@ -239,7 +247,10 @@ const ChatInterface = () => {
             const res = await fetch(url, { method: 'DELETE', headers });
             if (!res.ok) throw new Error('Unable to clear this session. Please try again.');
             
-            // Allow this cleared conversation to accept new messages now that deletion succeeded
+            // Invalidate in-flight messages ONLY upon confirmed clear success
+            invalidatedConvsRef.current.add(clearKey);
+            sendGenerationRef.current += 1;
+            // Then allow new messages in this cleared conversation
             invalidatedConvsRef.current.delete(clearKey);
 
             setMessages([
@@ -252,8 +263,6 @@ const ChatInterface = () => {
             fetchConversations();
         } catch (err) {
             console.error(err);
-            // On failure, also un-invalidate so the user can retry sending
-            invalidatedConvsRef.current.delete(clearKey);
             alert("Error clearing session memory.");
         }
     };
@@ -271,6 +280,20 @@ const ChatInterface = () => {
         activeSendCountRef.current += 1;
         setIsLoading(true);
 
+        let streamConvId = originatingConvId;
+
+        // Unified request validity guard accessible across stream, fallback, and catch blocks
+        const isStillCurrentConv = () => {
+            if (thisSendGen !== sendGenerationRef.current) return false;
+            if (invalidatedConvsRef.current.has(originatingConvId)) return false;
+            if (streamConvId && invalidatedConvsRef.current.has(streamConvId)) return false;
+            return (
+                originatingConvId === activeConvIdRef.current || 
+                (originatingConvId === null && (activeConvIdRef.current === null || activeConvIdRef.current === streamConvId)) ||
+                (streamConvId && activeConvIdRef.current === streamConvId)
+            );
+        };
+
         try {
             const token = localStorage.getItem('auth_token');
             const headers = { 'Content-Type': 'application/json' };
@@ -281,7 +304,6 @@ const ChatInterface = () => {
             let streamAccepted = false;
             let accumulatedText = '';
             const streamMsgId = Date.now();
-            let streamConvId = originatingConvId;
 
             try {
                 const streamResponse = await fetch('/api/chat/stream', {
@@ -316,16 +338,6 @@ const ChatInterface = () => {
                     let doneReading = false;
                     let receivedDone = false;
                     let buffer = '';
-
-                    const isStillCurrentConv = () => {
-                        if (thisSendGen !== sendGenerationRef.current) return false;
-                        if (invalidatedConvsRef.current.has(originatingConvId)) return false;
-                        if (streamConvId && invalidatedConvsRef.current.has(streamConvId)) return false;
-                        return (
-                            originatingConvId === activeConvIdRef.current || 
-                            (originatingConvId === null && (activeConvIdRef.current === null || activeConvIdRef.current === streamConvId))
-                        );
-                    };
 
                     while (!doneReading) {
                         const { value, done } = await reader.read();
@@ -410,14 +422,8 @@ const ChatInterface = () => {
                 }
             } catch (streamErr) {
                 console.warn('SSE Streaming connection failed:', streamErr);
-                const isStillValidConv = () => (
-                    thisSendGen === sendGenerationRef.current &&
-                    !invalidatedConvsRef.current.has(originatingConvId) &&
-                    (!streamConvId || !invalidatedConvsRef.current.has(streamConvId)) &&
-                    (originatingConvId === activeConvIdRef.current || (streamConvId && activeConvIdRef.current === streamConvId))
-                );
                 if (accumulatedText.length > 0) {
-                    if (isStillValidConv()) {
+                    if (isStillCurrentConv()) {
                         setMessages(prev => prev.map(m => m.id === streamMsgId ? { 
                             ...m, 
                             content: m.content + '\n\n*(Response interrupted due to network issue)*',
@@ -428,22 +434,15 @@ const ChatInterface = () => {
                     }
                     return;
                 }
-                if (isStillValidConv()) {
+                if (isStillCurrentConv()) {
                     setMessages(prev => prev.filter(m => m.id !== streamMsgId));
                 }
             }
 
             if (!streamSuccess) {
-                const isStillValidConv = () => (
-                    thisSendGen === sendGenerationRef.current &&
-                    !invalidatedConvsRef.current.has(originatingConvId) &&
-                    (!streamConvId || !invalidatedConvsRef.current.has(streamConvId)) &&
-                    (originatingConvId === activeConvIdRef.current || (streamConvId && activeConvIdRef.current === streamConvId))
-                );
-
                 if (streamAccepted) {
                     // Avoid double-posting to /api/chat since the stream request was already accepted by the server
-                    if (accumulatedText.length === 0 && isStillValidConv()) {
+                    if (accumulatedText.length === 0 && isStillCurrentConv()) {
                         setMessages(prev => [
                             ...prev,
                             {
@@ -474,11 +473,13 @@ const ChatInterface = () => {
                 const data = await response.json();
                 
                 // If user switched or deleted conversation during in-flight generation, do not append
-                if (!isStillValidConv()) {
+                if (!isStillCurrentConv()) {
                     return;
                 }
 
                 if (data.conversation_id && data.conversation_id !== activeConvId) {
+                    streamConvId = data.conversation_id;
+                    activeConvIdRef.current = data.conversation_id;
                     setActiveConvId(data.conversation_id);
                     fetchConversations();
                 } else {

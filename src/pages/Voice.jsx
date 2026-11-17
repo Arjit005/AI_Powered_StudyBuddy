@@ -11,68 +11,46 @@ const Voice = () => {
     const [browserSupported, setBrowserSupported] = useState(true);
     const [error, setError] = useState(null);
     const recognitionRef = useRef(null);
-    const recognitionSessionRef = useRef(0);
+    const activeSessionIdRef = useRef(0);
     const playbackGenRef = useRef(0);
     const aiRequestGenRef = useRef(0);
     const aiAbortControllerRef = useRef(null);
     const isMountedRef = useRef(true);
+
+    const cleanupActiveRecognition = () => {
+        if (recognitionRef.current) {
+            const rec = recognitionRef.current;
+            recognitionRef.current = null;
+            // Detach handlers to prevent memory leaks and late event delivery
+            rec.onresult = null;
+            rec.onerror = null;
+            rec.onend = null;
+            rec.onstart = null;
+            try {
+                if (typeof rec.abort === 'function') {
+                    rec.abort();
+                } else if (typeof rec.stop === 'function') {
+                    rec.stop();
+                }
+            } catch (_) {}
+        }
+    };
 
     useEffect(() => {
         isMountedRef.current = true;
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
         if (!SpeechRecognition) {
             setBrowserSupported(false);
-            return;
         }
-
-        const recognition = new SpeechRecognition();
-        recognition.continuous = true;
-        recognition.interimResults = true;
-        recognition.lang = 'en-US';
-
-        recognition.onresult = (event) => {
-            if (recognition._session !== recognitionSessionRef.current) return;
-            let fullTranscript = '';
-            for (let i = 0; i < event.results.length; i++) {
-                fullTranscript += event.results[i][0].transcript;
-            }
-            if (isMountedRef.current && recognition._session === recognitionSessionRef.current) {
-                setTranscript(fullTranscript);
-            }
-        };
-
-        recognition.onerror = (event) => {
-            console.error('Speech recognition error:', event.error);
-            if (!isMountedRef.current || recognition._session !== recognitionSessionRef.current) return;
-            setIsListening(false);
-            if (event.error === 'not-allowed') {
-                setError('Microphone access was denied. Please allow microphone permissions in your browser.');
-            } else if (event.error === 'no-speech') {
-                setError('No speech detected. Please speak closer to your microphone.');
-            } else if (event.error === 'network') {
-                setError('Speech recognition network error. Please verify your connection.');
-            } else {
-                setError(`Microphone error (${event.error}). Please try again.`);
-            }
-        };
-
-        recognition.onend = () => {
-            if (isMountedRef.current && recognition._session === recognitionSessionRef.current) {
-                setIsListening(false);
-            }
-        };
-
-        recognitionRef.current = recognition;
 
         return () => {
             isMountedRef.current = false;
+            activeSessionIdRef.current += 1;
             playbackGenRef.current += 1;
-            recognitionSessionRef.current += 1;
+            cleanupActiveRecognition();
+
             if (aiAbortControllerRef.current) {
                 try { aiAbortControllerRef.current.abort(); } catch (_) {}
-            }
-            if (recognitionRef.current) {
-                try { recognitionRef.current.stop(); } catch (_) {}
             }
             if ('speechSynthesis' in window) {
                 window.speechSynthesis.cancel();
@@ -84,22 +62,82 @@ const Voice = () => {
         if (!browserSupported) return;
 
         if (isListening) {
-            recognitionSessionRef.current += 1;
-            recognitionRef.current?.stop();
+            // Stop current session
+            activeSessionIdRef.current += 1;
+            cleanupActiveRecognition();
             setIsListening(false);
         } else {
             setTranscript('');
+            setError(null);
+
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if (!SpeechRecognition) {
+                setBrowserSupported(false);
+                return;
+            }
+
+            // Cleanup any stale instance before creating a fresh one
+            cleanupActiveRecognition();
+
+            const thisSessionId = ++activeSessionIdRef.current;
+
             try {
-                const thisSession = ++recognitionSessionRef.current;
-                if (recognitionRef.current) {
-                    recognitionRef.current._session = thisSession;
-                }
-                recognitionRef.current?.start();
+                const recognition = new SpeechRecognition();
+                recognition.continuous = true;
+                recognition.interimResults = true;
+                recognition.lang = 'en-US';
+
+                recognition.onstart = () => {
+                    if (!isMountedRef.current || thisSessionId !== activeSessionIdRef.current) return;
+                    setIsListening(true);
+                };
+
+                recognition.onresult = (event) => {
+                    if (!isMountedRef.current || thisSessionId !== activeSessionIdRef.current) return;
+                    let fullTranscript = '';
+                    for (let i = 0; i < event.results.length; i++) {
+                        fullTranscript += event.results[i][0].transcript;
+                    }
+                    setTranscript(fullTranscript);
+                };
+
+                recognition.onerror = (event) => {
+                    console.error('Speech recognition error:', event.error);
+                    if (!isMountedRef.current || thisSessionId !== activeSessionIdRef.current) return;
+
+                    // Benign abort errors caused by intentional cancellation
+                    if (event.error === 'aborted') {
+                        setIsListening(false);
+                        return;
+                    }
+
+                    setIsListening(false);
+                    if (event.error === 'not-allowed') {
+                        setError('Microphone access was denied. Please allow microphone permissions in your browser.');
+                    } else if (event.error === 'no-speech') {
+                        setError('No speech detected. Please speak closer to your microphone.');
+                    } else if (event.error === 'network') {
+                        setError('Speech recognition network error. Please verify your connection.');
+                    } else {
+                        setError(`Microphone error (${event.error}). Please try again.`);
+                    }
+                };
+
+                recognition.onend = () => {
+                    if (!isMountedRef.current || thisSessionId !== activeSessionIdRef.current) return;
+                    setIsListening(false);
+                };
+
+                recognitionRef.current = recognition;
+                recognition.start();
+                // Set optimistic listening state; onstart confirms or onend/onerror handles early termination
                 setIsListening(true);
             } catch (err) {
                 console.error('Failed to start speech recognition:', err);
-                setIsListening(false);
-                setError('Microphone capture could not be started. Please check microphone permissions and try again.');
+                if (thisSessionId === activeSessionIdRef.current) {
+                    setIsListening(false);
+                    setError('Microphone capture could not be started. Please check microphone permissions and try again.');
+                }
             }
         }
     };
@@ -107,10 +145,10 @@ const Voice = () => {
     const handleAskAi = async () => {
         if (!transcript.trim() || isLoading) return;
 
-        // Stop listening while generating
-        if (isListening) {
-            recognitionSessionRef.current += 1;
-            recognitionRef.current?.stop();
+        // Stop listening while generating and invalidate active recognition session
+        if (isListening || recognitionRef.current) {
+            activeSessionIdRef.current += 1;
+            cleanupActiveRecognition();
             setIsListening(false);
         }
 
