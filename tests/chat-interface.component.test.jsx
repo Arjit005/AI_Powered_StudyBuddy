@@ -43,6 +43,7 @@ describe('ChatInterface Real Component Regression Suite', () => {
 
     beforeEach(() => {
         originalFetch = globalThis.fetch;
+        localStorage.setItem('auth_token', 'chat-test-token');
         window.confirm = () => true;
         window.alert = () => {};
     });

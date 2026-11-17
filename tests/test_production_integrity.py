@@ -3,8 +3,12 @@ import os
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 import pytest
+import uuid
 from fastapi.testclient import TestClient
+from backend.auth import create_access_token
+from backend.database import SessionLocal
 from backend.main import app
+from backend.models import User
 
 client = TestClient(app)
 
@@ -20,7 +24,27 @@ def test_health_check_endpoint():
 
 def test_activity_heatmap_endpoint():
     """Verify real database-aggregated heatmap endpoint returns 112 days with zero mock formula."""
-    response = client.get("/api/analytics/activity-heatmap")
+    db = SessionLocal()
+    username = f"heatmap_{uuid.uuid4().hex[:12]}"
+    user = User(
+        username=username,
+        email=f"{username}@example.com",
+        hashed_password="not-used-in-this-test",
+    )
+    try:
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+        token = create_access_token({"sub": str(user.id), "email": user.email})
+        response = client.get(
+            "/api/analytics/activity-heatmap",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+    finally:
+        db.delete(user)
+        db.commit()
+        db.close()
+
     assert response.status_code == 200
     data = response.json()
     assert "days" in data

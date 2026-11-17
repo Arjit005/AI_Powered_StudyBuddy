@@ -40,7 +40,7 @@ const StudyTimer = () => {
                 if (mode === 'focus' && remaining <= 0) {
                     apiRequest(TRACK_ACTIVITY_ENDPOINT, {
                         method: 'POST',
-                        auth: 'optional',
+                        auth: 'required',
                         responseType: 'none',
                         json: { activity_type: 'timer_focus', duration_seconds: duration }
                     }).then(() => {

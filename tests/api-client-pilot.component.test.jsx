@@ -113,6 +113,7 @@ describe('API client pilot callers', () => {
     it('keeps Timer non-OK feedback distinct from a network failure', async () => {
         vi.useFakeTimers();
         vi.setSystemTime(new Date(0));
+        localStorage.setItem('auth_token', 'timer-token');
         fetch.mockResolvedValue(new Response('{"detail":"Unavailable"}', { status: 503 }));
         const { container } = render(React.createElement(StudyTimer));
 

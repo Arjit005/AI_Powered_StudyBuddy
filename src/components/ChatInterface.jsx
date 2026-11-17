@@ -65,7 +65,7 @@ const ChatInterface = () => {
     const fetchConversations = async () => {
         const thisFetchGen = ++fetchConversationsGenRef.current;
         try {
-            const data = await apiRequest('/api/conversations', { auth: 'optional' });
+            const data = await apiRequest('/api/conversations', { auth: 'required' });
             if (thisFetchGen !== fetchConversationsGenRef.current) return;
             setConversations(data);
             // Only select the default first conversation if the user has NOT selected or created one
@@ -84,7 +84,7 @@ const ChatInterface = () => {
         const thisGen = ++historyRequestGenRef.current;
         try {
             const url = convId ? `/api/chat?conversation_id=${convId}` : '/api/chat';
-            const data = await apiRequest(url, { auth: 'optional' });
+            const data = await apiRequest(url, { auth: 'required' });
             
             // Check if this response is still for the current request generation and conversation
             if (thisGen !== historyRequestGenRef.current || convId !== activeConvIdRef.current) {
@@ -143,7 +143,7 @@ const ChatInterface = () => {
         try {
             const newConv = await apiRequest('/api/conversations', {
                 method: 'POST',
-                auth: 'optional',
+                auth: 'required',
                 json: { title: 'New Study Session' },
             });
             setConversations(prev => [newConv, ...prev]);
@@ -164,7 +164,7 @@ const ChatInterface = () => {
         try {
             await apiRequest(`/api/conversations/${convId}`, {
                 method: 'DELETE',
-                auth: 'optional',
+                auth: 'required',
                 responseType: 'none',
             });
 
@@ -214,7 +214,7 @@ const ChatInterface = () => {
             const url = activeConvId ? `/api/chat?conversation_id=${activeConvId}` : '/api/chat';
             await apiRequest(url, {
                 method: 'DELETE',
-                auth: 'optional',
+                auth: 'required',
                 responseType: 'none',
             });
             
@@ -275,7 +275,7 @@ const ChatInterface = () => {
             try {
                 const streamResponse = await apiRequest('/api/chat/stream', {
                     method: 'POST',
-                    auth: 'optional',
+                    auth: 'required',
                     json: {
                         message: textToSend,
                         conversation_id: originatingConvId
@@ -426,7 +426,7 @@ const ChatInterface = () => {
                 // 2. Fallback to standard synchronous endpoint
                 const data = await apiRequest('/api/chat', {
                     method: 'POST',
-                    auth: 'optional',
+                    auth: 'required',
                     json: {
                         message: textToSend,
                         conversation_id: originatingConvId

@@ -49,7 +49,7 @@ export default function Library() {
       if (search.trim()) params.append('search', search.trim());
       if (params.toString()) url += `?${params.toString()}`;
 
-      const data = await apiRequest(url, { auth: 'optional' });
+      const data = await apiRequest(url, { auth: 'required' });
       if (thisGen !== requestGenRef.current) return;
 
       const serverItems = Array.isArray(data)
@@ -96,7 +96,7 @@ export default function Library() {
     try {
       await apiRequest(`/api/library/${id}/favorite`, {
         method: 'PUT',
-        auth: 'optional',
+        auth: 'required',
         responseType: 'none',
       });
     } catch (err) {
@@ -117,7 +117,7 @@ export default function Library() {
     try {
       await apiRequest(`/api/library/${id}`, {
         method: 'DELETE',
-        auth: 'optional',
+        auth: 'required',
         responseType: 'none',
       });
       // Invalidate any in-flight background fetches so stale results don't restore deleted items
@@ -150,7 +150,7 @@ export default function Library() {
     setDetailLoading(true);
     setDetailError(null);
     try {
-      const full = await apiRequest(`/api/library/${item.id}`, { auth: 'optional' });
+      const full = await apiRequest(`/api/library/${item.id}`, { auth: 'required' });
       if (thisGen !== detailRequestGenRef.current) return;
       setSelectedItem(full);
     } catch (err) {

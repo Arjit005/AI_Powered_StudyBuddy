@@ -59,6 +59,7 @@ describe('API client migrated analytics callers', () => {
     });
 
     it('retains partial analytics results and displays a warning when one request fails', async () => {
+        localStorage.setItem('auth_token', 'analytics-token');
         fetch.mockImplementation((url) => {
             if (url === '/api/analytics/activity-heatmap') {
                 return Promise.reject(new Error('offline'));
@@ -74,20 +75,25 @@ describe('API client migrated analytics callers', () => {
         expect(await screen.findByText(/Some analytics modules were temporarily unavailable/i)).toBeTruthy();
     });
 
-    it('does not send an unauthenticated dashboard request while optional analytics remain available', async () => {
+    it('sends authenticated requests for all private analytics data', async () => {
+        localStorage.setItem('auth_token', 'analytics-token');
         fetch.mockImplementation((url) => {
             if (url === '/api/progress') return Promise.resolve(jsonResponse(progressData));
             if (url === '/api/analytics/activity-heatmap') return Promise.resolve(jsonResponse({ days: [] }));
             if (url === '/api/sessions/history') return Promise.resolve(jsonResponse([]));
-            throw new Error(`Unexpected unauthenticated request: ${url}`);
+            if (url === '/api/analytics/dashboard') return Promise.resolve(jsonResponse({ chart: null }));
+            throw new Error(`Unexpected request: ${url}`);
         });
 
         render(React.createElement(Progress));
 
         expect(await screen.findByText('3.5')).toBeTruthy();
-        expect(await screen.findByText(/Some analytics modules were temporarily unavailable/i)).toBeTruthy();
-        expect(fetch).toHaveBeenCalledTimes(3);
-        expect(fetch.mock.calls.some(([url]) => url === '/api/analytics/dashboard')).toBe(false);
+        await waitFor(() => {
+            expect(fetch).toHaveBeenCalledTimes(4);
+        });
+        for (const [, options] of fetch.mock.calls) {
+            expect(options.headers.get('Authorization')).toBe('Bearer analytics-token');
+        }
     });
 
     it('resets progress via a status-only DELETE and reloads analytics on success', async () => {

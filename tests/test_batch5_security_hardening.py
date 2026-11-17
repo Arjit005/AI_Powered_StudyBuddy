@@ -45,6 +45,10 @@ def test_rag_query_pinecone_namespace_isolation():
             assert call_kwargs_user.get("namespace") == "user_42"
 
 
+def test_rag_retrieval_never_reads_unowned_guest_sources():
+    assert RAGService.retrieve(None, None, "private guest notes") == []
+
+
 # --- Portkey Semantic Cache Tenant Partitioning Verification ---
 
 def test_semantic_cache_different_tenants_have_distinct_headers(monkeypatch):

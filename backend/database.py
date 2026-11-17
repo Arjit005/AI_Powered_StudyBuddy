@@ -1,8 +1,12 @@
 
 import os
+from dotenv import load_dotenv
 from sqlalchemy import create_engine, event
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import sessionmaker, declarative_base
+
+load_dotenv("backend/.env")
+load_dotenv(".env")
 
 DATABASE_URL = os.getenv("DATABASE_URL")
 ENV = os.getenv("ENVIRONMENT", "development").lower()
@@ -66,10 +70,8 @@ if DATABASE_URL:
             raise e
 else:
     if ENV == "production":
-        print(
-            "[DATABASE WARNING] DATABASE_URL is not set on production. Running with local SQLite "
-            "(storage will be ephemeral on Render). For zero-loss persistence, attach a free "
-            "Neon (neon.tech) or Supabase PostgreSQL DATABASE_URL in your cloud environment."
+        raise RuntimeError(
+            "DATABASE_URL is required in production. Refusing to start with ephemeral SQLite storage."
         )
     # Isolated Local Development & Testing SQLite
     SQLALCHEMY_DATABASE_URL = "sqlite:///./study_buddy.db"

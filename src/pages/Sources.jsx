@@ -32,7 +32,7 @@ const Sources = () => {
         setLoading(true);
         setFetchError(null);
         try {
-            const data = await apiRequest('/api/sources', { auth: 'optional' });
+            const data = await apiRequest('/api/sources', { auth: 'required' });
             setSources(Array.isArray(data) ? data : []);
         } catch (e) {
             console.error("Error fetching sources:", e);
@@ -76,7 +76,7 @@ const Sources = () => {
         try {
             await apiRequest('/api/sources', {
                 method: 'POST',
-                auth: 'optional',
+                auth: 'required',
                 formData,
                 responseType: 'none',
             });
@@ -104,7 +104,7 @@ const Sources = () => {
         setGuideError(null);
         setLoadingGuide(true);
         try {
-            const data = await apiRequest(`/api/sources/${source.id}/guide`, { auth: 'optional' });
+            const data = await apiRequest(`/api/sources/${source.id}/guide`, { auth: 'required' });
             if (thisGen !== guideRequestGenRef.current) return;
             setSourceGuide(data);
         } catch (e) {
@@ -126,7 +126,7 @@ const Sources = () => {
         try {
             await apiRequest(`/api/sources/${id}`, {
                 method: 'DELETE',
-                auth: 'optional',
+                auth: 'required',
                 responseType: 'none',
             });
             setSources(current => current.filter(s => s.id !== id));
@@ -146,7 +146,7 @@ const Sources = () => {
         try {
             await apiRequest(`/api/sources/${id}/reindex`, {
                 method: 'POST',
-                auth: 'optional',
+                auth: 'required',
                 responseType: 'none',
             });
             alert("Source successfully re-chunked and re-embedded!");

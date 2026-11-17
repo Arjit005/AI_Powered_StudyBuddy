@@ -142,7 +142,7 @@ const Summarize = () => {
         try {
             await apiRequest('/api/library', {
                 method: 'POST',
-                auth: 'optional',
+                auth: 'required',
                 responseType: 'none',
                 json: {
                     material_type: 'summary',

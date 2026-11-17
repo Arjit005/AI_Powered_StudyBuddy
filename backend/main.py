@@ -491,10 +491,10 @@ def create_source(
     content: Optional[str] = Form(None),
     url: Optional[str] = Form(None),
     db: Session = Depends(get_db),
-    current_user: Optional[models.User] = Depends(auth.get_current_user_optional)
+    current_user: models.User = Depends(auth.get_current_user_required)
 ):
     security.limiter.check_rate_limit(request, category="sources", max_requests=30, window_seconds=60)
-    user_id = current_user.id if current_user else None
+    user_id = current_user.id
 
     raw_content = content
     MAX_FILE_BYTES = 20 * 1024 * 1024  # 20MB limit
@@ -539,14 +539,9 @@ def create_source(
 @app.get("/api/sources", tags=["Sources"])
 def list_sources(
     db: Session = Depends(get_db),
-    current_user: Optional[models.User] = Depends(auth.get_current_user_optional)
+    current_user: models.User = Depends(auth.get_current_user_required)
 ):
-    user_id = current_user.id if current_user else None
-    query = db.query(models.Source)
-    if user_id:
-        query = query.filter((models.Source.user_id == user_id) | (models.Source.user_id.is_(None)))
-    else:
-        query = query.filter(models.Source.user_id.is_(None))
+    query = db.query(models.Source).filter(models.Source.user_id == current_user.id)
     sources = query.order_by(models.Source.created_at.desc()).all()
     return [
         {
@@ -567,13 +562,12 @@ def list_sources(
 def get_source_detail(
     source_id: int, 
     db: Session = Depends(get_db),
-    current_user: Optional[models.User] = Depends(auth.get_current_user_optional)
+    current_user: models.User = Depends(auth.get_current_user_required)
 ):
-    query = db.query(models.Source).filter(models.Source.id == source_id)
-    if current_user:
-        query = query.filter((models.Source.user_id == current_user.id) | (models.Source.user_id.is_(None)))
-    else:
-        query = query.filter(models.Source.user_id.is_(None))
+    query = db.query(models.Source).filter(
+        models.Source.id == source_id,
+        models.Source.user_id == current_user.id
+    )
 
     source = query.first()
     if not source:
@@ -605,22 +599,21 @@ def get_source_detail(
 def delete_source(
     source_id: int, 
     db: Session = Depends(get_db),
-    current_user: Optional[models.User] = Depends(auth.get_current_user_optional)
+    current_user: models.User = Depends(auth.get_current_user_required)
 ):
-    query = db.query(models.Source).filter(models.Source.id == source_id)
-    if current_user:
-        query = query.filter(models.Source.user_id == current_user.id)
-    else:
-        query = query.filter(models.Source.user_id.is_(None))
+    query = db.query(models.Source).filter(
+        models.Source.id == source_id,
+        models.Source.user_id == current_user.id
+    )
 
     source = query.first()
     if not source:
         raise HTTPException(status_code=404, detail="Source not found or unauthorized.")
     
-    user_id = source.user_id
+    user_id = current_user.id
     # Clean up Pinecone vectors for this source before deleting SQL records
     vector_delete_ok = rag_service.RAGService.delete_source_vectors(source_id=source_id, user_id=user_id)
-    if not vector_delete_ok and os.getenv("PINECONE_API"):
+    if not vector_delete_ok and rag_service.RAGService._pinecone_api_key():
         raise HTTPException(
             status_code=500,
             detail="Failed to clean up remote vector embeddings. Source deletion aborted to maintain data consistency."
@@ -634,13 +627,12 @@ def delete_source(
 def reindex_source(
     source_id: int, 
     db: Session = Depends(get_db),
-    current_user: Optional[models.User] = Depends(auth.get_current_user_optional)
+    current_user: models.User = Depends(auth.get_current_user_required)
 ):
-    query = db.query(models.Source).filter(models.Source.id == source_id)
-    if current_user:
-        query = query.filter(models.Source.user_id == current_user.id)
-    else:
-        query = query.filter(models.Source.user_id.is_(None))
+    query = db.query(models.Source).filter(
+        models.Source.id == source_id,
+        models.Source.user_id == current_user.id
+    )
 
     source = query.first()
     if not source:
@@ -652,13 +644,12 @@ def reindex_source(
 def get_source_guide_endpoint(
     source_id: int, 
     db: Session = Depends(get_db),
-    current_user: Optional[models.User] = Depends(auth.get_current_user_optional)
+    current_user: models.User = Depends(auth.get_current_user_required)
 ):
-    query = db.query(models.Source).filter(models.Source.id == source_id)
-    if current_user:
-        query = query.filter((models.Source.user_id == current_user.id) | (models.Source.user_id.is_(None)))
-    else:
-        query = query.filter(models.Source.user_id.is_(None))
+    query = db.query(models.Source).filter(
+        models.Source.id == source_id,
+        models.Source.user_id == current_user.id
+    )
 
     source = query.first()
     if not source:
@@ -672,13 +663,11 @@ def get_source_guide_endpoint(
 @app.get("/api/conversations", response_model=List[ConversationResponse], tags=["Conversations"])
 def list_conversations(
     db: Session = Depends(get_db),
-    current_user: Optional[models.User] = Depends(auth.get_current_user_optional)
+    current_user: models.User = Depends(auth.get_current_user_required)
 ):
-    query = db.query(models.Conversation)
-    if current_user:
-        query = query.filter(models.Conversation.user_id == current_user.id)
-    else:
-        query = query.filter(models.Conversation.user_id.is_(None))
+    query = db.query(models.Conversation).filter(
+        models.Conversation.user_id == current_user.id
+    )
 
     convs = query.order_by(models.Conversation.updated_at.desc(), models.Conversation.id.desc()).all()
     results = []
@@ -698,11 +687,10 @@ def list_conversations(
 def create_conversation(
     req: ConversationCreate,
     db: Session = Depends(get_db),
-    current_user: Optional[models.User] = Depends(auth.get_current_user_optional)
+    current_user: models.User = Depends(auth.get_current_user_required)
 ):
-    user_id = current_user.id if current_user else None
     conv = models.Conversation(
-        user_id=user_id,
+        user_id=current_user.id,
         title=req.title or "New Study Session"
     )
     db.add(conv)
@@ -722,13 +710,12 @@ def update_conversation(
     conv_id: int,
     req: ConversationUpdate,
     db: Session = Depends(get_db),
-    current_user: Optional[models.User] = Depends(auth.get_current_user_optional)
+    current_user: models.User = Depends(auth.get_current_user_required)
 ):
-    query = db.query(models.Conversation).filter(models.Conversation.id == conv_id)
-    if current_user:
-        query = query.filter(models.Conversation.user_id == current_user.id)
-    else:
-        query = query.filter(models.Conversation.user_id.is_(None))
+    query = db.query(models.Conversation).filter(
+        models.Conversation.id == conv_id,
+        models.Conversation.user_id == current_user.id
+    )
     conv = query.first()
     if not conv:
         raise HTTPException(status_code=404, detail="Conversation session not found.")
@@ -750,13 +737,12 @@ def update_conversation(
 def delete_conversation(
     conv_id: int,
     db: Session = Depends(get_db),
-    current_user: Optional[models.User] = Depends(auth.get_current_user_optional)
+    current_user: models.User = Depends(auth.get_current_user_required)
 ):
-    query = db.query(models.Conversation).filter(models.Conversation.id == conv_id)
-    if current_user:
-        query = query.filter(models.Conversation.user_id == current_user.id)
-    else:
-        query = query.filter(models.Conversation.user_id.is_(None))
+    query = db.query(models.Conversation).filter(
+        models.Conversation.id == conv_id,
+        models.Conversation.user_id == current_user.id
+    )
     conv = query.first()
     if not conv:
         raise HTTPException(status_code=404, detail="Conversation session not found.")
@@ -774,7 +760,7 @@ def chat_endpoint(
     req: ChatRequest,
     request: Request,
     db: Session = Depends(get_db),
-    current_user: Optional[models.User] = Depends(auth.get_current_user_optional)
+    current_user: models.User = Depends(auth.get_current_user_required)
 ):
     # 1. Rate Limiting Check
     security.limiter.check_rate_limit(request, category="ai_chat", max_requests=30, window_seconds=60)
@@ -802,16 +788,13 @@ def chat_endpoint(
             "citations": []
         }
 
-    user_id = current_user.id if current_user else None
+    user_id = current_user.id
 
     # 5. Resolve Active Conversation Session
     conv = None
     if req.conversation_id:
         conv_query = db.query(models.Conversation).filter(models.Conversation.id == req.conversation_id)
-        if user_id:
-            conv_query = conv_query.filter(models.Conversation.user_id == user_id)
-        else:
-            conv_query = conv_query.filter(models.Conversation.user_id.is_(None))
+        conv_query = conv_query.filter(models.Conversation.user_id == user_id)
         conv = conv_query.first()
 
     if not conv:
@@ -824,17 +807,8 @@ def chat_endpoint(
         conv.title = clean_message[:35] + ("..." if len(clean_message) > 35 else "")
 
     # 6. Check if user has source corpus and retrieve relevant chunks
-    # For authenticated users: their own private sources + global/system sources (user_id IS NULL)
-    # For anonymous requests: strictly NO private sources (never query when user_id is None unless public-only)
-    if user_id:
-        sources_query = db.query(models.Source).filter(
-            (models.Source.user_id == user_id) | (models.Source.user_id.is_(None))
-        )
-        has_sources = sources_query.count() > 0
-    else:
-        # Anonymous users: never access any user-owned source. Only explicitly unowned public docs if any.
-        sources_query = db.query(models.Source).filter(models.Source.user_id.is_(None))
-        has_sources = sources_query.count() > 0
+    sources_query = db.query(models.Source).filter(models.Source.user_id == user_id)
+    has_sources = sources_query.count() > 0
 
     citations_list = []
     sources_context_block = ""
@@ -935,14 +909,14 @@ def chat_with_ai_stream(
     req: ChatRequest,
     request: Request,
     db: Session = Depends(get_db),
-    current_user: Optional[models.User] = Depends(auth.get_current_user_optional)
+    current_user: models.User = Depends(auth.get_current_user_required)
 ):
     """
     Streaming SSE endpoint for real-time typewriter AI tutoring responses.
     Yields data chunks via Server-Sent Events (SSE).
     """
     security.limiter.check_rate_limit(request, category="chat", max_requests=20, window_seconds=60)
-    user_id = current_user.id if current_user else None
+    user_id = current_user.id
 
     # Guardrails check
     clean_message = security.InputSanitizer.sanitize_text(req.message, max_length=3000)
@@ -962,10 +936,7 @@ def chat_with_ai_stream(
     conv = None
     if req.conversation_id:
         conv_query = db.query(models.Conversation).filter(models.Conversation.id == req.conversation_id)
-        if user_id:
-            conv_query = conv_query.filter(models.Conversation.user_id == user_id)
-        else:
-            conv_query = conv_query.filter(models.Conversation.user_id.is_(None))
+        conv_query = conv_query.filter(models.Conversation.user_id == user_id)
         conv = conv_query.first()
     if not conv:
         auto_title = clean_message[:35] + ("..." if len(clean_message) > 35 else "")
@@ -977,13 +948,7 @@ def chat_with_ai_stream(
     conv_id = conv.id
 
     # Check RAG sources
-    # Anonymous users cannot access any private tenant sources
-    if user_id:
-        sources_query = db.query(models.Source).filter(
-            (models.Source.user_id == user_id) | (models.Source.user_id.is_(None))
-        )
-    else:
-        sources_query = db.query(models.Source).filter(models.Source.user_id.is_(None))
+    sources_query = db.query(models.Source).filter(models.Source.user_id == user_id)
     has_sources = sources_query.count() > 0
 
     sources_context_block = ""
@@ -1036,7 +1001,7 @@ def chat_with_ai_stream(
             f"{sources_context_block}\nStudent Question: {clean_message}"
         )
     else:
-        prompt = ai_service.AIService.generate_hybrid_response(
+        prompt = ai_service.AIService.build_hybrid_prompt(
             clean_message,
             recent_turns=chat_history_buffer,
             long_term_summary=conv.long_term_summary
@@ -1094,22 +1059,17 @@ def chat_with_ai_stream(
 def get_chat_history(
     conversation_id: Optional[int] = None,
     db: Session = Depends(get_db),
-    current_user: Optional[models.User] = Depends(auth.get_current_user_optional)
+    current_user: models.User = Depends(auth.get_current_user_required)
 ):
-    query = db.query(models.ChatHistory)
-    if current_user:
-        query = query.filter(models.ChatHistory.user_id == current_user.id)
-    else:
-        query = query.filter(models.ChatHistory.user_id.is_(None))
+    query = db.query(models.ChatHistory).filter(
+        models.ChatHistory.user_id == current_user.id
+    )
 
     if conversation_id:
         query = query.filter(models.ChatHistory.conversation_id == conversation_id)
     else:
         latest_conv = db.query(models.Conversation)
-        if current_user:
-            latest_conv = latest_conv.filter(models.Conversation.user_id == current_user.id)
-        else:
-            latest_conv = latest_conv.filter(models.Conversation.user_id.is_(None))
+        latest_conv = latest_conv.filter(models.Conversation.user_id == current_user.id)
         latest = latest_conv.order_by(models.Conversation.updated_at.desc()).first()
         if latest:
             query = query.filter(models.ChatHistory.conversation_id == latest.id)
@@ -1136,21 +1096,16 @@ def get_chat_history(
 def clear_chat_history(
     conversation_id: Optional[int] = None,
     db: Session = Depends(get_db),
-    current_user: Optional[models.User] = Depends(auth.get_current_user_optional)
+    current_user: models.User = Depends(auth.get_current_user_required)
 ):
-    query = db.query(models.ChatHistory)
-    if current_user:
-        query = query.filter(models.ChatHistory.user_id == current_user.id)
-    else:
-        query = query.filter(models.ChatHistory.user_id.is_(None))
+    query = db.query(models.ChatHistory).filter(
+        models.ChatHistory.user_id == current_user.id
+    )
 
     if conversation_id:
         query = query.filter(models.ChatHistory.conversation_id == conversation_id)
         conv_q = db.query(models.Conversation).filter(models.Conversation.id == conversation_id)
-        if current_user:
-            conv_q = conv_q.filter(models.Conversation.user_id == current_user.id)
-        else:
-            conv_q = conv_q.filter(models.Conversation.user_id.is_(None))
+        conv_q = conv_q.filter(models.Conversation.user_id == current_user.id)
         conv = conv_q.first()
         if conv:
             conv.long_term_summary = None
@@ -1165,13 +1120,11 @@ def clear_chat_history(
 @app.get("/api/sessions/history", response_model=List[SessionHistoryItem], tags=["Analytics"])
 def get_session_history(
     db: Session = Depends(get_db),
-    current_user: Optional[models.User] = Depends(auth.get_current_user_optional)
+    current_user: models.User = Depends(auth.get_current_user_required)
 ):
-    query = db.query(models.StudySession)
-    if current_user:
-        query = query.filter(models.StudySession.user_id == current_user.id)
-    else:
-        query = query.filter(models.StudySession.user_id.is_(None))
+    query = db.query(models.StudySession).filter(
+        models.StudySession.user_id == current_user.id
+    )
 
     sessions = query.order_by(models.StudySession.id.desc()).limit(20).all()
     return [
@@ -1273,12 +1226,11 @@ def track_activity(
     req: ActivityRequest,
     request: Request,
     db: Session = Depends(get_db),
-    current_user: Optional[models.User] = Depends(auth.get_current_user_optional)
+    current_user: models.User = Depends(auth.get_current_user_required)
 ):
     security.limiter.check_rate_limit(request, category="activity", max_requests=60, window_seconds=60)
-    user_id = current_user.id if current_user else None
     session = models.StudySession(
-        user_id=user_id,
+        user_id=current_user.id,
         activity_type=req.activity_type,
         duration_seconds=req.duration_seconds
     )
@@ -1289,15 +1241,12 @@ def track_activity(
 @app.get("/api/progress", tags=["Analytics"])
 def get_progress(
     db: Session = Depends(get_db),
-    current_user: Optional[models.User] = Depends(auth.get_current_user_optional)
+    current_user: models.User = Depends(auth.get_current_user_required)
 ):
     try:
-        user_id = current_user.id if current_user else None
-        query = db.query(models.StudySession)
-        if user_id:
-            query = query.filter(models.StudySession.user_id == user_id)
-        else:
-            query = query.filter(models.StudySession.user_id.is_(None))
+        query = db.query(models.StudySession).filter(
+            models.StudySession.user_id == current_user.id
+        )
 
         timer_query = query.filter(models.StudySession.activity_type == "timer_focus")
         total_seconds = timer_query.with_entities(func.sum(models.StudySession.duration_seconds)).scalar() or 0
@@ -1322,13 +1271,11 @@ def get_progress(
 @app.delete("/api/progress", tags=["Analytics"])
 def reset_progress(
     db: Session = Depends(get_db),
-    current_user: Optional[models.User] = Depends(auth.get_current_user_optional)
+    current_user: models.User = Depends(auth.get_current_user_required)
 ):
-    query = db.query(models.StudySession)
-    if current_user:
-        query = query.filter(models.StudySession.user_id == current_user.id)
-    else:
-        query = query.filter(models.StudySession.user_id.is_(None))
+    query = db.query(models.StudySession).filter(
+        models.StudySession.user_id == current_user.id
+    )
     query.delete(synchronize_session=False)
     db.commit()
     return {"status": "reset"}
@@ -1336,7 +1283,7 @@ def reset_progress(
 @app.get("/api/analytics/activity-heatmap", tags=["Analytics"])
 def get_activity_heatmap(
     db: Session = Depends(get_db),
-    current_user: Optional[models.User] = Depends(auth.get_current_user_optional)
+    current_user: models.User = Depends(auth.get_current_user_required)
 ):
     """
     Returns authentic, database-aggregated daily study activity for the past 16 weeks (112 days).
@@ -1344,16 +1291,13 @@ def get_activity_heatmap(
     """
     from datetime import datetime, timedelta, timezone
     
-    user_id = current_user.id if current_user else None
+    user_id = current_user.id
     now = datetime.now(timezone.utc)
     # Calculate starting date: 16 weeks (112 days) ago
     start_date = (now - timedelta(days=111)).replace(hour=0, minute=0, second=0, microsecond=0)
 
     query = db.query(models.StudySession).filter(models.StudySession.created_at >= start_date)
-    if user_id:
-        query = query.filter(models.StudySession.user_id == user_id)
-    else:
-        query = query.filter(models.StudySession.user_id.is_(None))
+    query = query.filter(models.StudySession.user_id == user_id)
 
     sessions = query.all()
 
@@ -1423,10 +1367,17 @@ def get_analytics_dashboard(
 # MODEL CONTEXT PROTOCOL (MCP) & CANVAS SUITE ENDPOINTS
 # ============================================================================
 @app.post("/api/mcp", tags=["Model Context Protocol"])
-async def mcp_jsonrpc_endpoint(req: MCPRpcRequest, request: Request):
+async def mcp_jsonrpc_endpoint(
+    req: MCPRpcRequest,
+    request: Request,
+    current_user: Optional[models.User] = Depends(auth.get_current_user_optional)
+):
     security.limiter.check_rate_limit(request, category="mcp", max_requests=120, window_seconds=60)
     payload = req.model_dump()
-    response = mcp_service.MCPService.handle_jsonrpc(payload)
+    response = mcp_service.MCPService.handle_jsonrpc(
+        payload,
+        user_id=current_user.id if current_user else None
+    )
     return response
 
 @app.get("/api/mcp/tools", tags=["Model Context Protocol"])
@@ -1439,11 +1390,19 @@ def list_mcp_tools(request: Request):
     }
 
 @app.post("/api/mcp/tools/call", tags=["Model Context Protocol"])
-def execute_mcp_tool_direct(req: MCPToolCallRequest, request: Request):
+def execute_mcp_tool_direct(
+    req: MCPToolCallRequest,
+    request: Request,
+    current_user: Optional[models.User] = Depends(auth.get_current_user_optional)
+):
     security.limiter.check_rate_limit(request, category="mcp", max_requests=60, window_seconds=60)
     try:
         start_t = time.time()
-        result = mcp_service.MCPService.execute_tool(req.name, req.arguments or {})
+        result = mcp_service.MCPService.execute_tool(
+            req.name,
+            req.arguments or {},
+            user_id=current_user.id if current_user else None
+        )
         elapsed = round((time.time() - start_t) * 1000, 2)
         return {
             "status": "success",
@@ -1451,6 +1410,8 @@ def execute_mcp_tool_direct(req: MCPToolCallRequest, request: Request):
             "execution_time_ms": elapsed,
             "data": result
         }
+    except PermissionError as pe:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(pe))
     except ValueError as ve:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(ve))
     except Exception as e:
@@ -1477,14 +1438,14 @@ def generate_canvas_graph(
     )
     elapsed = round((time.time() - start_t) * 1000, 2)
 
-    user_id = current_user.id if current_user else None
-    study_session = models.StudySession(
-        user_id=user_id,
-        activity_type="canvas_diagram",
-        duration_seconds=30
-    )
-    db.add(study_session)
-    db.commit()
+    if current_user:
+        study_session = models.StudySession(
+            user_id=current_user.id,
+            activity_type="canvas_diagram",
+            duration_seconds=30
+        )
+        db.add(study_session)
+        db.commit()
 
     return {
         "status": "success",
@@ -1537,14 +1498,11 @@ def list_library_materials(
     material_type: Optional[str] = None,
     search: Optional[str] = None,
     db: Session = Depends(get_db),
-    current_user: Optional[models.User] = Depends(auth.get_current_user_optional)
+    current_user: models.User = Depends(auth.get_current_user_required)
 ):
-    user_id = current_user.id if current_user else None
-    query = db.query(models.SavedStudyMaterial)
-    if user_id:
-        query = query.filter((models.SavedStudyMaterial.user_id == user_id) | (models.SavedStudyMaterial.user_id.is_(None)))
-    else:
-        query = query.filter(models.SavedStudyMaterial.user_id.is_(None))
+    query = db.query(models.SavedStudyMaterial).filter(
+        models.SavedStudyMaterial.user_id == current_user.id
+    )
 
     if material_type:
         query = query.filter(models.SavedStudyMaterial.material_type == material_type)
@@ -1572,11 +1530,10 @@ def list_library_materials(
 def save_material_to_library(
     req: SavedMaterialCreateRequest,
     db: Session = Depends(get_db),
-    current_user: Optional[models.User] = Depends(auth.get_current_user_optional)
+    current_user: models.User = Depends(auth.get_current_user_required)
 ):
-    user_id = current_user.id if current_user else None
     material = models.SavedStudyMaterial(
-        user_id=user_id,
+        user_id=current_user.id,
         material_type=req.material_type,
         title=req.title,
         topic=req.topic or req.title,
@@ -1596,13 +1553,12 @@ def save_material_to_library(
 def get_library_material(
     item_id: int,
     db: Session = Depends(get_db),
-    current_user: Optional[models.User] = Depends(auth.get_current_user_optional)
+    current_user: models.User = Depends(auth.get_current_user_required)
 ):
-    query = db.query(models.SavedStudyMaterial).filter(models.SavedStudyMaterial.id == item_id)
-    if current_user:
-        query = query.filter((models.SavedStudyMaterial.user_id == current_user.id) | (models.SavedStudyMaterial.user_id.is_(None)))
-    else:
-        query = query.filter(models.SavedStudyMaterial.user_id.is_(None))
+    query = db.query(models.SavedStudyMaterial).filter(
+        models.SavedStudyMaterial.id == item_id,
+        models.SavedStudyMaterial.user_id == current_user.id
+    )
 
     item = query.first()
     if not item:
@@ -1623,13 +1579,12 @@ def get_library_material(
 def delete_library_material(
     item_id: int,
     db: Session = Depends(get_db),
-    current_user: Optional[models.User] = Depends(auth.get_current_user_optional)
+    current_user: models.User = Depends(auth.get_current_user_required)
 ):
-    query = db.query(models.SavedStudyMaterial).filter(models.SavedStudyMaterial.id == item_id)
-    if current_user:
-        query = query.filter(models.SavedStudyMaterial.user_id == current_user.id)
-    else:
-        query = query.filter(models.SavedStudyMaterial.user_id.is_(None))
+    query = db.query(models.SavedStudyMaterial).filter(
+        models.SavedStudyMaterial.id == item_id,
+        models.SavedStudyMaterial.user_id == current_user.id
+    )
 
     item = query.first()
     if not item:
@@ -1642,13 +1597,12 @@ def delete_library_material(
 def toggle_library_favorite(
     item_id: int,
     db: Session = Depends(get_db),
-    current_user: Optional[models.User] = Depends(auth.get_current_user_optional)
+    current_user: models.User = Depends(auth.get_current_user_required)
 ):
-    query = db.query(models.SavedStudyMaterial).filter(models.SavedStudyMaterial.id == item_id)
-    if current_user:
-        query = query.filter(models.SavedStudyMaterial.user_id == current_user.id)
-    else:
-        query = query.filter(models.SavedStudyMaterial.user_id.is_(None))
+    query = db.query(models.SavedStudyMaterial).filter(
+        models.SavedStudyMaterial.id == item_id,
+        models.SavedStudyMaterial.user_id == current_user.id
+    )
 
     item = query.first()
     if not item:

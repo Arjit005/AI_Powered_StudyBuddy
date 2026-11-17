@@ -31,6 +31,10 @@ except ImportError:
 
 class RAGService:
     @staticmethod
+    def _pinecone_api_key() -> Optional[str]:
+        return os.getenv("PINECONE_API") or os.getenv("PINECONE_API_KEY")
+
+    @staticmethod
     def extract_text_from_bytes(file_bytes: bytes, filename: str, source_type: str) -> str:
         """
         Extracts raw text from PDF bytes or plain text/markdown bytes.
@@ -409,7 +413,7 @@ class RAGService:
             vectors=vectors_to_upsert,
             namespace=f"user_{source.user_id}" if source.user_id else "global"
         )
-        if not upsert_ok and os.getenv("PINECONE_API"):
+        if not upsert_ok and RAGService._pinecone_api_key():
             db.rollback()
             raise RuntimeError("Failed to index vector embeddings in Pinecone. Rolled back database transaction.")
 
@@ -454,14 +458,14 @@ class RAGService:
         Upserts vector embeddings into the remote Pinecone serverless index.
         Returns True on success, or False if Pinecone operations failed.
         """
-        pinecone_api_key = os.getenv("PINECONE_API")
+        pinecone_api_key = RAGService._pinecone_api_key()
         if not pinecone_api_key or not vectors:
             return True
 
         try:
             from pinecone import Pinecone
             pc = Pinecone(api_key=pinecone_api_key)
-            index = pc.Index("study-buddy-kb")
+            index = pc.Index(os.getenv("PINECONE_INDEX_NAME", "study-buddy-kb"))
             # Batch upsert in chunks of 50
             batch_size = 50
             for i in range(0, len(vectors), batch_size):
@@ -479,14 +483,14 @@ class RAGService:
         Deletes vector IDs from the Pinecone serverless index to avoid orphaned records.
         Returns True on success, or False if Pinecone operations failed.
         """
-        pinecone_api_key = os.getenv("PINECONE_API")
+        pinecone_api_key = RAGService._pinecone_api_key()
         if not pinecone_api_key or not vector_ids:
             return True
 
         try:
             from pinecone import Pinecone
             pc = Pinecone(api_key=pinecone_api_key)
-            index = pc.Index("study-buddy-kb")
+            index = pc.Index(os.getenv("PINECONE_INDEX_NAME", "study-buddy-kb"))
             index.delete(ids=vector_ids, namespace=namespace)
             print(f"Pinecone: Deleted {len(vector_ids)} vectors from namespace '{namespace}'.")
             return True
@@ -515,14 +519,14 @@ class RAGService:
         """
         Queries Pinecone serverless index using genuine neural embedding vector with optional metadata filtering.
         """
-        pinecone_api_key = os.getenv("PINECONE_API")
+        pinecone_api_key = RAGService._pinecone_api_key()
         if not pinecone_api_key or not query_vec:
             return []
 
         try:
             from pinecone import Pinecone
             pc = Pinecone(api_key=pinecone_api_key)
-            index = pc.Index("study-buddy-kb")
+            index = pc.Index(os.getenv("PINECONE_INDEX_NAME", "study-buddy-kb"))
 
             filter_dict = None
             if source_ids:
@@ -578,7 +582,10 @@ class RAGService:
         Retrieves top_k relevant source chunks using genuine neural embedding vector search
         in Pinecone with fallback to relational database cosine similarity + keyword overlap.
         """
-        namespace = f"user_{user_id}" if user_id else "global"
+        if user_id is None:
+            return []
+
+        namespace = f"user_{user_id}"
 
         # 1. Generate neural query embedding
         query_emb_1536 = None
@@ -589,7 +596,7 @@ class RAGService:
 
         # 2. Try Pinecone Vector Retrieval first (queries user + global shared corpus)
         if query_emb_1536:
-            namespaces_to_query = [f"user_{user_id}", "global"] if user_id else ["global"]
+            namespaces_to_query = [namespace]
             all_matches = []
             for ns in namespaces_to_query:
                 matches = RAGService._query_pinecone(
@@ -621,10 +628,7 @@ class RAGService:
                             SourceChunk.source_id == int(src_id),
                             SourceChunk.chunk_index == int(c_idx)
                         )
-                        if user_id:
-                            chunk_q = chunk_q.filter((Source.user_id == user_id) | (Source.user_id.is_(None)))
-                        else:
-                            chunk_q = chunk_q.filter(Source.user_id.is_(None))
+                        chunk_q = chunk_q.filter(Source.user_id == user_id)
                         if source_ids:
                             chunk_q = chunk_q.filter(SourceChunk.source_id.in_(source_ids))
                         chunk = chunk_q.first()
@@ -644,10 +648,7 @@ class RAGService:
         )
 
         chunk_query = db.query(SourceChunk).join(Source, SourceChunk.source_id == Source.id)
-        if user_id:
-            chunk_query = chunk_query.filter((Source.user_id == user_id) | (Source.user_id.is_(None)))
-        else:
-            chunk_query = chunk_query.filter(Source.user_id.is_(None))
+        chunk_query = chunk_query.filter(Source.user_id == user_id)
         if source_ids:
             chunk_query = chunk_query.filter(SourceChunk.source_id.in_(source_ids))
 

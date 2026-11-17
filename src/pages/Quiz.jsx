@@ -144,7 +144,7 @@ const Quiz = () => {
             const score = calculateScore();
             await apiRequest('/api/library', {
                 method: 'POST',
-                auth: 'optional',
+                auth: 'required',
                 responseType: 'none',
                 json: {
                     material_type: 'quiz',

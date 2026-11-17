@@ -2,6 +2,7 @@ import base64
 from datetime import timedelta
 
 import pytest
+from unittest.mock import patch
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -9,8 +10,9 @@ from sqlalchemy.pool import StaticPool
 
 from backend import database
 from backend.auth import create_access_token
+from backend.ai_service import AIService
 from backend.main import app
-from backend.models import Base, StudySession, User
+from backend.models import Base, ChatHistory, Conversation, SavedStudyMaterial, Source, StudySession, User
 
 
 @pytest.fixture
@@ -185,7 +187,7 @@ def test_authenticated_analytics_are_isolated_and_anonymous_records_excluded(
     assert manipulated_identity_chart == chart_a_after_own_activity
 
 
-def test_anonymous_session_history_remains_scoped_to_anonymous_records(isolated_client):
+def test_anonymous_session_history_requires_authentication(isolated_client):
     client, session_factory = isolated_client
     with session_factory() as db:
         user = _create_user(db, "history_private_user")
@@ -209,11 +211,108 @@ def test_anonymous_session_history_remains_scoped_to_anonymous_records(isolated_
         anonymous_session_id = anonymous_session.id
 
     response = client.get("/api/sessions/history")
+    assert response.status_code == 401
+
+    response = client.get(
+        "/api/sessions/history",
+        headers=_auth_headers(user),
+    )
 
     assert response.status_code == 200
     history = response.json()
     assert len(history) == 1
-    assert history[0]["id"] == anonymous_session_id
-    assert history[0]["activity_type"] == "anonymous_history_activity"
-    assert history[0]["duration_seconds"] == 90
+    assert history[0]["id"] != anonymous_session_id
+    assert history[0]["activity_type"] == "private_history_activity"
+    assert history[0]["duration_seconds"] == 180
     assert isinstance(history[0]["created_at"], str)
+
+
+@pytest.mark.parametrize(
+    ("method", "path", "payload"),
+    [
+        ("GET", "/api/sources", None),
+        ("GET", "/api/conversations", None),
+        ("POST", "/api/conversations", {"title": "Private session"}),
+        ("POST", "/api/chat", {"message": "Explain recursion"}),
+        ("POST", "/api/chat/stream", {"message": "Explain recursion"}),
+        ("GET", "/api/chat", None),
+        ("GET", "/api/sessions/history", None),
+        ("GET", "/api/progress", None),
+        ("GET", "/api/analytics/activity-heatmap", None),
+        ("GET", "/api/library", None),
+        (
+            "POST",
+            "/api/library",
+            {
+                "material_type": "note",
+                "title": "Private note",
+                "content_json": "{}",
+            },
+        ),
+        (
+            "POST",
+            "/api/track-activity",
+            {"activity_type": "timer_focus", "duration_seconds": 60},
+        ),
+    ],
+)
+def test_private_data_endpoints_reject_anonymous_requests(
+    isolated_client, method, path, payload
+):
+    client, _ = isolated_client
+
+    response = client.request(method, path, json=payload)
+
+    assert response.status_code == 401
+
+
+def test_authenticated_data_views_exclude_legacy_anonymous_records(isolated_client):
+    client, session_factory = isolated_client
+    with session_factory() as db:
+        user = _create_user(db, "owned_data_user")
+        db.add_all(
+            [
+                Source(title="Legacy guest source", raw_text="Guest-only text"),
+                Conversation(title="Legacy guest conversation"),
+                SavedStudyMaterial(
+                    material_type="note",
+                    title="Legacy guest note",
+                    content_json="{}",
+                ),
+            ]
+        )
+        db.commit()
+
+    headers = _auth_headers(user)
+    assert client.get("/api/sources", headers=headers).json() == []
+    assert client.get("/api/conversations", headers=headers).json() == []
+    assert client.get("/api/library", headers=headers).json() == []
+    assert client.get("/api/chat", headers=headers).json() == []
+
+
+def test_stream_chat_builds_prompt_without_running_non_streaming_generation(
+    isolated_client,
+):
+    client, session_factory = isolated_client
+    with session_factory() as db:
+        user = _create_user(db, "streaming_user")
+
+    with patch.object(
+        AIService, "build_hybrid_prompt", return_value="prepared tutor prompt"
+    ) as build_prompt, patch.object(
+        AIService,
+        "generate_hybrid_response",
+        side_effect=AssertionError("non-streaming generation must not run"),
+    ) as generate_response, patch.object(
+        AIService, "_generate_content_stream", return_value=iter([])
+    ) as stream:
+        response = client.post(
+            "/api/chat/stream",
+            json={"message": "Explain recursion"},
+            headers=_auth_headers(user),
+        )
+
+    assert response.status_code == 200
+    build_prompt.assert_called_once()
+    stream.assert_called_once_with("prepared tutor prompt")
+    generate_response.assert_not_called()

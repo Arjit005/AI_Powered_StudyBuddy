@@ -1,5 +1,10 @@
 import pytest
+from fastapi.testclient import TestClient
+from backend.main import app
 from backend.mcp_service import MCPService
+
+
+client = TestClient(app)
 
 
 def test_mcp_invalid_jsonrpc_version():
@@ -33,6 +38,20 @@ def test_mcp_notification_handling():
 def test_mcp_create_flashcards_empty_topic():
     with pytest.raises(ValueError, match="topic' is required and cannot be empty"):
         MCPService.execute_tool("create_study_flashcards", {"topic": "   "})
+
+
+def test_mcp_study_memory_requires_an_authenticated_user():
+    with pytest.raises(PermissionError, match="Authentication is required"):
+        MCPService.execute_tool("query_study_memory", {})
+
+
+def test_mcp_http_study_memory_requires_authentication():
+    response = client.post(
+        "/api/mcp/tools/call",
+        json={"name": "query_study_memory", "arguments": {}},
+    )
+
+    assert response.status_code == 401
 
 
 def test_mcp_canvas_diagram_coordinate_and_edge_validation():

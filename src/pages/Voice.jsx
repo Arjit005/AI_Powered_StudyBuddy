@@ -166,7 +166,7 @@ const Voice = () => {
         try {
             const data = await apiRequest('/api/chat', {
                 method: 'POST',
-                auth: 'optional',
+                auth: 'required',
                 signal: abortCtrl.signal,
                 json: { message: transcript },
             });

@@ -160,6 +160,8 @@ class MCPService:
             return cls._export_notes_to_canvas(content, layout)
 
         elif name == "query_study_memory":
+            if user_id is None:
+                raise PermissionError("Authentication is required to query private study memory.")
             cid = arguments.get("conversation_id")
             if cid is not None and (not isinstance(cid, int) or isinstance(cid, bool) or cid < 1):
                 cid = None
@@ -654,16 +656,16 @@ class MCPService:
     @classmethod
     def _query_study_memory(cls, conversation_id: Optional[int] = None, limit: int = 5, user_id: Optional[int] = None) -> Dict[str, Any]:
         """
-        Exposes SQLite hybrid memory via MCP protocol scoped to authenticated or global tenant.
+        Exposes hybrid memory via MCP protocol scoped to the authenticated user.
         """
+        if user_id is None:
+            raise PermissionError("Authentication is required to query private study memory.")
+
         db = SessionLocal()
         try:
             if conversation_id:
                 conv_q = db.query(Conversation).filter(Conversation.id == conversation_id)
-                if user_id is not None:
-                    conv_q = conv_q.filter(Conversation.user_id == user_id)
-                else:
-                    conv_q = conv_q.filter(Conversation.user_id.is_(None))
+                conv_q = conv_q.filter(Conversation.user_id == user_id)
                 conv = conv_q.first()
                 if not conv:
                     return {"status": "not_found", "message": f"Conversation {conversation_id} not found or unauthorized"}
@@ -679,10 +681,7 @@ class MCPService:
                 }
             else:
                 convs_q = db.query(Conversation)
-                if user_id is not None:
-                    convs_q = convs_q.filter(Conversation.user_id == user_id)
-                else:
-                    convs_q = convs_q.filter(Conversation.user_id.is_(None))
+                convs_q = convs_q.filter(Conversation.user_id == user_id)
                 convs = convs_q.order_by(Conversation.updated_at.desc()).limit(limit).all()
                 return {
                     "active_conversations": [

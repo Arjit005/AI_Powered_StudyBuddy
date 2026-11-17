@@ -16,8 +16,14 @@ services:
         value: "true"
       - key: GEMINI_API_KEY
         sync: false
-      - key: JWT_SECRET
+      - key: JWT_SECRET_KEY
         generateValue: true
+      - key: DATABASE_URL
+        sync: false
+      - key: PINECONE_API
+        sync: false
+      - key: PINECONE_INDEX_NAME
+        value: "study-buddy-kb"
       - key: CORS_ORIGINS
         value: "https://ai-study-buddy-frontend.onrender.com"
 

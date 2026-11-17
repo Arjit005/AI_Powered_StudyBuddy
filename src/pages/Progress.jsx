@@ -22,10 +22,10 @@ const Progress = () => {
         const thisGen = ++progressRequestGenRef.current;
         try {
             const [progResult, heatResult, dashResult, sessResult] = await Promise.allSettled([
-                apiRequest('/api/progress', { auth: 'optional' }),
-                apiRequest('/api/analytics/activity-heatmap', { auth: 'optional' }),
+                apiRequest('/api/progress', { auth: 'required' }),
+                apiRequest('/api/analytics/activity-heatmap', { auth: 'required' }),
                 apiRequest('/api/analytics/dashboard', { auth: 'required' }),
-                apiRequest('/api/sessions/history', { auth: 'optional' })
+                apiRequest('/api/sessions/history', { auth: 'required' })
             ]);
 
             if (thisGen !== progressRequestGenRef.current || resetInProgressRef.current) return;
@@ -118,7 +118,7 @@ const Progress = () => {
         try {
             await apiRequest('/api/progress', {
                 method: 'DELETE',
-                auth: 'optional',
+                auth: 'required',
                 responseType: 'none',
             });
             if (thisResetGen !== progressRequestGenRef.current) return;

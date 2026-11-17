@@ -204,10 +204,10 @@ Create a `.env` file in the project root or configure these variables in your cl
 | :--- | :---: | :--- | :--- |
 | `GEMINI_API_KEY` | Optional | Google Gemini Pro / Flash API key for primary AI reasoning | `AIzaSy...` |
 | `HUGGINGFACE_API_KEY` | Optional | Hugging Face token for secondary LLM failover | `hf_...` |
-| `PINECONE_API_KEY` | Optional | Pinecone key for fast dense vector RAG retrieval | `pcsk_...` |
-| `PINECONE_INDEX_NAME` | Optional | Name of Pinecone vector index (1536/768 dim) | `study-buddy-rag` |
-| `DATABASE_URL` | Optional | PostgreSQL connection string (defaults to local SQLite) | `postgresql://user:pass@ep-xyz.neon.tech/neondb` |
-| `SECRET_KEY` | Recommended | Cryptographic salt for JWT session tokens | `super-secret-hex-key-here` |
+| `PINECONE_API` | Optional | Pinecone key for fast dense vector RAG retrieval (`PINECONE_API_KEY` is also accepted) | `pcsk_...` |
+| `PINECONE_INDEX_NAME` | Optional | Pinecone vector index name (defaults to `study-buddy-kb`) | `study-buddy-kb` |
+| `DATABASE_URL` | Required in production; optional locally | PostgreSQL connection string (local development defaults to SQLite) | `postgresql://user:pass@ep-xyz.neon.tech/neondb` |
+| `JWT_SECRET_KEY` | Required outside development | Secret used to sign application JWT session tokens | Generate a long random value |
 | `CORS_ORIGINS` | Optional | Comma-separated list of allowed web origins | `https://my-domain.com,http://localhost:5173` |
 
 ---
@@ -250,18 +250,17 @@ npm run dev
 
 ---
 
-## ☁️ Cloud Deployment (Render Unified Full-Stack)
+## ☁️ Cloud Deployment (Render Blueprint)
 
-AI Study Buddy is configured for seamless single-service full-stack deployment on [Render](https://render.com).
+The [Render blueprint](render.yaml) deploys a Python backend and a separate static frontend on [Render](https://render.com).
 
 1. Push your repository to GitHub.
-2. In Render, create a new **Web Service** pointing to your repository.
-3. Configure settings:
-   - **Environment**: `Python`
-   - **Build Command**: `pip install -r backend/requirements.txt`
-   - **Start Command**: `uvicorn backend.main:app --host 0.0.0.0 --port $PORT`
-4. Add environment variables (`GEMINI_API_KEY`, `DATABASE_URL`, `SECRET_KEY`).
-5. **Done!** FastAPI will automatically serve the compiled React SPA from `dist/` at the root domain while handling all `/api/...` endpoints and WebSocket/SSE streams.
+2. In Render, create a Blueprint instance from the repository and review both services.
+3. Set `DATABASE_URL` for the backend to a persistent PostgreSQL database before deploying. The backend refuses to start in production without it.
+4. Render generates `JWT_SECRET_KEY` from the blueprint. Add `GEMINI_API_KEY` and any optional provider keys as needed.
+5. Confirm the frontend URL matches the backend's `CORS_ORIGINS` value.
+
+Private study data (sources, conversations, chat history, library materials, and progress) requires a signed-in account. Stateless AI generation endpoints remain available without signing in.
 
 ---
 
@@ -280,7 +279,7 @@ To connect AI Study Buddy's visual studio and memory tools into Claude Desktop, 
 }
 ```
 
-Now Claude can generate study canvas diagrams, query hybrid memory, search grounded sources, and inspect student notes directly inside your chat sessions.
+The standalone STDIO server supports stateless generation tools. Account-specific `query_study_memory` calls require an authenticated HTTP MCP request with the account's Bearer token; the STDIO server has no account session and cannot read private conversations.
 
 ---
 

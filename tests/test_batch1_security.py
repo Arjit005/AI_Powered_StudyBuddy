@@ -70,15 +70,9 @@ def test_anonymous_chat_does_not_leak_private_sources():
         db.add(private_src)
         db.commit()
 
-        # Send unauthenticated chat request
+        # Anonymous chat is rejected rather than reading shared null-owned records.
         resp = client.post("/api/chat", json={"message": "quantum mechanics"})
-        assert resp.status_code == 200
-        data = resp.json()
-
-        # Citations must be empty for anonymous query against private source
-        citations = data.get("citations", [])
-        for c in citations:
-            assert c["source_id"] != private_src.id
+        assert resp.status_code == 401
     finally:
         db.close()
 
