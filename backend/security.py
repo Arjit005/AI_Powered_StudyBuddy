@@ -19,6 +19,9 @@ logger = logging.getLogger(__name__)
 # ============================================================================
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
+        # Exclude streaming routes from BaseHTTPMiddleware wrapper to prevent chunk buffering
+        if request.url.path in ["/api/chat/stream", "/api/test-sse"]:
+            return await call_next(request)
         response = await call_next(request)
         # Prevent MIME type sniffing
         response.headers["X-Content-Type-Options"] = "nosniff"

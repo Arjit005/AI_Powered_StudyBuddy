@@ -4,6 +4,7 @@ os.environ.setdefault("MPLCONFIGDIR", "/tmp/matplotlib")
 
 import time
 import json
+import asyncio
 from typing import List, Optional, Any
 from fastapi import FastAPI, Depends, HTTPException, Request, status, UploadFile, File, Form, BackgroundTasks
 from fastapi.responses import JSONResponse, StreamingResponse
@@ -58,6 +59,9 @@ app.add_middleware(
 
 @app.middleware("http")
 async def add_process_time_header(request: Request, call_next):
+    # Exclude streaming endpoints to avoid buffering or delaying stream chunks
+    if request.url.path in ["/api/chat/stream", "/api/test-sse"]:
+        return await call_next(request)
     start_time = time.time()
     response = await call_next(request)
     process_time = time.time() - start_time
@@ -1133,8 +1137,28 @@ def chat_endpoint(
         "citations": citations_list
     }
 
+@app.get("/api/test-sse")
+async def test_sse_endpoint():
+    async def sse_gen():
+        for i in range(12):
+            yield f"data: {{\"count\": {i+1}, \"time\": \"{time.time():.4f}\"}}\n\n"
+            await asyncio.sleep(0.15)
+        yield "data: [DONE]\n\n"
+
+    return StreamingResponse(
+        sse_gen(),
+        media_type="text/event-stream",
+        headers={
+            "X-Accel-Buffering": "no",
+            "X-Stream-Debug": "asb-1",
+            "Content-Encoding": "identity",
+            "Cache-Control": "no-cache, no-transform",
+            "Connection": "keep-alive"
+        }
+    )
+
 @app.post("/api/chat/stream", tags=["AI Learning"])
-def chat_with_ai_stream(
+async def chat_with_ai_stream(
     req: ChatRequest,
     request: Request,
     db: Session = Depends(get_db),
@@ -1256,13 +1280,14 @@ def chat_with_ai_stream(
             long_term_summary=conv.long_term_summary
         )
 
-    def event_generator():
+    async def event_generator():
         # First send session metadata with initial phase
         init_payload = {
             "conversation_id": conv_id,
             "phase": "retrieving" if has_sources else "thinking"
         }
         yield f"data: {json.dumps(init_payload)}\n\n"
+        await asyncio.sleep(0)
 
         full_content = []
         stream_succeeded = False
@@ -1271,18 +1296,22 @@ def chat_with_ai_stream(
                 if token:
                     full_content.append(token)
                     yield f"data: {json.dumps({'token': token})}\n\n"
+                    await asyncio.sleep(0)
             stream_succeeded = True
         except Exception as e:
             import logging
             logging.error(f"Streaming token generation error: {e}", exc_info=True)
             yield f"data: {json.dumps({'error': 'AI tutor generation interrupted. Please retry.'})}\n\n"
+            await asyncio.sleep(0)
 
         # Emit citations after LLM generation completes, before [DONE]
         if citations_list:
             yield f"data: {json.dumps({'citations': citations_list})}\n\n"
+            await asyncio.sleep(0)
 
         # Signal completion
         yield "data: [DONE]\n\n"
+        await asyncio.sleep(0)
 
         # Save AI response to DB asynchronously using dedicated session
         if full_content:
