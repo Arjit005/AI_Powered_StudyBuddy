@@ -248,9 +248,11 @@ def run_migrations(target_engine=None):
             command.upgrade(config, "head")
             connection.commit()
 
-        # Ensure all tables defined in Base metadata exist (auto-create new tables like session_artifacts)
-        Base.metadata.create_all(bind=connection)
-        connection.commit()
+        # Development/Test only: If running in test or local dev mode, auto-create missing models
+        env_mode = os.getenv("ENVIRONMENT", "production").lower()
+        if env_mode in ["dev", "development", "test"]:
+            Base.metadata.create_all(bind=connection)
+            connection.commit()
     finally:
         if postgres_lock_acquired:
             if connection.in_transaction():

@@ -515,7 +515,6 @@ class AIService:
                     timeout=15
                 )
                 if response.status_code == 200:
-                    overlap_buffer = ""
                     has_emitted = False
                     for line in response.iter_lines():
                         if not line:
@@ -531,19 +530,11 @@ class AIService:
                             delta = d.get("choices", [{}])[0].get("delta", {}).get("content", "")
                             if delta:
                                 has_emitted = True
-                                combined = overlap_buffer + delta
-                                sanitized = sanitize_output(combined)
-                                if len(sanitized) > 60:
-                                    emit_len = len(sanitized) - 60
-                                    to_yield = sanitized[:emit_len]
-                                    overlap_buffer = sanitized[emit_len:]
-                                    yield to_yield
-                                else:
-                                    overlap_buffer = sanitized
+                                sanitized = sanitize_output(delta)
+                                if sanitized:
+                                    yield sanitized
                         except Exception:
                             continue
-                    if overlap_buffer:
-                        yield sanitize_output(overlap_buffer)
                     if has_emitted:
                         return
             except Exception as e:
@@ -577,22 +568,12 @@ class AIService:
                             stream=True,
                             request_options={"retry": None, "timeout": 10}
                         )
-                        overlap_buffer = ""
                         for chunk in response:
                             if chunk.text:
-                                combined = overlap_buffer + chunk.text
-                                sanitized = sanitize_output(combined)
-                                if len(sanitized) > 20:
-                                    emit_len = len(sanitized) - 20
-                                    to_yield = sanitized[:emit_len]
-                                    overlap_buffer = sanitized[emit_len:]
+                                sanitized = sanitize_output(chunk.text)
+                                if sanitized:
                                     has_yielded = True
-                                    yield to_yield
-                                else:
-                                    has_yielded = True
-                                    overlap_buffer = sanitized
-                        if overlap_buffer:
-                            yield sanitize_output(overlap_buffer)
+                                    yield sanitized
                         circuit_breaker.record_success("gemini")
                         gemini_succeeded = True
                         return

@@ -907,6 +907,18 @@ def put_session_artifact(
             "updated_at": art.updated_at.isoformat() if art.updated_at else None
         }
     else:
+        # For a brand new artifact, client must propose revision 1
+        if req.revision != 1:
+            return JSONResponse(
+                status_code=409,
+                content={
+                    "server_revision": 0,
+                    "server_payload": None,
+                    "server_updated_at": None,
+                    "detail": f"Artifact does not exist yet. Expected revision 1, received {req.revision}."
+                }
+            )
+
         import uuid
         new_art = models.SessionArtifact(
             id=str(uuid.uuid4()),
@@ -1245,9 +1257,10 @@ def chat_with_ai_stream(
         )
 
     def event_generator():
-        # First send session metadata
+        # First send session metadata with initial phase
         init_payload = {
-            "conversation_id": conv_id
+            "conversation_id": conv_id,
+            "phase": "retrieving" if has_sources else "thinking"
         }
         yield f"data: {json.dumps(init_payload)}\n\n"
 
@@ -1298,9 +1311,11 @@ def chat_with_ai_stream(
         event_generator(),
         media_type="text/event-stream",
         headers={
+            "X-Accel-Buffering": "no",
+            "X-Stream-Debug": "asb-1",
+            "Content-Encoding": "identity",
             "Cache-Control": "no-cache, no-transform",
-            "Connection": "keep-alive",
-            "X-Accel-Buffering": "no"
+            "Connection": "keep-alive"
         }
     )
 
