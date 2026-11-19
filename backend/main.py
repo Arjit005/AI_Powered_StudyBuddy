@@ -202,9 +202,9 @@ class FeedbackRequest(BaseModel):
     comment: Optional[str] = Field(None, max_length=1000)
 
 class ArtifactPutRequest(BaseModel):
-    payload: Any
+    payload: Any = Field(...)
     schema_version: int = Field(1, ge=1)
-    revision: int = Field(1, ge=1)
+    revision: int = Field(..., ge=1)
 
 class ArtifactResponse(BaseModel):
     kind: str
@@ -838,7 +838,7 @@ def get_session_artifact(
         models.SessionArtifact.session_id == session_id,
         models.SessionArtifact.user_id == current_user.id,
         models.SessionArtifact.kind == kind
-    ).first()
+    ).with_for_update().first()
 
     if not art:
         raise HTTPException(status_code=404, detail="Artifact not found.")
@@ -883,7 +883,7 @@ def put_session_artifact(
         models.SessionArtifact.session_id == session_id,
         models.SessionArtifact.user_id == current_user.id,
         models.SessionArtifact.kind == kind
-    ).first()
+    ).with_for_update().first()
 
     if art:
         # Optimistic concurrency check: revision must match
@@ -959,7 +959,7 @@ def delete_session_artifact(
         models.SessionArtifact.session_id == session_id,
         models.SessionArtifact.user_id == current_user.id,
         models.SessionArtifact.kind == kind
-    ).first()
+    ).with_for_update().first()
     if art:
         db.delete(art)
         db.commit()
