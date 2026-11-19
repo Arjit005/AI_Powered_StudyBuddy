@@ -215,18 +215,13 @@ const Quiz = () => {
     return (
         <div className="py-12 min-h-screen">
             <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
-                {/* Header */}
-                <div className="text-center mb-10">
-                    <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-amber-500/20 border border-amber-500/30 text-amber-400 mb-3 shadow-[0_0_20px_rgba(245,158,11,0.25)]">
-                        <Zap className="w-7 h-7" />
-                    </div>
-                    <h1 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight mb-2">
-                        Dynamic MCQ Quiz Engine
-                    </h1>
-                    <p className="text-slate-400 text-sm max-w-lg mx-auto">
-                        Evaluate comprehension on any concept with AI-generated questions and instant feedback.
-                    </p>
-                </div>
+                {/* Header with Cloud Memory Indicator */}
+                <PageHeader 
+                    eyebrow="Adaptive Evaluation & Recall"
+                    title="Dynamic MCQ Quiz Engine"
+                    subtitle="Evaluate comprehension on any concept. Quiz questions and selected answers auto-persist in session memory."
+                    syncStatus={artifactStatus}
+                />
 
                 {error && (
                     <div className="max-w-md mx-auto mb-6 p-4 rounded-xl bg-rose-950/50 border border-rose-800/60 text-rose-300 text-xs">

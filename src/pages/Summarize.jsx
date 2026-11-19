@@ -224,11 +224,12 @@ const Summarize = () => {
     return (
         <div className="py-8 sm:py-12 min-h-screen">
             <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
-                {/* Unified PageHeader (FIX-12) */}
+                {/* Unified PageHeader with Cloud Memory status */}
                 <PageHeader 
                     eyebrow="Key Takeaways & Synthesis"
                     title="Smart Topic Summarizer"
-                    subtitle="Condense complex concepts, chapters, and academic topics into structured executive takeaways."
+                    subtitle="Condense complex concepts, chapters, and academic topics into structured executive takeaways. Auto-saved to session memory."
+                    syncStatus={artifactStatus}
                 />
 
                 {error && (

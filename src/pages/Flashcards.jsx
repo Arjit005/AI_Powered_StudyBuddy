@@ -291,18 +291,24 @@ const Flashcards = () => {
     return (
         <div className="py-12 min-h-screen">
             <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-                {/* Header */}
-                <div className="text-center mb-8">
-                    <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 mb-3 shadow-[0_0_20px_rgba(16,185,129,0.25)]">
-                        <BookOpen className="w-7 h-7" />
-                    </div>
-                    <h1 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight mb-2">
-                        Spaced Repetition Flashcards
-                    </h1>
-                    <p className="text-slate-400 text-sm max-w-lg mx-auto">
-                        Practice active recall and track your self-rated mastery.
-                    </p>
-                </div>
+                {/* Header with Cloud Memory Indicator */}
+                <PageHeader 
+                    eyebrow="Active Recall & Leitner SRS"
+                    title="Spaced Repetition Flashcards"
+                    subtitle="Practice active recall. All cards and mastery progress auto-save to this session's memory."
+                    syncStatus={artifactStatus}
+                    actions={
+                        <button
+                            onClick={handleSaveDeck}
+                            disabled={saving || !cards || cards.length === 0}
+                            className="px-3.5 py-2 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 hover:text-emerald-400 text-xs font-mono transition-colors flex items-center gap-1.5 disabled:opacity-50"
+                            title="Save Deck to Personal Library"
+                        >
+                            {saved ? <Check className="w-4 h-4 text-emerald-400" /> : <Save className="w-4 h-4" />}
+                            <span>{saved ? 'Saved' : saving ? 'Saving...' : 'Save Deck'}</span>
+                        </button>
+                    }
+                />
 
                 {/* Generator Bar */}
                 <div className="max-w-xl mx-auto mb-6 flex gap-3">
@@ -325,15 +331,6 @@ const Flashcards = () => {
                             <Sparkles className="w-4 h-4" />
                         )}
                         <span>Generate</span>
-                    </button>
-                    <button
-                        onClick={handleSaveDeck}
-                        disabled={saving || !cards || cards.length === 0}
-                        className="px-3.5 py-3 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 hover:text-emerald-400 text-xs font-mono transition-colors flex items-center gap-1.5 disabled:opacity-50"
-                        title="Save Deck to Personal Library"
-                    >
-                        {saved ? <Check className="w-4 h-4 text-emerald-400" /> : <Save className="w-4 h-4" />}
-                        <span className="hidden sm:inline">{saved ? 'Saved' : saving ? 'Saving...' : 'Save'}</span>
                     </button>
                 </div>
 

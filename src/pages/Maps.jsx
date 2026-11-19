@@ -150,11 +150,12 @@ const Maps = () => {
     return (
         <div className="py-8 min-h-screen">
             <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-                {/* Standardized PageHeader matching /progress */}
+                {/* Standardized PageHeader with Cloud Session Memory indicator */}
                 <PageHeader
                     eyebrow="Visual Learning & Mind Mapping"
                     title="Concept Maps & Diagrams"
-                    subtitle="Generate visual flowcharts, biological structures, and knowledge hierarchies at a glance."
+                    subtitle="Generate visual flowcharts, biological structures, and knowledge hierarchies. Auto-persisted in session memory."
+                    syncStatus={artifactStatus}
                     actions={
                         <div className="flex items-center gap-2">
                             {artifactStatus === 'saving' && (
