@@ -69,7 +69,7 @@ export default function MarkdownRenderer({
                                     <button
                                         key={`cit-${m.index}`}
                                         type="button"
-                                        onClick={() => onSelectCitation && onSelectCitation(cit || { n })}
+                                        onClick={(e) => onSelectCitation && onSelectCitation(cit || { n }, e.currentTarget)}
                                         className="inline-flex items-center justify-center px-1.5 py-0.2 mx-0.5 text-[11px] font-mono font-bold rounded-md bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 hover:scale-105 active:scale-95 transition-all cursor-pointer align-super"
                                         title={cit ? `Source: ${cit.source_title || 'Document'}` : `Source [${n}]`}
                                         aria-label={`Open citation ${n}`}
@@ -184,7 +184,7 @@ export default function MarkdownRenderer({
                         <button
                             key={i}
                             type="button"
-                            onClick={() => onSelectCitation && onSelectCitation(c)}
+                            onClick={(e) => onSelectCitation && onSelectCitation(c, e.currentTarget)}
                             className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-950/40 border border-emerald-500/30 hover:border-emerald-500/60 text-emerald-300 text-xs transition-all hover:bg-emerald-900/40"
                         >
                             <span className="w-4 h-4 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-xs font-bold">
