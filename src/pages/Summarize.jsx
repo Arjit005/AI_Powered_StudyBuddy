@@ -14,12 +14,41 @@ import {
 } from 'lucide-react';
 import PageHeader from '../components/PageHeader';
 import MarkdownRenderer from '../components/MarkdownRenderer';
+import { usePersistentArtifact } from '../hooks/usePersistentArtifact';
 
 const Summarize = () => {
+    const activeSessionId = (() => {
+        try {
+            return localStorage.getItem('asb_active_session_id') || 'default_session';
+        } catch {
+            return 'default_session';
+        }
+    })();
+
+    const { data: savedSummary, setData: setSavedSummary, status: artifactStatus, isHydrated } = usePersistentArtifact({
+        sessionId: activeSessionId,
+        kind: 'summary',
+        initial: null
+    });
+
     const [topic, setTopic] = useState('');
     const [summaryTopic, setSummaryTopic] = useState('');
     const [summary, setSummary] = useState('');
     const [isLoading, setIsLoading] = useState(false);
+
+    // Restore previous summary on mount without re-running generation
+    useEffect(() => {
+        if (isHydrated && savedSummary && !summary) {
+            if (savedSummary.topic) {
+                setTopic(savedSummary.topic);
+                setSummaryTopic(savedSummary.topic);
+            }
+            if (savedSummary.summary) {
+                setSummary(savedSummary.summary);
+                currentSummaryRef.current = savedSummary.summary;
+            }
+        }
+    }, [isHydrated, savedSummary]);
     const [copied, setCopied] = useState(false);
     const [saved, setSaved] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
@@ -64,6 +93,13 @@ const Summarize = () => {
                 setSummary(data.summary);
                 setSummaryTopic(topic.trim());
                 currentSummaryRef.current = data.summary;
+
+                // Save persistent artifact
+                setSavedSummary({
+                    topic: topic.trim(),
+                    summary: data.summary,
+                    updatedAt: new Date().toISOString()
+                });
             } else {
                 setError('AI was unable to generate a summary for this topic. Please try another.');
             }

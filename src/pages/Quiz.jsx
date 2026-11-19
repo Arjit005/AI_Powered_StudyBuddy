@@ -1,10 +1,25 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Zap, CheckCircle2, XCircle, Award, RotateCcw, Save, Check } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { apiRequest } from '../config/apiClient';
 import MarkdownRenderer from '../components/MarkdownRenderer';
+import { usePersistentArtifact } from '../hooks/usePersistentArtifact';
 
 const Quiz = () => {
+    const activeSessionId = (() => {
+        try {
+            return localStorage.getItem('asb_active_session_id') || 'default_session';
+        } catch {
+            return 'default_session';
+        }
+    })();
+
+    const { data: savedQuizArtifact, setData: setSavedQuizArtifact, status: artifactStatus, isHydrated } = usePersistentArtifact({
+        sessionId: activeSessionId,
+        kind: 'quiz',
+        initial: null
+    });
+
     const [topic, setTopic] = useState('');
     const [quiz, setQuiz] = useState(null);
     const [loading, setLoading] = useState(false);
@@ -17,6 +32,16 @@ const Quiz = () => {
     const quizStartTimeRef = useRef(null);
     const quizInstanceRef = useRef(null);
     const submitGuardRef = useRef(false);
+
+    // Reconcile and restore quiz state from server artifact
+    useEffect(() => {
+        if (isHydrated && savedQuizArtifact) {
+            if (savedQuizArtifact.topic) setTopic(savedQuizArtifact.topic);
+            if (savedQuizArtifact.quiz) setQuiz(savedQuizArtifact.quiz);
+            if (savedQuizArtifact.answers) setAnswers(savedQuizArtifact.answers);
+            if (typeof savedQuizArtifact.submitted === 'boolean') setSubmitted(savedQuizArtifact.submitted);
+        }
+    }, [isHydrated, savedQuizArtifact]);
 
     const generateQuiz = async () => {
         if (!topic.trim() || saving || loading) return;
@@ -82,7 +107,17 @@ const Quiz = () => {
 
     const handleSelect = (qIdx, option) => {
         if (submitted) return;
-        setAnswers(prev => ({ ...prev, [qIdx]: option }));
+        const updatedAnswers = { ...answers, [qIdx]: option };
+        setAnswers(updatedAnswers);
+
+        // Auto-save quiz progress
+        setSavedQuizArtifact({
+            topic,
+            quiz,
+            answers: updatedAnswers,
+            submitted: false,
+            updatedAt: new Date().toISOString()
+        });
     };
 
     const calculateScore = () => {

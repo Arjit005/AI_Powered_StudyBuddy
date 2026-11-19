@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, Boolean, Float, inspect, text
+from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, Boolean, Float, UniqueConstraint, Index, inspect, text
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from .database import Base, engine
@@ -164,6 +164,28 @@ class SecurityLockout(Base):
 
     client_key = Column(String(64), primary_key=True)
     expires_at = Column(Float, nullable=False, index=True)
+
+
+class SessionArtifact(Base):
+    __tablename__ = "session_artifacts"
+
+    id = Column(String(36), primary_key=True)  # UUID string
+    session_id = Column(Integer, ForeignKey("conversations.id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    kind = Column(String(32), nullable=False)   # 'mindmap' | 'canvas' | 'flashcards' | 'quiz' | 'summary' | 'chat_draft'
+    payload = Column(Text, nullable=False)      # JSON string
+    schema_version = Column(Integer, nullable=False, default=1)
+    revision = Column(Integer, nullable=False, default=1)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    __table_args__ = (
+        UniqueConstraint("session_id", "user_id", "kind", name="uq_session_user_kind"),
+        Index("ix_artifact_user_session", "user_id", "session_id"),
+    )
+
+    conversation = relationship("Conversation", backref="artifacts")
+    user = relationship("User", backref="artifacts")
 
 
 def run_migrations(target_engine=None):

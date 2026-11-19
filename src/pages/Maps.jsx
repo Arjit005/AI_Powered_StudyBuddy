@@ -1,7 +1,9 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Sparkles, X, ZoomIn, Download, Network, Layers, Cpu, CheckCircle2 } from 'lucide-react';
 import MermaidViewer from '../components/MermaidViewer';
+import PageHeader from '../components/PageHeader';
 import { apiRequest } from '../config/apiClient';
+import { usePersistentArtifact } from '../hooks/usePersistentArtifact';
 
 const SUGGESTIONS = [
     "Photosynthesis & Plant Biology",
@@ -12,6 +14,22 @@ const SUGGESTIONS = [
 ];
 
 const Maps = () => {
+    // Current active session ID from localStorage or active state
+    const activeSessionId = (() => {
+        try {
+            return localStorage.getItem('asb_active_session_id') || 'default_session';
+        } catch {
+            return 'default_session';
+        }
+    })();
+
+    // Persistent Artifact Hook for Mindmap
+    const { data: savedArtifact, setData: setSavedArtifact, status: artifactStatus, isHydrated } = usePersistentArtifact({
+        sessionId: activeSessionId,
+        kind: 'mindmap',
+        initial: null
+    });
+
     const [topic, setTopic] = useState('');
     const [loading, setLoading] = useState(false);
     const [viewMode, setViewMode] = useState('mermaid'); // 'mermaid' or 'networkx'
@@ -22,6 +40,16 @@ const Maps = () => {
     const [isZoomed, setIsZoomed] = useState(false);
     const [error, setError] = useState(null);
     const mapRequestGenRef = useRef(0);
+
+    // Restore from persistent artifact on hydration without triggering LLM
+    useEffect(() => {
+        if (isHydrated && savedArtifact && !diagramData && !mapImage) {
+            if (savedArtifact.topic) setTopic(savedArtifact.topic);
+            if (savedArtifact.diagramData) setDiagramData(savedArtifact.diagramData);
+            if (savedArtifact.mapImage) setMapImage(savedArtifact.mapImage);
+            if (savedArtifact.viewMode) setViewMode(savedArtifact.viewMode);
+        }
+    }, [isHydrated, savedArtifact]);
 
     const generateDiagram = async (targetTopic) => {
         const topicToUse = targetTopic || topic;
@@ -34,7 +62,7 @@ const Maps = () => {
 
         const thisGen = ++mapRequestGenRef.current;
         try {
-            // Fetch detailed Mermaid diagram and NetworkX topology graph concurrently with independent fault tolerance
+            // Fetch detailed Mermaid diagram and NetworkX topology graph concurrently
             const [diagramResult, mapResult] = await Promise.allSettled([
                 apiRequest('/api/generate-diagram', {
                     method: 'POST',
@@ -52,10 +80,13 @@ const Maps = () => {
 
             let hasDiagram = false;
             let hasMap = false;
+            let finalDiagramData = null;
+            let finalMapImage = null;
 
             if (diagramResult.status === 'fulfilled') {
                 const data = diagramResult.value;
                 if (data && typeof data === 'object' && typeof data.mermaid_code === 'string' && data.mermaid_code.trim()) {
+                    finalDiagramData = data;
                     setDiagramData(data);
                     hasDiagram = true;
                 }
@@ -65,7 +96,6 @@ const Maps = () => {
                 const mapJson = mapResult.value;
                 if (mapJson && typeof mapJson.map_image === 'string') {
                     const rawB64 = mapJson.map_image.trim();
-                    // Validate Base64 length (<= 5MB) and decodability/padding format
                     const isValidBase64 = (str) => {
                         if (!str || str.length % 4 !== 0) return false;
                         if (!/^[A-Za-z0-9+/]+={0,2}$/.test(str)) return false;
@@ -74,13 +104,11 @@ const Maps = () => {
                         } catch (_) {
                             return false;
                         }
-                    }
-                    const hasPngMagicHeader = (str) => {
-                        // PNG base64 representation always begins with "iVBORw0KGgo" (representing bytes 0x89 0x50 0x4E 0x47 0x0D 0x0A 0x1A 0x0A)
-                        return str.startsWith('iVBORw0KGgo');
                     };
+                    const hasPngMagicHeader = (str) => str.startsWith('iVBORw0KGgo');
                     if (rawB64.length <= 5 * 1024 * 1024 && isValidBase64(rawB64) && hasPngMagicHeader(rawB64)) {
-                        setMapImage(`data:image/png;base64,${rawB64}`);
+                        finalMapImage = `data:image/png;base64,${rawB64}`;
+                        setMapImage(finalMapImage);
                         hasMap = true;
                     }
                 }
@@ -90,12 +118,23 @@ const Maps = () => {
                 throw new Error('The server returned no usable diagram or concept map. Please try again.');
             }
 
-            // Automatically switch to available view if one failed
+            const chosenMode = (!hasDiagram && hasMap) ? 'networkx' : 'mermaid';
             if (!hasDiagram && hasMap) {
                 setViewMode('networkx');
             } else if (hasDiagram) {
                 setViewMode('mermaid');
             }
+
+            // Save persistent artifact
+            setSavedArtifact({
+                topic: topicToUse.trim(),
+                engine: chosenMode,
+                diagramData: finalDiagramData,
+                mapImage: finalMapImage,
+                viewMode: chosenMode,
+                generatedAt: new Date().toISOString()
+            });
+
         } catch (err) {
             console.error("Error generating diagram:", err);
             if (thisGen === mapRequestGenRef.current) {
@@ -109,20 +148,27 @@ const Maps = () => {
     };
 
     return (
-        <div className="py-12 min-h-screen">
+        <div className="py-8 min-h-screen">
             <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-                {/* Header */}
-                <div className="text-center mb-10">
-                    <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-cyan-500/20 border border-cyan-500/30 text-cyan-400 mb-3 shadow-[0_0_20px_rgba(6,182,212,0.25)]">
-                        <Network className="w-7 h-7" />
-                    </div>
-                    <h1 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight mb-2">
-                        Interactive Concept Mind Maps
-                    </h1>
-                    <p className="text-slate-400 text-sm max-w-xl mx-auto">
-                        Generate visual concept maps, flowcharts, and topic breakdowns to understand complex subjects at a glance.
-                    </p>
-                </div>
+                {/* Standardized PageHeader matching /progress */}
+                <PageHeader
+                    eyebrow="Visual Learning & Mind Mapping"
+                    title="Concept Maps & Diagrams"
+                    subtitle="Generate visual flowcharts, biological structures, and knowledge hierarchies at a glance."
+                    actions={
+                        <div className="flex items-center gap-2">
+                            {artifactStatus === 'saving' && (
+                                <span className="text-[11px] font-mono text-emerald-400 animate-pulse">Saving…</span>
+                            )}
+                            {artifactStatus === 'saved' && (
+                                <span className="text-[11px] font-mono text-slate-400">Saved</span>
+                            )}
+                            {artifactStatus === 'offline' && (
+                                <span className="text-[11px] font-mono text-amber-400">Offline — saved locally</span>
+                            )}
+                        </div>
+                    }
+                />
 
                 {/* Generator Bar */}
                 <div className="max-w-xl mx-auto mb-4 flex gap-3">
@@ -137,7 +183,7 @@ const Maps = () => {
                     <button
                         onClick={() => generateDiagram()}
                         disabled={loading || !topic.trim()}
-                        className="px-6 py-3 rounded-xl font-semibold text-sm bg-gradient-to-r from-emerald-500 to-teal-500 text-slate-950 hover:brightness-110 active:scale-95 transition-all shadow-[0_0_20px_rgba(16,185,129,0.3)] disabled:opacity-40 flex items-center gap-2"
+                        className="px-6 py-3 rounded-xl font-semibold text-sm bg-gradient-to-r from-emerald-500 to-teal-500 text-slate-950 hover:brightness-110 active:scale-95 transition-all shadow-[0_0_20px_rgba(16,185,129,0.3)] disabled:opacity-40 flex items-center gap-2 cursor-pointer"
                     >
                         {loading ? (
                             <div className="w-4 h-4 border-2 border-slate-950 border-t-transparent rounded-full animate-spin" />

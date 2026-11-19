@@ -49,7 +49,17 @@ const ChatInterface = () => {
     // Session state
     const [conversations, setConversations] = useState([]);
     const [conversationsLoaded, setConversationsLoaded] = useState(false);
-    const [activeConvId, setActiveConvId] = useState(null);
+    const [activeConvId, setActiveConvIdState] = useState(null);
+    const setActiveConvId = (id) => {
+        setActiveConvIdState(id);
+        if (id) {
+            try {
+                localStorage.setItem('asb_active_session_id', String(id));
+            } catch {
+                // ignore
+            }
+        }
+    };
     const [sidebarOpen, setSidebarOpen] = useState(true);
     const [memoryModalOpen, setMemoryModalOpen] = useState(false);
 

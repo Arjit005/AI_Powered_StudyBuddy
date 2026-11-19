@@ -139,10 +139,47 @@ const sanitizeSvg = (svgStr) => {
     }
 };
 
+export const sanitizeMermaidLabel = (label) => {
+    if (!label || typeof label !== 'string') return '"Node"';
+    let clean = label.trim();
+    // Replace double quotes with HTML entity &quot;
+    clean = clean.replace(/"/g, '&quot;');
+    // Strip or replace unquoted characters that break Mermaid lexer
+    clean = clean.replace(/[{}\[\]|<>#;~]/g, ' ');
+    // If empty after cleanup, fallback to default
+    if (!clean.trim()) return '"Node"';
+    return `"${clean.trim()}"`;
+};
+
+export const sanitizeMermaidSource = (source) => {
+    if (!source || typeof source !== 'string') return '';
+    let clean = source.trim();
+    if (clean.startsWith('```mermaid')) {
+        clean = clean.replace(/^```mermaid\s*/, '').replace(/```$/, '').trim();
+    } else if (clean.startsWith('```')) {
+        clean = clean.replace(/^```\s*/, '').replace(/```$/, '').trim();
+    }
+
+    // Replace unquoted node brackets: e.g. Node[Unquoted (Text)] -> Node["Unquoted (Text)"]
+    clean = clean.replace(/(\w+)\s*\[([^"\]\n]+)\]/g, (match, id, label) => {
+        const safe = label.trim().replace(/"/g, '&quot;');
+        return `${id}["${safe}"]`;
+    });
+
+    // Replace unquoted subgraph brackets: subgraph ID [Label (With Parens)] -> subgraph ID ["Label (With Parens)"]
+    clean = clean.replace(/(subgraph\s+\w+)\s*\[([^"\]\n]+)\]/g, (match, prefix, label) => {
+        const safe = label.trim().replace(/"/g, '&quot;');
+        return `${prefix} ["${safe}"]`;
+    });
+
+    return clean;
+};
+
 const initMermaid = () => {
     if (!mermaidInitialized) {
         mermaid.initialize({
             startOnLoad: false,
+            suppressErrorRendering: true,
             theme: 'dark',
             securityLevel: 'strict',
             themeVariables: {
@@ -242,25 +279,34 @@ const MermaidViewer = ({ chart, title = "Architecture Diagram" }) => {
 
         const renderChart = () => {
             const id = 'mermaid-' + Math.random().toString(36).substring(2, 9);
-            // Clean markdown code blocks if passed with backticks
-            let cleanChart = chart.trim();
-            if (cleanChart.startsWith('```mermaid')) {
-                cleanChart = cleanChart.replace(/^```mermaid\s*/, '').replace(/```$/, '').trim();
-            } else if (cleanChart.startsWith('```')) {
-                cleanChart = cleanChart.replace(/^```\s*/, '').replace(/```$/, '').trim();
-            }
+            // Apply sanitization across unquoted brackets and backticks
+            const cleanChart = sanitizeMermaidSource(chart);
 
             // Serialize through global render queue to prevent concurrent mermaid DOM race conditions
             globalRenderQueue = globalRenderQueue.catch(() => {}).then(async () => {
                 if (isCancelled) return;
                 try {
-                    // Reapply secure configuration directly at rendering boundary
                     initMermaid();
+                    // Pre-validate before rendering to prevent error graphic injection
+                    try {
+                        await mermaid.parse(cleanChart);
+                    } catch (parseErr) {
+                        // Attempt automatic repair pass: strip problematic parens/slashes
+                        const repaired = cleanChart.replace(/[()\/]/g, ' ');
+                        await mermaid.parse(repaired);
+                        const { svg } = await mermaid.render(id, repaired);
+                        if (!isCancelled) {
+                            const sanitized = sanitizeSvg(svg);
+                            setSvgState({ chart, svg: sanitized || '', error: sanitized ? null : 'Diagram could not be verified safely.' });
+                        }
+                        return;
+                    }
+
                     const { svg } = await mermaid.render(id, cleanChart);
                     if (!isCancelled) {
                         const sanitized = sanitizeSvg(svg);
                         if (!sanitized) {
-                            setSvgState({ chart, svg: '', error: 'Diagram sanitization failed or produced invalid SVG.' });
+                            setSvgState({ chart, svg: '', error: 'Diagram could not be verified safely.' });
                         } else {
                             setSvgState({ chart, svg: sanitized, error: null });
                         }
@@ -268,13 +314,14 @@ const MermaidViewer = ({ chart, title = "Architecture Diagram" }) => {
                 } catch (err) {
                     console.error("Mermaid Render Error:", err);
                     if (!isCancelled) {
-                        setSvgState({ chart, svg: '', error: err.message || 'Failed to render diagram syntax.' });
+                        // Do not surface library error text, stack traces, or lexer internals to users
+                        setSvgState({ chart, svg: '', error: 'Visual concept diagram could not be rendered for this structure. Showing simplified view.' });
                     }
                 }
             }).catch(queueErr => {
                 console.error("Mermaid Queue Failure:", queueErr);
                 if (!isCancelled) {
-                    setSvgState({ chart, svg: '', error: 'Diagram rendering queue encountered an error.' });
+                    setSvgState({ chart, svg: '', error: 'Visual concept diagram could not be rendered.' });
                 }
             });
         };
@@ -385,16 +432,20 @@ const MermaidViewer = ({ chart, title = "Architecture Diagram" }) => {
             {/* Diagram Canvas */}
             <div className="p-4 sm:p-6 bg-[#070a10] overflow-auto flex items-center justify-center min-h-[280px] max-h-[550px]">
                 {error ? (
-                    <div className="p-4 rounded-xl bg-rose-950/40 border border-rose-800/60 text-xs text-rose-300 font-mono space-y-2 max-w-md">
-                        <div className="flex items-center gap-2 font-bold text-rose-400">
-                            <AlertCircle className="w-4 h-4 shrink-0" />
-                            <span>Diagram Display Notice</span>
+                    <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800 text-xs text-slate-300 font-mono space-y-2 max-w-md text-center">
+                        <div className="flex items-center justify-center gap-2 font-bold text-slate-300">
+                            <AlertCircle className="w-4 h-4 shrink-0 text-amber-400" />
+                            <span>Simplified View Notice</span>
                         </div>
-                        <p className="text-[11px] text-rose-200/90">{error}</p>
-                        <p className="text-[11px] text-slate-400">Raw source code is displayed below:</p>
-                        <pre className="p-2.5 rounded bg-black/60 overflow-x-auto text-[11px] text-emerald-400">
-                            {chart}
-                        </pre>
+                        <p className="text-[12px] text-slate-400">{error}</p>
+                        {import.meta.env.DEV && (
+                            <details className="mt-3 text-left">
+                                <summary className="cursor-pointer text-[10px] text-slate-500 hover:text-slate-400">Mermaid source (dev)</summary>
+                                <pre className="p-2 mt-1 rounded bg-black/60 overflow-x-auto text-[10px] text-emerald-400">
+                                    {chart}
+                                </pre>
+                            </details>
+                        )}
                     </div>
                 ) : svgContent ? (
                     <div

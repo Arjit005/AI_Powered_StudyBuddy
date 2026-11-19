@@ -17,8 +17,23 @@ import {
 } from 'lucide-react';
 import MermaidViewer from '../components/MermaidViewer';
 import { apiRequest } from '../config/apiClient';
+import { usePersistentArtifact } from '../hooks/usePersistentArtifact';
 
 export default function CanvasStudio() {
+  const activeSessionId = (() => {
+    try {
+      return localStorage.getItem('asb_active_session_id') || 'default_session';
+    } catch {
+      return 'default_session';
+    }
+  })();
+
+  const { data: savedCanvas, setData: setSavedCanvas, status: artifactStatus, isHydrated } = usePersistentArtifact({
+    sessionId: activeSessionId,
+    kind: 'canvas',
+    initial: null
+  });
+
   const [topic, setTopic] = useState('');
   const [detailLevel, setDetailLevel] = useState('standard');
   const [diagramType] = useState('architecture');
@@ -28,6 +43,18 @@ export default function CanvasStudio() {
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [isPanning, setIsPanning] = useState(false);
+
+  // Reconcile and restore canvas state without triggering LLM
+  useEffect(() => {
+    if (isHydrated && savedCanvas && !canvasData) {
+      if (savedCanvas.topic) setTopic(savedCanvas.topic);
+      if (savedCanvas.canvasData) setCanvasData(savedCanvas.canvasData);
+      if (savedCanvas.viewport) {
+        if (savedCanvas.viewport.zoom) setZoom(savedCanvas.viewport.zoom);
+        if (savedCanvas.viewport.pan) setPan(savedCanvas.viewport.pan);
+      }
+    }
+  }, [isHydrated, savedCanvas]);
   const [panStart, setPanStart] = useState({ x: 0, y: 0 });
   const [draggingNodeId, setDraggingNodeId] = useState(null);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
@@ -141,6 +168,14 @@ export default function CanvasStudio() {
       });
       setPan({ x: 0, y: 0 });
       setZoom(1);
+
+      // Persist artifact
+      setSavedCanvas({
+        topic,
+        canvasData: data.canvas,
+        viewport: { zoom: 1, pan: { x: 0, y: 0 } },
+        updatedAt: new Date().toISOString()
+      });
     } catch (err) {
       if (thisGen === requestGenRef.current) {
         console.error("Generate canvas error:", err);
@@ -206,6 +241,15 @@ export default function CanvasStudio() {
   const handleMouseUp = () => {
     setDraggingNodeId(null);
     setIsPanning(false);
+    // Debounce save state after interaction ends (pointerup/mouseup guard)
+    if (canvasData) {
+      setSavedCanvas({
+        topic,
+        canvasData,
+        viewport: { zoom, pan },
+        updatedAt: new Date().toISOString()
+      });
+    }
   };
 
   useEffect(() => {
@@ -662,8 +706,8 @@ export default function CanvasStudio() {
             backgroundPosition: `${pan.x}px ${pan.y}px`
           }}
         >
-          {/* Centered Empty State (FIX-20 / A8) */}
-          {!loading && (!canvasData?.nodes || canvasData.nodes.length === 0) && (
+          {/* Centered Empty State (FIX-20 / A8) - Only rendered once hydrated to prevent flash of empty state */}
+          {isHydrated && !loading && (!canvasData?.nodes || canvasData.nodes.length === 0) && (
             <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center z-10 pointer-events-none">
               <div className="glass-panel p-8 rounded-3xl max-w-lg border border-white/15 shadow-2xl pointer-events-auto space-y-4">
                 <div className="w-14 h-14 mx-auto rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400">

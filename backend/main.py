@@ -197,6 +197,18 @@ class FeedbackRequest(BaseModel):
     rating: int = Field(..., ge=1, le=5)
     comment: Optional[str] = Field(None, max_length=1000)
 
+class ArtifactPutRequest(BaseModel):
+    payload: Any
+    schema_version: int = Field(1, ge=1)
+    revision: int = Field(1, ge=1)
+
+class ArtifactResponse(BaseModel):
+    kind: str
+    payload: Any
+    schema_version: int
+    revision: int
+    updated_at: Optional[str] = None
+
 # Database dependency
 get_db = database.get_db
 
@@ -761,6 +773,181 @@ def delete_conversation(
     db.delete(conv)
     db.commit()
     return {"status": "deleted", "id": conv_id}
+
+# ============================================================================
+# SESSION ARTIFACTS PERSISTENCE API (Part 2)
+# ============================================================================
+VALID_ARTIFACT_KINDS = {'mindmap', 'canvas', 'flashcards', 'quiz', 'summary', 'chat_draft'}
+
+@app.get("/api/sessions/{session_id}/artifacts", response_model=List[ArtifactResponse], tags=["Artifacts"])
+def list_session_artifacts(
+    session_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.get_current_user_required)
+):
+    # Verify session belongs to user (return 404 to avoid leaking existence)
+    conv = db.query(models.Conversation).filter(
+        models.Conversation.id == session_id,
+        models.Conversation.user_id == current_user.id
+    ).first()
+    if not conv:
+        raise HTTPException(status_code=404, detail="Session not found.")
+
+    artifacts = db.query(models.SessionArtifact).filter(
+        models.SessionArtifact.session_id == session_id,
+        models.SessionArtifact.user_id == current_user.id
+    ).all()
+
+    results = []
+    for art in artifacts:
+        try:
+            payload = json.loads(art.payload)
+        except Exception:
+            payload = {}
+        results.append({
+            "kind": art.kind,
+            "payload": payload,
+            "schema_version": art.schema_version,
+            "revision": art.revision,
+            "updated_at": art.updated_at.isoformat() if art.updated_at else None
+        })
+    return results
+
+@app.get("/api/sessions/{session_id}/artifacts/{kind}", tags=["Artifacts"])
+def get_session_artifact(
+    session_id: int,
+    kind: str,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.get_current_user_required)
+):
+    if kind not in VALID_ARTIFACT_KINDS:
+        raise HTTPException(status_code=400, detail=f"Invalid artifact kind '{kind}'.")
+
+    conv = db.query(models.Conversation).filter(
+        models.Conversation.id == session_id,
+        models.Conversation.user_id == current_user.id
+    ).first()
+    if not conv:
+        raise HTTPException(status_code=404, detail="Session not found.")
+
+    art = db.query(models.SessionArtifact).filter(
+        models.SessionArtifact.session_id == session_id,
+        models.SessionArtifact.user_id == current_user.id,
+        models.SessionArtifact.kind == kind
+    ).first()
+
+    if not art:
+        raise HTTPException(status_code=404, detail="Artifact not found.")
+
+    try:
+        payload = json.loads(art.payload)
+    except Exception:
+        payload = {}
+
+    return {
+        "payload": payload,
+        "schema_version": art.schema_version,
+        "revision": art.revision,
+        "updated_at": art.updated_at.isoformat() if art.updated_at else None
+    }
+
+@app.put("/api/sessions/{session_id}/artifacts/{kind}", tags=["Artifacts"])
+def put_session_artifact(
+    session_id: int,
+    kind: str,
+    req: ArtifactPutRequest,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.get_current_user_required)
+):
+    if kind not in VALID_ARTIFACT_KINDS:
+        raise HTTPException(status_code=400, detail=f"Invalid artifact kind '{kind}'.")
+
+    # Authorize session ownership
+    conv = db.query(models.Conversation).filter(
+        models.Conversation.id == session_id,
+        models.Conversation.user_id == current_user.id
+    ).first()
+    if not conv:
+        raise HTTPException(status_code=404, detail="Session not found.")
+
+    # Size limit validation: max 1 MB (1,048,576 bytes)
+    payload_str = json.dumps(req.payload)
+    if len(payload_str.encode('utf-8')) > 1048576:
+        raise HTTPException(status_code=413, detail="Payload exceeds maximum permitted size of 1MB.")
+
+    art = db.query(models.SessionArtifact).filter(
+        models.SessionArtifact.session_id == session_id,
+        models.SessionArtifact.user_id == current_user.id,
+        models.SessionArtifact.kind == kind
+    ).first()
+
+    if art:
+        # Optimistic concurrency check: revision must match
+        if art.revision != req.revision:
+            try:
+                server_payload = json.loads(art.payload)
+            except Exception:
+                server_payload = {}
+            return JSONResponse(
+                status_code=409,
+                content={
+                    "server_revision": art.revision,
+                    "server_payload": server_payload,
+                    "server_updated_at": art.updated_at.isoformat() if art.updated_at else None
+                }
+            )
+
+        art.payload = payload_str
+        art.schema_version = req.schema_version
+        art.revision = art.revision + 1
+        db.commit()
+        db.refresh(art)
+        return {
+            "revision": art.revision,
+            "updated_at": art.updated_at.isoformat() if art.updated_at else None
+        }
+    else:
+        import uuid
+        new_art = models.SessionArtifact(
+            id=str(uuid.uuid4()),
+            session_id=session_id,
+            user_id=current_user.id,
+            kind=kind,
+            payload=payload_str,
+            schema_version=req.schema_version,
+            revision=1
+        )
+        db.add(new_art)
+        db.commit()
+        db.refresh(new_art)
+        return {
+            "revision": new_art.revision,
+            "updated_at": new_art.updated_at.isoformat() if new_art.updated_at else None
+        }
+
+@app.delete("/api/sessions/{session_id}/artifacts/{kind}", tags=["Artifacts"])
+def delete_session_artifact(
+    session_id: int,
+    kind: str,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.get_current_user_required)
+):
+    conv = db.query(models.Conversation).filter(
+        models.Conversation.id == session_id,
+        models.Conversation.user_id == current_user.id
+    ).first()
+    if not conv:
+        raise HTTPException(status_code=404, detail="Session not found.")
+
+    art = db.query(models.SessionArtifact).filter(
+        models.SessionArtifact.session_id == session_id,
+        models.SessionArtifact.user_id == current_user.id,
+        models.SessionArtifact.kind == kind
+    ).first()
+    if art:
+        db.delete(art)
+        db.commit()
+    return {"status": "deleted", "kind": kind}
 
 # ============================================================================
 # SOURCE-GROUNDED HYBRID-MEMORY CHAT ENDPOINTS (Phase 1)

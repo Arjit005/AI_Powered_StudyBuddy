@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import FlipCard3D from '../components/ui/FlipCard3D';
+import PageHeader from '../components/PageHeader';
 import { apiRequest } from '../config/apiClient';
+import { usePersistentArtifact } from '../hooks/usePersistentArtifact';
 import { 
   ChevronLeft, 
   ChevronRight, 
@@ -11,7 +13,29 @@ import {
   Flame 
 } from 'lucide-react';
 
+const DEFAULT_CARDS = [
+    { id: 1, front: "What is Photosynthesis?", back: "The biochemical process by which plants and other organisms convert sunlight, water, and carbon dioxide into oxygen and energy-rich glucose." },
+    { id: 2, front: "State Newton's Third Law of Motion", back: "For every action, there is an equal and opposite reaction. When one body exerts a force on a second body, the second body exerts a force equal in magnitude and opposite in direction." },
+    { id: 3, front: "What is Binary Search and its time complexity?", back: "An efficient search algorithm that finds an element in a sorted list by repeatedly dividing the search space in half. Its time complexity is O(log n)." },
+    { id: 4, front: "What is the difference between an Acid and a Base?", back: "Acids have a pH less than 7 and donate protons (H+ ions); Bases have a pH greater than 7 and accept protons or release hydroxide ions (OH-)." },
+    { id: 5, front: "What is Opportunity Cost in Economics?", back: "The value of the next best alternative that is forgone when making a choice between mutually exclusive options." }
+];
+
 const Flashcards = () => {
+    const activeSessionId = (() => {
+        try {
+            return localStorage.getItem('asb_active_session_id') || 'default_session';
+        } catch {
+            return 'default_session';
+        }
+    })();
+
+    const { data: savedFlashcards, setData: setSavedFlashcards, status: artifactStatus, isHydrated } = usePersistentArtifact({
+        sessionId: activeSessionId,
+        kind: 'flashcards',
+        initial: null
+    });
+
     const [isFlipped, setIsFlipped] = useState(false);
     const [currentCard, setCurrentCard] = useState(0);
     const [topic, setTopic] = useState('');
@@ -22,14 +46,23 @@ const Flashcards = () => {
     
     // Spaced repetition mastery state: { [cardId]: 'hard' | 'good' | 'mastered' }
     const [mastery, setMastery] = useState({});
+    const [cards, setCards] = useState(DEFAULT_CARDS);
 
-    const [cards, setCards] = useState([
-        { id: 1, front: "What is Photosynthesis?", back: "The biochemical process by which plants and other organisms convert sunlight, water, and carbon dioxide into oxygen and energy-rich glucose." },
-        { id: 2, front: "State Newton's Third Law of Motion", back: "For every action, there is an equal and opposite reaction. When one body exerts a force on a second body, the second body exerts a force equal in magnitude and opposite in direction." },
-        { id: 3, front: "What is Binary Search and its time complexity?", back: "An efficient search algorithm that finds an element in a sorted list by repeatedly dividing the search space in half. Its time complexity is O(log n)." },
-        { id: 4, front: "What is the difference between an Acid and a Base?", back: "Acids have a pH less than 7 and donate protons (H+ ions); Bases have a pH greater than 7 and accept protons or release hydroxide ions (OH-)." },
-        { id: 5, front: "What is Opportunity Cost in Economics?", back: "The value of the next best alternative that is forgone when making a choice between mutually exclusive options." }
-    ]);
+    // Reconcile and restore flashcard progress from persistent artifact
+    useEffect(() => {
+        if (isHydrated && savedFlashcards) {
+            if (savedFlashcards.topic) setTopic(savedFlashcards.topic);
+            if (Array.isArray(savedFlashcards.cards) && savedFlashcards.cards.length > 0) {
+                setCards(savedFlashcards.cards);
+            }
+            if (typeof savedFlashcards.currentIndex === 'number') {
+                setCurrentCard(savedFlashcards.currentIndex);
+            }
+            if (savedFlashcards.mastery) {
+                setMastery(savedFlashcards.mastery);
+            }
+        }
+    }, [isHydrated, savedFlashcards]);
 
     // Audio Speech Synthesis & timeout cleanup
     const advanceTimeoutRef = useRef(null);
@@ -132,16 +165,27 @@ const Flashcards = () => {
         if (!isFlipped) return;
         const activeCard = cards[currentCard];
         if (!activeCard) return;
-        setMastery(prev => ({
-            ...prev,
+        const updatedMastery = {
+            ...mastery,
             [activeCard.id || currentCard]: rating
-        }));
+        };
+        setMastery(updatedMastery);
+
+        // Persist study progress to server artifact
+        setSavedFlashcards({
+            topic,
+            cards,
+            currentIndex: (currentCard + 1) % cards.length,
+            mastery: updatedMastery,
+            updatedAt: new Date().toISOString()
+        });
+
         // Auto-advance on rating
         if (advanceTimeoutRef.current) clearTimeout(advanceTimeoutRef.current);
         advanceTimeoutRef.current = setTimeout(() => {
             nextCard();
         }, 300);
-    }, [isFlipped, cards, currentCard, nextCard]);
+    }, [isFlipped, cards, currentCard, mastery, topic, setSavedFlashcards, nextCard]);
 
     // Text to Speech
     const handleReadCard = (e) => {

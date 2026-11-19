@@ -890,26 +890,38 @@ class AIService:
     @staticmethod
     def generate_detailed_mermaid_diagram(topic: str, diagram_type: str = "flowchart") -> dict:
         """
-        Generates production-grade detailed Mermaid.js architecture diagrams and flowcharts.
+        Generates production-grade detailed Mermaid.js concept diagrams and flowcharts.
+        Ensures all node labels are strictly double-quoted to prevent Mermaid parser crashes.
         """
         try:
+            # Semantic title formatting: avoid hardcoding 'System Architecture' for non-software topics
+            clean_topic = topic.strip()
+            suffix = "Flowchart" if diagram_type == "flowchart" else "Concept Map"
+            default_title = f"{clean_topic} — {suffix}"
+
             prompt = f"""
-            You are a Principal Software & Systems Architect.
-            Task: Design a comprehensive, detailed architectural {diagram_type} for: "{topic}".
+            You are an expert pedagogical knowledge visualizer and curriculum architect.
+            Task: Design a comprehensive, educational {diagram_type} for the study topic: "{clean_topic}".
             
-            RULES FOR MERMAID CODE:
-            1. Use 'flowchart TD' or 'sequenceDiagram'.
-            2. Include 8-15 distinct nodes with informative labels explaining data flow or hierarchy.
-            3. Use subgraphs to group logical components.
-            4. Add clear directional edge labels (e.g. A -->|"Protocol / Action"| B).
-            5. Return ONLY a raw JSON object with this format:
+            CRITICAL RULES FOR MERMAID CODE (SYNTAX SAFETY):
+            1. Use 'flowchart TD'.
+            2. ALWAYS wrap every node label inside double quotes: node_id["Exact Label Here"]
+               Example: VC["Vena Cava (Superior/Inferior)"] or ATP["ATP -> ADP Conversion"]
+               NEVER leave parentheses, brackets, colons, or arrows unquoted.
+            3. Include 8-15 distinct nodes explaining the flow, components, or conceptual hierarchy.
+            4. Use subgraphs to group logical stages or systems:
+               subgraph GroupId ["Group Label"]
+               ...
+               end
+            5. Add clear directional edge labels with quoted or pipe notation: A -->|"Flow/Process"| B
+            6. Return ONLY a raw JSON object with this format:
             {{
-                "title": "System Architecture: {topic}",
-                "description": "Comprehensive architectural layout and data flow for {topic}.",
-                "mermaid_code": "flowchart TD\\n    subgraph Client [Client Interface]\\n        Web[React SPA]\\n    end\\n    subgraph Core [Core Engine]\\n        Service[Business Logic]\\n    end\\n    Web -->|HTTP| Service",
+                "title": "{default_title}",
+                "description": "Comprehensive visual breakdown and study flow for {clean_topic}.",
+                "mermaid_code": "flowchart TD\\n    subgraph System [\\"Primary Structure\\"]\\n        N1[\\"First Component\\"] -->|\\"Process\\"| N2[\\"Second Component\\"]\\n    end",
                 "key_components": [
-                    "Component 1 and role",
-                    "Component 2 and role"
+                    "Key Concept 1: explanation",
+                    "Key Concept 2: explanation"
                 ]
             }}
             """
@@ -920,10 +932,18 @@ class AIService:
                 isinstance(data.get("mermaid_code"), str) and len(data["mermaid_code"].strip()) > 20 and
                 isinstance(data.get("title"), str) and isinstance(data.get("description"), str)):
                 components = [str(c).strip() for c in data.get("key_components", []) if str(c).strip()] if isinstance(data.get("key_components"), list) else []
+                raw_title = data["title"].strip()
+                # Clean up any leftover 'System Architecture' text if present in model response
+                clean_title = re.sub(r'^System Architecture:\s*', '', raw_title, flags=re.IGNORECASE)
+                if not ("—" in clean_title or "-" in clean_title):
+                    clean_title = f"{clean_title} — {suffix}"
+
+                # Sanitize Mermaid source: ensure unquoted labels get quoted
+                raw_code = data["mermaid_code"].strip()
                 return {
-                    "title": data["title"].strip(),
+                    "title": clean_title,
                     "description": data["description"].strip(),
-                    "mermaid_code": data["mermaid_code"].strip(),
+                    "mermaid_code": raw_code,
                     "key_components": components
                 }
             raise ValueError("Generated diagram did not meet validation criteria.")
