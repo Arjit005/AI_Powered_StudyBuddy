@@ -112,14 +112,18 @@ const FeedbackWidget = () => {
         }
     };
 
-    // On dense routes (/chat, /progress, /canvas), do not float over interactive elements
-    const isDenseRoute = ['/chat', '/progress', '/canvas'].includes(location.pathname);
+    // Hide FAB on Canvas, full diagram view, and prevent overlay on dense routes (FIX-05 / A4)
+    if (location.pathname === '/canvas' || location.pathname === '/maps') {
+        return null;
+    }
+
+    const isDenseRoute = ['/chat', '/progress'].includes(location.pathname);
 
     return (
-        <div className={`fixed z-50 transition-all ${
+        <div className={`fixed z-40 transition-all ${
             isDenseRoute 
-                ? 'bottom-[max(1rem,env(safe-area-inset-bottom))] right-4 sm:right-6' 
-                : 'bottom-[max(1.5rem,env(safe-area-inset-bottom))] right-6'
+                ? 'bottom-4 right-4 sm:right-6' 
+                : 'bottom-6 right-6'
         }`}>
             {!isOpen ? (
                 <button

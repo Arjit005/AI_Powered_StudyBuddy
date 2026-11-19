@@ -7,12 +7,13 @@ import {
   Copy, 
   Check, 
   Sparkles, 
-  ShieldCheck, 
   Volume2, 
   VolumeX, 
   Save, 
   Download 
 } from 'lucide-react';
+import PageHeader from '../components/PageHeader';
+import MarkdownRenderer from '../components/MarkdownRenderer';
 
 const Summarize = () => {
     const [topic, setTopic] = useState('');
@@ -59,19 +60,19 @@ const Summarize = () => {
 
             if (thisGen !== summarizeGenRef.current) return;
 
-            if (!data || typeof data.summary !== 'string' || !data.summary.trim()) {
-                throw new Error('Received an invalid or empty summary from AI service.');
+            if (data && typeof data.summary === 'string' && data.summary.trim()) {
+                setSummary(data.summary);
+                setSummaryTopic(topic.trim());
+                currentSummaryRef.current = data.summary;
+            } else {
+                setError('AI was unable to generate a summary for this topic. Please try another.');
             }
-            setSummary(data.summary);
-            currentSummaryRef.current = data.summary;
-            setSummaryTopic(topic.trim());
-            setSaved(false);
-            if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
         } catch (err) {
+            console.error("Summarizer error:", err);
             if (thisGen === summarizeGenRef.current) {
-                setError(err.kind === 'http' && !err.hasDetail
-                    ? 'Failed to synthesize summary'
-                    : err.message || 'Error occurred while generating summary.');
+                setError(err.kind === 'http' 
+                    ? (err.hasDetail ? err.message : 'Failed to generate topic summary.')
+                    : 'Network error generating summary.');
             }
         } finally {
             if (thisGen === summarizeGenRef.current) {
@@ -80,64 +81,62 @@ const Summarize = () => {
         }
     };
 
-    const handleCopy = async () => {
-        if (!summary) return;
-        let success = false;
-        try {
-            if (navigator?.clipboard?.writeText) {
-                await navigator.clipboard.writeText(summary);
-                success = true;
-            } else {
-                const ta = document.createElement('textarea');
-                ta.value = summary;
-                ta.style.position = 'fixed';
-                ta.style.opacity = '0';
-                document.body.appendChild(ta);
-                ta.focus();
-                ta.select();
-                success = document.execCommand('copy');
-                document.body.removeChild(ta);
-            }
-        } catch (copyErr) {
-            console.error("Clipboard copy failed:", copyErr);
-            success = false;
-        } finally {
-            if (success) {
-                setCopied(true);
-                if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
-                copyTimeoutRef.current = setTimeout(() => setCopied(false), 2000);
-            }
-        }
-    };
-
-    // Text to Speech Toggle
+    // Text-to-Speech (TTS)
     const handleToggleTTS = () => {
-        if (typeof window === 'undefined' || !('speechSynthesis' in window) || !summary) return;
+        if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
+            alert("Speech synthesis is not supported in this browser.");
+            return;
+        }
 
         if (isSpeaking) {
             window.speechSynthesis.cancel();
             setIsSpeaking(false);
-        } else {
-            const thisUtteranceGen = ++utteranceGenRef.current;
-            const utterance = new SpeechSynthesisUtterance(summary);
-            utterance.rate = 1.0;
-            utterance.pitch = 1.0;
-            utterance.onend = () => {
-                if (thisUtteranceGen === utteranceGenRef.current) setIsSpeaking(false);
-            };
-            utterance.onerror = () => {
-                if (thisUtteranceGen === utteranceGenRef.current) setIsSpeaking(false);
-            };
-            window.speechSynthesis.speak(utterance);
-            setIsSpeaking(true);
+            return;
         }
+
+        if (!summary) return;
+        window.speechSynthesis.cancel();
+        const thisUtteranceGen = ++utteranceGenRef.current;
+
+        // Strip markdown asterisks and hash symbols for clean audio reading
+        const plainText = summary
+            .replace(/[#*`_~]/g, '')
+            .replace(/\[\d+\]/g, '')
+            .trim();
+
+        const utterance = new SpeechSynthesisUtterance(plainText);
+        utterance.rate = 1.0;
+        utterance.pitch = 1.0;
+        utterance.lang = 'en-US';
+
+        utterance.onstart = () => {
+            if (thisUtteranceGen === utteranceGenRef.current) setIsSpeaking(true);
+        };
+        utterance.onend = () => {
+            if (thisUtteranceGen === utteranceGenRef.current) setIsSpeaking(false);
+        };
+        utterance.onerror = (e) => {
+            console.error("TTS Speech Error:", e);
+            if (thisUtteranceGen === utteranceGenRef.current) setIsSpeaking(false);
+        };
+
+        window.speechSynthesis.speak(utterance);
     };
 
-    // Save to Library
+    // Copy to clipboard
+    const handleCopy = () => {
+        if (!summary) return;
+        navigator.clipboard.writeText(summary);
+        setCopied(true);
+        if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
+        copyTimeoutRef.current = setTimeout(() => setCopied(false), 2000);
+    };
+
+    // Save to library
     const handleSaveToLibrary = async () => {
         if (!summary || isSaving) return;
+        const activeTopic = summaryTopic || topic;
         const contentToSave = summary;
-        const activeTopic = (summaryTopic && summaryTopic.trim()) ? summaryTopic.trim() : (topic && topic.trim()) ? topic.trim() : 'Study Summary';
         setIsSaving(true);
         try {
             await apiRequest('/api/library', {
@@ -187,50 +186,72 @@ const Summarize = () => {
     };
 
     return (
-        <div className="py-12 min-h-screen">
-            <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
-                {/* Header */}
-                <div className="text-center mb-10">
-                    <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-teal-500/20 border border-teal-500/30 text-teal-400 mb-3 shadow-[0_0_20px_rgba(20,184,166,0.25)]">
-                        <FileText className="w-7 h-7" />
-                    </div>
-                    <h1 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight mb-2">
-                        Smart Topic Summarizer
-                    </h1>
-                    <p className="text-slate-400 text-sm max-w-lg mx-auto">
-                        Condense lengthy articles, technical papers, or syllabus chapters into structured core takeaways with audio speech synthesis.
-                    </p>
-                </div>
+        <div className="py-8 sm:py-12 min-h-screen">
+            <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
+                {/* Unified PageHeader (FIX-12) */}
+                <PageHeader 
+                    eyebrow="Key Takeaways & Synthesis"
+                    title="Smart Topic Summarizer"
+                    subtitle="Condense complex concepts, chapters, and academic topics into structured executive takeaways."
+                />
 
                 {error && (
-                    <div className="mb-6 max-w-md mx-auto p-4 rounded-xl bg-rose-950/50 border border-rose-800/60 text-rose-300 text-xs">
-                        {error}
+                    <div className="p-3.5 rounded-xl bg-rose-950/60 border border-rose-800/80 text-rose-300 text-xs font-mono">
+                        ⚠️ {error}
                     </div>
                 )}
 
-                <div className="grid gap-6 lg:grid-cols-2">
+                {/* Main Two-Column Layout */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
                     {/* Input Panel */}
-                    <div className="glass-panel p-6 sm:p-8 rounded-3xl flex flex-col justify-between">
-                        <div>
-                            <div className="flex justify-between items-center mb-3">
-                                <label className="text-xs font-mono uppercase tracking-wider text-slate-400">
-                                    Source Topic or Text
-                                </label>
-                                <span className="text-[11px] font-mono text-slate-500">{topic.length}/1000</span>
-                            </div>
+                    <div className="glass-panel p-6 sm:p-8 rounded-3xl border border-white/10">
+                        <div className="flex items-center gap-2 mb-4">
+                            <Sparkles className="w-5 h-5 text-emerald-400" />
+                            <h2 className="text-base font-bold text-white">What would you like to summarize?</h2>
+                        </div>
+                        <p className="text-xs text-slate-300 mb-4 leading-relaxed">
+                            Paste lecture notes, book excerpts, or type a conceptual question.
+                        </p>
+
+                        <div className="relative">
                             <textarea
-                                className="w-full h-80 p-4 rounded-2xl glass-input text-sm font-sans placeholder:text-slate-600 resize-none leading-relaxed"
-                                placeholder="Paste or type a topic, textbook chapter, or concept... (e.g. Photosynthesis, Supply & Demand, Newton's Laws, Machine Learning Basics)"
+                                rows="6"
                                 value={topic}
-                                maxLength={1000}
                                 onChange={(e) => setTopic(e.target.value)}
-                            />
+                                placeholder="e.g. Causes of World War I, How Transformer Attention Works, DNA Replication, Cellular Respiration..."
+                                maxLength={1000}
+                                className="w-full p-4 rounded-2xl glass-input text-sm text-white placeholder-slate-500 resize-none font-sans border border-white/15 focus-visible:ring-2 focus-visible:ring-emerald-500/70"
+                            ></textarea>
+                            <span className="absolute bottom-3 right-3 text-xs font-mono text-slate-400">
+                                {topic.length}/1000
+                            </span>
+                        </div>
+
+                        {/* Quick Prompts */}
+                        <div className="mt-4">
+                            <span className="text-xs font-mono text-slate-400 uppercase tracking-wide block mb-2">Example Topics:</span>
+                            <div className="flex flex-wrap gap-2">
+                                {[
+                                    "Quantum Entanglement & Superposition",
+                                    "How Neural Networks Learn with Backpropagation",
+                                    "Key Causes of the French Revolution"
+                                ].map((t, idx) => (
+                                    <button
+                                        key={idx}
+                                        type="button"
+                                        onClick={() => setTopic(t)}
+                                        className="text-xs px-3 py-1.5 rounded-xl bg-slate-900 border border-white/15 text-slate-300 hover:text-white hover:border-emerald-500/40 transition-colors cursor-pointer"
+                                    >
+                                        {t}
+                                    </button>
+                                ))}
+                            </div>
                         </div>
 
                         <button
                             onClick={handleSummarize}
                             disabled={isLoading || !topic.trim()}
-                            className="mt-6 w-full py-3.5 px-4 rounded-xl font-semibold text-sm bg-gradient-to-r from-emerald-500 to-teal-500 text-slate-950 hover:brightness-110 active:scale-95 transition-all shadow-[0_0_25px_rgba(16,185,129,0.3)] disabled:opacity-40 flex items-center justify-center gap-2"
+                            className="mt-6 w-full py-3.5 px-4 rounded-xl font-semibold text-sm bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-400 hover:to-emerald-500 text-slate-950 transition-all shadow-[0_0_25px_rgba(16,185,129,0.3)] disabled:opacity-40 flex items-center justify-center gap-2 cursor-pointer focus-visible:ring-2 focus-visible:ring-emerald-500/70"
                         >
                             {isLoading ? (
                                 <>
@@ -247,27 +268,28 @@ const Summarize = () => {
                         </button>
                     </div>
 
-                    {/* Output Panel */}
-                    <div className="glass-panel p-6 sm:p-8 rounded-3xl flex flex-col justify-between relative overflow-hidden">
+                    {/* Output Panel (FIX-21: clean non-clipped header, FIX-01: MarkdownRenderer) */}
+                    <div className="glass-panel p-6 sm:p-8 rounded-3xl flex flex-col justify-between border border-white/10 relative overflow-hidden">
                         <div>
-                            <div className="flex justify-between items-center mb-3 pb-2 border-b border-white/5">
-                                <div className="flex items-center gap-2">
-                                    <BookOpen className="w-4 h-4 text-emerald-400" />
-                                    <span className="text-xs font-mono uppercase tracking-wider text-slate-400 truncate max-w-[200px]">
-                                        Executive Summary {summaryTopic ? `(${summaryTopic.slice(0, 25)})` : ''}
+                            <div className="flex justify-between items-center mb-4 pb-3 border-b border-white/10 gap-2">
+                                <div className="flex items-center gap-2 min-w-0 flex-1">
+                                    <BookOpen className="w-4 h-4 text-emerald-400 shrink-0" />
+                                    <span className="text-xs font-mono uppercase tracking-wider text-slate-300 truncate">
+                                        Executive Summary
                                     </span>
                                 </div>
                                 {summary && (
-                                    <div className="flex items-center gap-1.5">
+                                    <div className="flex items-center gap-1.5 shrink-0 whitespace-nowrap">
                                         {/* Audio TTS Button */}
                                         <button
                                             onClick={handleToggleTTS}
-                                            className={`p-1.5 rounded-lg border text-xs flex items-center gap-1 font-mono transition-colors ${
+                                            className={`p-1.5 px-2.5 rounded-lg border text-xs flex items-center gap-1 font-mono transition-colors cursor-pointer ${
                                                 isSpeaking 
                                                     ? 'bg-emerald-500/30 border-emerald-400 text-emerald-300 animate-pulse' 
-                                                    : 'bg-slate-900 border-slate-800 text-slate-300 hover:text-emerald-400'
+                                                    : 'bg-slate-900 border-white/15 text-slate-300 hover:text-emerald-400'
                                             }`}
                                             title={isSpeaking ? "Stop Reading" : "Read Summary Aloud (TTS)"}
+                                            aria-label="Read Summary Aloud"
                                         >
                                             {isSpeaking ? <VolumeX className="w-3.5 h-3.5" /> : <Volume2 className="w-3.5 h-3.5" />}
                                             <span>{isSpeaking ? 'Stop' : 'Listen'}</span>
@@ -277,8 +299,9 @@ const Summarize = () => {
                                         <button
                                             onClick={handleSaveToLibrary}
                                             disabled={isSaving}
-                                            className="p-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-300 hover:text-emerald-400 text-xs flex items-center gap-1 font-mono disabled:opacity-50"
+                                            className="p-1.5 px-2.5 rounded-lg bg-slate-900 border border-white/15 text-slate-300 hover:text-emerald-400 text-xs flex items-center gap-1 font-mono disabled:opacity-50 cursor-pointer"
                                             title="Save to Personal Study Library"
+                                            aria-label="Save to Library"
                                         >
                                             {saved ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Save className="w-3.5 h-3.5" />}
                                             <span>{isSaving ? 'Saving...' : (saved ? 'Saved!' : 'Save')}</span>
@@ -287,8 +310,9 @@ const Summarize = () => {
                                         {/* Download Markdown */}
                                         <button
                                             onClick={handleDownloadMarkdown}
-                                            className="p-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-300 hover:text-emerald-400 text-xs flex items-center gap-1 font-mono"
+                                            className="p-2 rounded-lg bg-slate-900 border border-white/15 text-slate-300 hover:text-emerald-400 text-xs flex items-center gap-1 font-mono cursor-pointer"
                                             title="Download Markdown File (.md)"
+                                            aria-label="Download Markdown"
                                         >
                                             <Download className="w-3.5 h-3.5" />
                                         </button>
@@ -296,7 +320,8 @@ const Summarize = () => {
                                         {/* Copy Text */}
                                         <button
                                             onClick={handleCopy}
-                                            className="p-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-300 hover:text-emerald-400 text-xs flex items-center gap-1 font-mono"
+                                            className="p-1.5 px-2.5 rounded-lg bg-slate-900 border border-white/15 text-slate-300 hover:text-emerald-400 text-xs flex items-center gap-1 font-mono cursor-pointer"
+                                            aria-label="Copy summary text"
                                         >
                                             {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
                                             <span>{copied ? 'Copied' : 'Copy'}</span>
@@ -306,22 +331,21 @@ const Summarize = () => {
                             </div>
 
                             {summary ? (
-                                <div className="h-80 overflow-y-auto pr-2 text-sm text-slate-200 leading-relaxed font-sans whitespace-pre-wrap">
-                                    {summary}
+                                <div className="h-96 overflow-y-auto pr-2 text-sm text-slate-200 leading-relaxed font-sans">
+                                    <MarkdownRenderer content={summary} />
                                 </div>
                             ) : (
-                                <div className="h-80 flex flex-col items-center justify-center text-slate-600 text-center p-6 border-2 border-dashed border-slate-800 rounded-2xl">
-                                    <BookOpen className="w-12 h-12 text-slate-700 mb-3" />
-                                    <p className="text-sm font-mono text-slate-400">Your AI-generated summary will render here</p>
-                                    <span className="text-xs text-slate-600 mt-1">Enter a topic on the left to begin synthesis</span>
+                                <div className="h-96 flex flex-col items-center justify-center text-slate-400 text-center p-6 border-2 border-dashed border-white/10 rounded-2xl">
+                                    <BookOpen className="w-12 h-12 text-slate-600 mb-3" />
+                                    <p className="text-sm font-mono text-slate-300">Your AI-generated summary will render here</p>
+                                    <span className="text-xs text-slate-400 mt-1">Enter a topic on the left to begin synthesis</span>
                                 </div>
                             )}
                         </div>
 
-                        <div className="mt-4 pt-3 border-t border-white/5 flex items-center justify-between text-[11px] font-mono text-slate-500">
-                            <span className="flex items-center gap-1 text-emerald-500/80">
-                                <ShieldCheck className="w-3 h-3 text-emerald-400" /> Grounded in Academic Facts
-                            </span>
+                        {/* Footer (FIX-28: remove fake trust label "Grounded in Academic Facts") */}
+                        <div className="mt-4 pt-3 border-t border-white/10 flex items-center justify-between text-xs font-mono text-slate-400">
+                            <span>Summary synthesis</span>
                             <span>Text-to-Speech & Export Enabled</span>
                         </div>
                     </div>

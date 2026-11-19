@@ -16,6 +16,7 @@
   color-scheme: dark;
   background-color: #0b0f17;
   color: #e2e8f0;
+  --border-interactive: rgba(255, 255, 255, 0.35);
 }
 
 body {
@@ -48,8 +49,8 @@ body {
 }
 
 .glass-input {
-  background: rgba(11, 15, 25, 0.8);
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(11, 15, 25, 0.85);
+  border: 1px solid var(--border-interactive);
   color: #f1f5f9;
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
@@ -57,8 +58,13 @@ body {
 .glass-input:focus {
   outline: none;
   border-color: #10b981;
-  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.25), 0 0 15px rgba(16, 185, 129, 0.15);
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.3), 0 0 15px rgba(16, 185, 129, 0.2);
   background: rgba(15, 23, 42, 0.95);
+}
+
+/* Explicit Interactive Boundary Class for ≥3:1 Contrast */
+.border-interactive {
+  border-color: var(--border-interactive) !important;
 }
 
 /* Custom Sleek Scrollbar */
@@ -72,7 +78,7 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.25);
   border-radius: 9999px;
   border: 2px solid #0b0f17;
 }
@@ -81,7 +87,7 @@ body {
   background: #10b981;
 }
 
-/* Glow & Pulse Animation (Static or disabled under reduced motion) */
+/* Glow & Pulse Animation */
 @keyframes pulseGlow {
   0%, 100% {
     opacity: 0.6;
@@ -102,6 +108,11 @@ body {
 pre code {
   font-family: 'JetBrains Mono', 'Fira Code', Menlo, Monaco, Consolas, 'Courier New', monospace;
   font-size: 0.875rem;
+}
+
+/* FIX-01 inline math nowrap */
+.katex, .katex-html {
+  white-space: nowrap !important;
 }
 
 /* FIX-16: prefers-reduced-motion Hygiene */

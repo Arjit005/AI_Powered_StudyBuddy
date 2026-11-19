@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { Volume2, VolumeX, Sparkles, RotateCw, Lightbulb, CheckCircle2 } from 'lucide-react';
+import MarkdownRenderer from '../MarkdownRenderer';
 
 /**
  * ReactBits-inspired 3D Physics FlipCard
@@ -168,9 +169,7 @@ const FlipCard3D = ({
 
                     {/* Central Content */}
                     <div className="my-auto text-left px-2 max-h-40 overflow-y-auto custom-scrollbar">
-                        <div className="text-base sm:text-lg font-medium text-slate-100 leading-relaxed">
-                            {backContent}
-                        </div>
+                        <MarkdownRenderer content={backContent} />
                     </div>
 
                     {/* Footer Tip */}

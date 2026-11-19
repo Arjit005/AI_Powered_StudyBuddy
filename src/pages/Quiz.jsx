@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react';
 import { Zap, CheckCircle2, XCircle, Award, RotateCcw, Save, Check } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { apiRequest } from '../config/apiClient';
+import MarkdownRenderer from '../components/MarkdownRenderer';
 
 const Quiz = () => {
     const [topic, setTopic] = useState('');
@@ -304,9 +305,9 @@ const Quiz = () => {
                                         </div>
 
                                         {submitted && q.explanation && (
-                                            <div className="p-3 rounded-xl bg-slate-900/80 border border-slate-800 text-xs text-slate-300 font-mono">
-                                                <span className="text-emerald-400 font-bold">Explanation: </span>
-                                                {q.explanation}
+                                            <div className="p-3.5 rounded-xl bg-slate-900/80 border border-slate-800 text-xs text-slate-300 font-sans">
+                                                <span className="text-emerald-400 font-bold block mb-1">Explanation: </span>
+                                                <MarkdownRenderer content={q.explanation} />
                                             </div>
                                         )}
                                     </div>

@@ -119,7 +119,7 @@ def generate_network_graph(edge_data):
             root = sources[0] if sources else list(G.nodes)[0]
             depths = get_node_depths(G, root)
 
-        fig = plt.figure(figsize=(13, 9), facecolor='#f8fafc')
+        fig = plt.figure(figsize=(13, 9), facecolor='#0b0f17')
         
         # 4. Determine Layout
         layout_type = edge_data.get("layout", "tree")
@@ -184,24 +184,24 @@ def generate_network_graph(edge_data):
             plt.text(x, y, wrapped_labels[node],
                      fontsize=fontsize,
                      fontweight=fontweight,
-                     color='#1e293b',
+                     color='#f8fafc',
                      ha='center', va='center',
                      bbox=dict(
-                         facecolor='white', 
+                         facecolor='#131c2e', 
                          edgecolor=color, 
                          boxstyle='round,pad=0.5', 
                          alpha=1.0, 
                          linewidth=2.0 
                      ))
 
-        title_color = '#064e3b'
+        title_color = '#10b981'
         suffix = "Organizational Chart" if layout_type == "tree" else "Concept Map"
         plt.title(f"{root if root else 'System'} {suffix}", fontsize=20, fontweight='bold', pad=30, color=title_color)
         plt.axis('off')
         plt.tight_layout()
 
         buffer = io.BytesIO()
-        plt.savefig(buffer, format='png', bbox_inches='tight', transparent=False, facecolor='#f8fafc', dpi=130)
+        plt.savefig(buffer, format='png', bbox_inches='tight', transparent=False, facecolor='#0b0f17', dpi=130)
         buffer.seek(0)
         img_bytes = buffer.getvalue()
         if fig:

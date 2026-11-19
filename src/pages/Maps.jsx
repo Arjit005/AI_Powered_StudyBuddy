@@ -249,12 +249,17 @@ const Maps = () => {
                     {/* Mode 2: NetworkX Matplotlib Graph */}
                     {!loading && mapImage && viewMode === 'networkx' && (
                         <div className="relative group w-full flex flex-col items-center">
-                            <img
-                                src={mapImage}
-                                alt="AI Concept Map"
-                                className="max-h-[500px] w-auto object-contain rounded-2xl border border-slate-800 shadow-2xl cursor-pointer hover:scale-[1.01] transition-transform"
-                                onClick={() => setIsZoomed(true)}
-                            />
+                            <div className="relative bg-[#0b0f17] p-2 rounded-2xl border border-slate-800 shadow-2xl">
+                                <img
+                                    src={mapImage}
+                                    alt="AI Concept Map"
+                                    className="max-h-[500px] w-auto object-contain rounded-xl cursor-pointer hover:scale-[1.01] transition-transform"
+                                    onClick={() => setIsZoomed(true)}
+                                />
+                            </div>
+                            <p className="text-[11px] text-slate-500 mt-2 font-mono">
+                                AI-generated concept map — verify before use
+                            </p>
                             <div className="mt-4 flex gap-3">
                                 <button
                                     onClick={() => setIsZoomed(true)}

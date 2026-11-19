@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Mic, MicOff, Volume2, VolumeX, Sparkles, Bot, RotateCcw, AlertCircle, Headphones } from 'lucide-react';
 import SpotlightCard from '../components/ui/SpotlightCard';
 import { apiRequest } from '../config/apiClient';
+import MarkdownRenderer from '../components/MarkdownRenderer';
 
 const Voice = () => {
     const [isListening, setIsListening] = useState(false);
@@ -395,8 +396,8 @@ const Voice = () => {
                             </button>
                         </div>
 
-                        <div className="text-slate-200 text-sm sm:text-base leading-relaxed whitespace-pre-wrap font-sans">
-                            {aiResponse}
+                        <div className="text-slate-200 text-sm sm:text-base leading-relaxed font-sans">
+                            <MarkdownRenderer content={aiResponse} />
                         </div>
                     </SpotlightCard>
                 )}

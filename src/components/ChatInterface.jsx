@@ -751,63 +751,70 @@ const ChatInterface = () => {
                                     {!loadingHistory && messages.map((msg, idx) => (
                                         <div
                                             key={idx}
-                                            className={`flex gap-3 sm:gap-4 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                                            className={`flex flex-col gap-1.5 my-3 ${msg.role === 'user' ? 'items-end' : 'items-start'}`}
                                         >
-                                            {msg.role === 'ai' && (
-                                                <div className="w-8 h-8 rounded-xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0 mt-1 shadow-sm">
-                                                    <Bot className="w-4 h-4" />
-                                                </div>
-                                            )}
-
-                                            <div className={`relative group max-w-[90%] sm:max-w-[85%] rounded-2xl p-4 sm:p-5 transition-all text-sm leading-relaxed ${
-                                                msg.role === 'user'
-                                                    ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-br-none shadow-[0_4px_20px_rgba(16,185,129,0.25)]'
-                                                    : msg.isError
-                                                    ? 'bg-rose-950/40 border border-rose-800/60 text-rose-200 rounded-bl-none'
-                                                    : 'bg-[#131b2e]/90 border border-white/5 text-slate-200 rounded-bl-none shadow-md backdrop-blur-md'
-                                            }`}>
-                                                <button
-                                                    onClick={() => handleCopy(msg.content, idx)}
-                                                    className="absolute top-2.5 right-2.5 opacity-0 group-hover:opacity-100 p-1.5 rounded-lg bg-black/40 hover:bg-black/60 text-slate-300 transition-all text-xs"
-                                                    title="Copy message"
-                                                >
-                                                    {copiedIndex === idx ? (
-                                                        <Check className="w-3.5 h-3.5 text-emerald-400" />
-                                                    ) : (
-                                                        <Copy className="w-3.5 h-3.5" />
-                                                    )}
-                                                </button>
-
-                                                <StructuredMessage 
-                                                    content={msg.content} 
-                                                    citations={msg.citations || []}
-                                                    onSelectCitation={(cit) => handleSelectCitation(cit)}
-                                                />
-                                                {msg.isStreaming && (
-                                                    <span className="inline-block w-2 h-4 bg-emerald-400 animate-pulse ml-1 translate-y-0.5 rounded-sm" title="Streaming response..." />
+                                            <div className="flex items-center gap-2 px-1 text-xs font-mono text-slate-400">
+                                                <span className="font-semibold text-slate-300">
+                                                    {msg.role === 'user' ? 'You' : 'AI Study Assistant'}
+                                                </span>
+                                                {msg.timestamp && (
+                                                    <span className="text-slate-400">· {msg.timestamp}</span>
                                                 )}
-
-                                                <div className="mt-2.5 pt-2 border-t border-white/5 flex items-center justify-between text-[11px] font-mono text-slate-500">
-                                                    {msg.role === 'ai' && !msg.isError ? (
-                                                        <span className="flex items-center gap-1 text-emerald-500/80">
-                                                            <Shield className="w-2.5 h-2.5" /> Verified by Safety Guard
-                                                        </span>
-                                                    ) : (
-                                                        <span className="text-slate-400">Student</span>
-                                                    )}
-                                                    {msg.timestamp && (
-                                                        <span className="flex items-center gap-1 text-slate-400">
-                                                            <Clock className="w-2.5 h-2.5" /> {msg.timestamp}
-                                                        </span>
-                                                    )}
-                                                </div>
                                             </div>
 
-                                            {msg.role === 'user' && (
-                                                <div className="w-8 h-8 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-300 shrink-0 mt-1 shadow-sm">
-                                                    <User className="w-4 h-4" />
+                                            <div className="flex gap-3 sm:gap-4 w-full">
+                                                {msg.role === 'ai' && (
+                                                    <div className="w-8 h-8 rounded-xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0 mt-1 shadow-sm">
+                                                        <Bot className="w-4 h-4" />
+                                                    </div>
+                                                )}
+
+                                                <div className={`relative group transition-all text-sm leading-relaxed ${
+                                                    msg.role === 'user'
+                                                        ? 'ml-auto max-w-[52ch] rounded-2xl p-4 sm:p-5 bg-emerald-500/15 border border-emerald-500/30 text-white rounded-br-none shadow-[0_4px_20px_rgba(16,185,129,0.2)]'
+                                                        : msg.isError
+                                                        ? 'max-w-[90%] sm:max-w-[85%] rounded-2xl p-4 sm:p-5 bg-rose-950/40 border border-rose-800/60 text-rose-200 rounded-bl-none'
+                                                        : 'max-w-[90%] sm:max-w-[85%] rounded-2xl p-4 sm:p-5 bg-[#131b2e]/90 border border-white/10 text-slate-200 rounded-bl-none shadow-md backdrop-blur-md'
+                                                }`}>
+                                                    <button
+                                                        onClick={() => handleCopy(msg.content, idx)}
+                                                        className="absolute top-2.5 right-2.5 opacity-0 group-hover:opacity-100 p-1.5 rounded-lg bg-black/40 hover:bg-black/60 text-slate-300 transition-all text-xs"
+                                                        title="Copy message"
+                                                    >
+                                                        {copiedIndex === idx ? (
+                                                            <Check className="w-3.5 h-3.5 text-emerald-400" />
+                                                        ) : (
+                                                            <Copy className="w-3.5 h-3.5" />
+                                                        )}
+                                                    </button>
+
+                                                    <StructuredMessage 
+                                                        content={msg.content} 
+                                                        citations={msg.citations || []}
+                                                        onSelectCitation={(cit) => handleSelectCitation(cit)}
+                                                    />
+                                                    {msg.isStreaming && (
+                                                        <span className="inline-block w-2 h-4 bg-emerald-400 animate-pulse ml-1 translate-y-0.5 rounded-sm" title="Streaming response..." />
+                                                    )}
+
+                                                    {msg.role === 'ai' && !msg.isError && (
+                                                        <div className="mt-2.5 pt-2 border-t border-white/10 flex items-center justify-between text-xs font-mono text-slate-400">
+                                                            <span className="flex items-center gap-1 text-emerald-400">
+                                                                <Shield className="w-3 h-3" />
+                                                                {msg.citations && msg.citations.length > 0 
+                                                                    ? `${msg.citations.length} sources cited`
+                                                                    : 'Standard response'}
+                                                            </span>
+                                                        </div>
+                                                    )}
                                                 </div>
-                                            )}
+
+                                                {msg.role === 'user' && (
+                                                    <div className="w-8 h-8 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-300 shrink-0 mt-1 shadow-sm">
+                                                        <User className="w-4 h-4" />
+                                                    </div>
+                                                )}
+                                            </div>
                                         </div>
                                     ))}
 
@@ -828,17 +835,30 @@ const ChatInterface = () => {
                                 </div>
                             </div>
 
-                            {/* Suggested Chips (Only if fresh chat) */}
+                            {/* Suggested Chips with right fade mask (FIX-21 / B3) */}
                             {messages.length <= 2 && (
-                                <div className="px-4 py-2 bg-[#0d1422] border-t border-emerald-950/30 flex items-center gap-2 overflow-x-auto text-xs no-scrollbar shrink-0">
-                                    <span className="text-slate-400 font-mono flex items-center gap-1 shrink-0 text-[11px]">
+                                <div 
+                                    className="px-4 py-2 bg-[#0d1422] border-t border-emerald-950/30 flex items-center gap-2 overflow-x-auto text-xs no-scrollbar shrink-0"
+                                    style={{
+                                        maskImage: 'linear-gradient(to right, black 85%, transparent)',
+                                        WebkitMaskImage: 'linear-gradient(to right, black 85%, transparent)'
+                                    }}
+                                >
+                                    <span className="text-slate-400 font-mono flex items-center gap-1 shrink-0 text-xs">
                                         <Sparkles className="w-3 h-3 text-emerald-400" /> Quick Topics:
                                     </span>
-                                    {SUGGESTED_PROMPTS.map((prompt, i) => (
+                                    {[
+                                        "Photosynthesis step-by-step diagram",
+                                        "Calculus derivatives with real examples",
+                                        "Database Indexing & B-Trees",
+                                        "Causes of World War II"
+                                    ].map((prompt, i) => (
                                         <button
                                             key={i}
+                                            type="button"
                                             onClick={() => setInput(prompt)}
-                                            className="px-3 py-1 rounded-full bg-slate-900 hover:bg-emerald-950/70 border border-slate-800 hover:border-emerald-700/60 text-slate-300 hover:text-emerald-300 shrink-0 transition-all font-mono text-[11px]"
+                                            className="px-3 py-1 rounded-full bg-slate-900 hover:bg-emerald-950/70 border border-white/15 hover:border-emerald-500/50 text-slate-300 hover:text-white shrink-0 transition-all font-mono text-xs max-w-[42ch] truncate cursor-pointer"
+                                            title={prompt}
                                         >
                                             {prompt}
                                         </button>

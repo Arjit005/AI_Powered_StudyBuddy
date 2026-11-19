@@ -19,7 +19,7 @@ import MermaidViewer from '../components/MermaidViewer';
 import { apiRequest } from '../config/apiClient';
 
 export default function CanvasStudio() {
-  const [topic, setTopic] = useState('Distributed Microservices with Event Sourcing');
+  const [topic, setTopic] = useState('');
   const [detailLevel, setDetailLevel] = useState('standard');
   const [diagramType] = useState('architecture');
   const [loading, setLoading] = useState(false);
@@ -49,7 +49,6 @@ export default function CanvasStudio() {
 
   // Initial load
   useEffect(() => {
-    fetchInitialCanvas();
     fetchMcpConfig();
     return () => {
       requestGenRef.current += 1;
@@ -501,9 +500,9 @@ export default function CanvasStudio() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-white flex flex-col pt-16">
+    <div className="h-screen bg-slate-950 text-white flex flex-col overflow-hidden">
       {/* Top Banner / Controls */}
-      <div className="glass-panel border-b border-white/10 px-6 py-4 flex flex-wrap items-center justify-between gap-4 sticky top-16 z-30">
+      <div className="glass-panel border-b border-white/10 px-6 py-3.5 flex flex-wrap items-center justify-between gap-4 shrink-0 z-20">
         <div className="flex items-center gap-3">
           <div className="p-2.5 rounded-xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-400">
             <Layout className="w-5 h-5" />
@@ -658,11 +657,41 @@ export default function CanvasStudio() {
           onMouseUp={handleMouseUp}
           className="flex-1 h-full w-full relative cursor-grab active:cursor-grabbing select-none overflow-hidden"
           style={{
-            backgroundImage: `radial-gradient(circle, rgba(16, 185, 129, 0.12) 1px, transparent 1px)`,
+            backgroundImage: `radial-gradient(circle, rgba(16, 185, 129, 0.15) 1.5px, transparent 1.5px)`,
             backgroundSize: `${24 * zoom}px ${24 * zoom}px`,
             backgroundPosition: `${pan.x}px ${pan.y}px`
           }}
         >
+          {/* Centered Empty State (FIX-20 / A8) */}
+          {!loading && (!canvasData?.nodes || canvasData.nodes.length === 0) && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center z-10 pointer-events-none">
+              <div className="glass-panel p-8 rounded-3xl max-w-lg border border-white/15 shadow-2xl pointer-events-auto space-y-4">
+                <div className="w-14 h-14 mx-auto rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
+                  <Layout className="w-7 h-7" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-white">Start with a topic</h3>
+                  <p className="text-xs text-slate-400 mt-1">Type in the search bar above or pick an example to visualize concepts.</p>
+                </div>
+                <div className="flex flex-wrap items-center justify-center gap-2 pt-2">
+                  {[
+                    "Water Cycle",
+                    "Causes of World War I",
+                    "Newton's Laws of Motion"
+                  ].map((exampleTopic, i) => (
+                    <button
+                      key={i}
+                      type="button"
+                      onClick={() => setTopic(exampleTopic)}
+                      className="px-3 py-1.5 rounded-xl bg-slate-900 border border-white/20 text-slate-300 hover:text-white hover:border-emerald-500/50 text-xs font-medium transition-all cursor-pointer shadow-sm"
+                    >
+                      {exampleTopic}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
           {loading ? (
             <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/60 backdrop-blur-sm z-30">
               <div className="p-4 rounded-2xl glass-panel-glow flex flex-col items-center gap-3 border border-emerald-500/30">
