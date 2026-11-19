@@ -110,9 +110,16 @@ pre code {
   font-size: 0.875rem;
 }
 
-/* FIX-01 inline math nowrap */
-.katex, .katex-html {
-  white-space: nowrap !important;
+/* Math formatting: wrap math blocks in scroll container, keep inline elements intact */
+.katex-display {
+  overflow-x: auto !important;
+  overflow-y: hidden !important;
+  max-width: 100% !important;
+  padding: 0.5rem 0 !important;
+}
+
+.katex {
+  max-width: 100%;
 }
 
 /* FIX-16: prefers-reduced-motion Hygiene */

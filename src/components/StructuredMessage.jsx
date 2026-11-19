@@ -7,7 +7,7 @@ const StructuredMessage = ({ content, citations = [], onSelectCitation }) => {
             content={content} 
             citations={citations} 
             onSelectCitation={onSelectCitation}
-            className="max-w-[72ch]"
+            className="w-full"
         />
     );
 };

@@ -808,11 +808,31 @@ def chat_endpoint(
         conv = conv_query.first()
 
     if not conv:
-        auto_title = clean_message[:35] + ("..." if len(clean_message) > 35 else "")
-        conv = models.Conversation(user_id=user_id, title=auto_title or "Study Session")
+        words = clean_message.split()
+        base_title = " ".join(words[:6]) if len(words) > 6 else clean_message
+        if len(base_title) > 36:
+            base_title = base_title[:36].rstrip() + "..."
+        # Disambiguate if existing session with same title exists
+        existing_count = db.query(models.Conversation).filter(
+            models.Conversation.user_id == user_id,
+            models.Conversation.title.like(f"{base_title}%")
+        ).count()
+        if existing_count > 0:
+            auto_title = f"{base_title} (Part {existing_count + 1})"
+        else:
+            auto_title = base_title or "Study Session"
+
+        conv = models.Conversation(user_id=user_id, title=auto_title)
         db.add(conv)
         db.commit()
         db.refresh(conv)
+    elif conv.title in ["New Study Session", "Study Session"]:
+        words = clean_message.split()
+        base_title = " ".join(words[:6]) if len(words) > 6 else clean_message
+        if len(base_title) > 36:
+            base_title = base_title[:36].rstrip() + "..."
+        conv.title = base_title
+        db.commit()
     elif conv.title in ["New Study Session", "Study Session"]:
         conv.title = clean_message[:35] + ("..." if len(clean_message) > 35 else "")
 
@@ -949,11 +969,31 @@ def chat_with_ai_stream(
         conv_query = conv_query.filter(models.Conversation.user_id == user_id)
         conv = conv_query.first()
     if not conv:
-        auto_title = clean_message[:35] + ("..." if len(clean_message) > 35 else "")
-        conv = models.Conversation(user_id=user_id, title=auto_title or "Study Session")
+        words = clean_message.split()
+        base_title = " ".join(words[:6]) if len(words) > 6 else clean_message
+        if len(base_title) > 36:
+            base_title = base_title[:36].rstrip() + "..."
+        # Disambiguate if existing session with same title exists
+        existing_count = db.query(models.Conversation).filter(
+            models.Conversation.user_id == user_id,
+            models.Conversation.title.like(f"{base_title}%")
+        ).count()
+        if existing_count > 0:
+            auto_title = f"{base_title} (Part {existing_count + 1})"
+        else:
+            auto_title = base_title or "Study Session"
+
+        conv = models.Conversation(user_id=user_id, title=auto_title)
         db.add(conv)
         db.commit()
         db.refresh(conv)
+    elif conv.title in ["New Study Session", "Study Session"]:
+        words = clean_message.split()
+        base_title = " ".join(words[:6]) if len(words) > 6 else clean_message
+        if len(base_title) > 36:
+            base_title = base_title[:36].rstrip() + "..."
+        conv.title = base_title
+        db.commit()
 
     conv_id = conv.id
 
@@ -1063,7 +1103,15 @@ def chat_with_ai_stream(
             finally:
                 persist_db.close()
 
-    return StreamingResponse(event_generator(), media_type="text/event-stream")
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache, no-transform",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no"
+        }
+    )
 
 @app.get("/api/chat", response_model=List[ChatHistoryItem], tags=["AI Learning"])
 def get_chat_history(

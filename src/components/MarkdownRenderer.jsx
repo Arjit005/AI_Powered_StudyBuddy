@@ -38,6 +38,13 @@ export default function MarkdownRenderer({
 
     if (!content) return null;
 
+    // Partial markdown streaming tolerance: if ends with unclosed ```, close it for rendering
+    let sanitizedContent = content;
+    const fenceCount = (content.match(/```/g) || []).length;
+    if (fenceCount % 2 !== 0) {
+        sanitizedContent = content + "\n```";
+    }
+
     const components = {
         h1: ({ node, ...props }) => <h1 className="text-xl sm:text-2xl font-bold text-white tracking-tight my-4" {...props} />,
         h2: ({ node, ...props }) => <h2 className="text-lg sm:text-xl font-bold text-white tracking-tight my-3 pb-1 border-b border-white/10" {...props} />,
@@ -102,10 +109,9 @@ export default function MarkdownRenderer({
         th: ({ node, ...props }) => <th className="px-3 py-2 text-slate-200" {...props} />,
         td: ({ node, ...props }) => <td className="px-3 py-2 text-slate-300" {...props} />,
         span: ({ node, className, children, ...props }) => {
-            // If Katex math span, ensure nowrap
             const isMath = className && (className.includes('katex') || className.includes('math'));
             return (
-                <span className={`${className || ''} ${isMath ? 'whitespace-nowrap inline-block' : ''}`} {...props}>
+                <span className={`${className || ''} ${isMath ? 'max-w-full overflow-x-auto inline-block align-middle' : ''}`} {...props}>
                     {children}
                 </span>
             );
@@ -168,7 +174,7 @@ export default function MarkdownRenderer({
                 rehypePlugins={[rehypeKatex]}
                 components={components}
             >
-                {content}
+                {sanitizedContent}
             </ReactMarkdown>
 
             {citations && citations.length > 0 && (

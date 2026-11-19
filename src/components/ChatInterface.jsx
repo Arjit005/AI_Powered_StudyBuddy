@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { 
     Send, Bot, User, Trash2, Shield, Copy, Check, Download, Sparkles, 
-    Clock, RefreshCw, Plus, MessageSquare, 
+    Clock, RefreshCw, Plus, MessageSquare, Square,
     PanelLeft, ChevronRight, Brain, X, BookOpen, ExternalLink
 } from 'lucide-react';
 import StructuredMessage from './StructuredMessage';
@@ -85,6 +85,7 @@ const ChatInterface = () => {
     const activeSendCountRef = useRef(0);
     const sendGenerationRef = useRef(0);
     const invalidatedConvsRef = useRef(new Set());
+    const abortControllerRef = useRef(null);
 
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -298,6 +299,13 @@ const ChatInterface = () => {
         }
     };
 
+    const handleStopGeneration = () => {
+        if (abortControllerRef.current) {
+            abortControllerRef.current.abort();
+            abortControllerRef.current = null;
+        }
+    };
+
     // Send Message
     const sendMessage = async (presetPrompt = null) => {
         const textToSend = (presetPrompt || input).trim();
@@ -325,6 +333,9 @@ const ChatInterface = () => {
         setIsLoading(true);
         activeSendCountRef.current += 1;
 
+        const abortController = new AbortController();
+        abortControllerRef.current = abortController;
+
         try {
             let streamSuccess = false;
             let streamAccepted = false;
@@ -332,6 +343,20 @@ const ChatInterface = () => {
             let streamCitations = [];
             const streamMsgId = 'stream-' + Date.now();
             let streamConvId = originatingConvId;
+
+            // RAF throttling state
+            let rafPending = false;
+            let pendingText = '';
+            const scheduleUpdate = () => {
+                if (rafPending) return;
+                rafPending = true;
+                requestAnimationFrame(() => {
+                    rafPending = false;
+                    if (isStillCurrentConv()) {
+                        setMessages(prev => prev.map(m => m.id === streamMsgId ? { ...m, content: pendingText, citations: streamCitations } : m));
+                    }
+                });
+            };
 
             try {
                 const token = localStorage.getItem('auth_token');
@@ -345,7 +370,8 @@ const ChatInterface = () => {
                     body: JSON.stringify({
                         message: textToSend,
                         conversation_id: originatingConvId
-                    })
+                    }),
+                    signal: abortController.signal
                 });
 
                 if (response.ok && response.body) {
@@ -374,7 +400,7 @@ const ChatInterface = () => {
 
                     while (!doneReading) {
                         const { value, done } = await reader.read();
-                        if (!isStillCurrentConv()) {
+                        if (!isStillCurrentConv() || abortController.signal.aborted) {
                             reader.cancel().catch(() => {});
                             return;
                         }
@@ -429,9 +455,8 @@ const ChatInterface = () => {
                             }
                             if (parsed.token || parsed.chunk) {
                                 accumulatedText += (parsed.token || parsed.chunk);
-                                if (isStillCurrentConv()) {
-                                    setMessages(prev => prev.map(m => m.id === streamMsgId ? { ...m, content: accumulatedText, citations: streamCitations } : m));
-                                }
+                                pendingText = accumulatedText;
+                                scheduleUpdate();
                             }
                         }
                     }
@@ -443,7 +468,7 @@ const ChatInterface = () => {
                         throw new Error('Streaming connection closed unexpectedly before response was received.');
                     } else if (!receivedDone) {
                         if (isStillCurrentConv()) {
-                            setMessages(prev => prev.map(m => m.id === streamMsgId ? { ...m, isStreaming: false, content: accumulatedText + "\n\n*(Generation interrupted)*" } : m));
+                            setMessages(prev => prev.map(m => m.id === streamMsgId ? { ...m, isStreaming: false, content: accumulatedText + "\n\n*(Generation stopped)*" } : m));
                         }
                         fetchConversations();
                         streamSuccess = true;
@@ -451,13 +476,20 @@ const ChatInterface = () => {
                     }
 
                     if (isStillCurrentConv()) {
-                        setMessages(prev => prev.map(m => m.id === streamMsgId ? { ...m, isStreaming: false } : m));
+                        setMessages(prev => prev.map(m => m.id === streamMsgId ? { ...m, isStreaming: false, content: accumulatedText, citations: streamCitations } : m));
                     }
                     fetchConversations();
                     streamSuccess = true;
                     return;
                 }
             } catch (streamErr) {
+                if (abortController.signal.aborted) {
+                    if (isStillCurrentConv()) {
+                        setMessages(prev => prev.map(m => m.id === streamMsgId ? { ...m, isStreaming: false, content: accumulatedText + "\n\n*(Generation stopped by student)*" } : m));
+                    }
+                    fetchConversations();
+                    return;
+                }
                 console.warn('SSE Streaming connection failed:', streamErr);
                 if (accumulatedText.length > 0) {
                     if (isStillCurrentConv()) {
@@ -604,6 +636,7 @@ const ChatInterface = () => {
                                                 <div
                                                     key={conv.id}
                                                     onClick={() => setActiveConvId(conv.id)}
+                                                    title={conv.title || "Study Session"}
                                                     className={`group p-2.5 rounded-2xl cursor-pointer transition-all flex items-center justify-between text-xs border ${
                                                         isActive
                                                             ? 'bg-emerald-950/40 border-emerald-500/40 text-emerald-300 shadow-[0_0_15px_rgba(16,185,129,0.15)]'
@@ -797,13 +830,11 @@ const ChatInterface = () => {
                                                         <span className="inline-block w-2 h-4 bg-emerald-400 animate-pulse ml-1 translate-y-0.5 rounded-sm" title="Streaming response..." />
                                                     )}
 
-                                                    {msg.role === 'ai' && !msg.isError && (
+                                                    {msg.role === 'ai' && !msg.isError && msg.citations && msg.citations.length > 0 && (
                                                         <div className="mt-2.5 pt-2 border-t border-white/10 flex items-center justify-between text-xs font-mono text-slate-400">
                                                             <span className="flex items-center gap-1 text-emerald-400">
                                                                 <Shield className="w-3 h-3" />
-                                                                {msg.citations && msg.citations.length > 0 
-                                                                    ? `${msg.citations.length} sources cited`
-                                                                    : 'Standard response'}
+                                                                {msg.citations.length} sources cited
                                                             </span>
                                                         </div>
                                                     )}
@@ -889,13 +920,26 @@ const ChatInterface = () => {
                                             <span className={`text-[10px] font-mono hidden sm:inline ${input.length > 2500 ? 'text-amber-400' : 'text-slate-500'}`}>
                                                 {input.length}/3000
                                             </span>
-                                            <button
-                                                type="submit"
-                                                disabled={!input.trim() || isLoading}
-                                                className="p-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 text-slate-950 hover:brightness-110 active:scale-95 transition-all disabled:opacity-30 disabled:cursor-not-allowed shadow-[0_0_15px_rgba(16,185,129,0.3)]"
-                                            >
-                                                <Send className="w-4 h-4" />
-                                            </button>
+                                            {isLoading ? (
+                                                <button
+                                                    type="button"
+                                                    onClick={handleStopGeneration}
+                                                    className="px-3 py-2 rounded-xl bg-rose-600/90 hover:bg-rose-600 text-white flex items-center gap-1.5 text-xs font-mono transition-all active:scale-95 shadow-[0_0_15px_rgba(225,29,72,0.4)]"
+                                                    title="Stop generating response"
+                                                >
+                                                    <Square className="w-3.5 h-3.5 fill-current" />
+                                                    <span className="hidden sm:inline">Stop</span>
+                                                </button>
+                                            ) : (
+                                                <button
+                                                    type="submit"
+                                                    disabled={!input.trim()}
+                                                    className="p-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 text-slate-950 hover:brightness-110 active:scale-95 transition-all disabled:opacity-30 disabled:cursor-not-allowed shadow-[0_0_15px_rgba(16,185,129,0.3)]"
+                                                    title="Send message"
+                                                >
+                                                    <Send className="w-4 h-4" />
+                                                </button>
+                                            )}
                                         </div>
                                     </form>
                                 </div>
