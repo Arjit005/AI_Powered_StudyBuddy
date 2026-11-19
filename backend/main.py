@@ -1245,10 +1245,9 @@ def chat_with_ai_stream(
         )
 
     def event_generator():
-        # First send metadata (conversation_id & citations)
+        # First send session metadata
         init_payload = {
-            "conversation_id": conv_id,
-            "citations": citations_list
+            "conversation_id": conv_id
         }
         yield f"data: {json.dumps(init_payload)}\n\n"
 
@@ -1256,13 +1255,18 @@ def chat_with_ai_stream(
         stream_succeeded = False
         try:
             for token in ai_service.AIService._generate_content_stream(prompt):
-                full_content.append(token)
-                yield f"data: {json.dumps({'token': token})}\n\n"
+                if token:
+                    full_content.append(token)
+                    yield f"data: {json.dumps({'token': token})}\n\n"
             stream_succeeded = True
         except Exception as e:
             import logging
             logging.error(f"Streaming token generation error: {e}", exc_info=True)
             yield f"data: {json.dumps({'error': 'AI tutor generation interrupted. Please retry.'})}\n\n"
+
+        # Emit citations after LLM generation completes, before [DONE]
+        if citations_list:
+            yield f"data: {json.dumps({'citations': citations_list})}\n\n"
 
         # Signal completion
         yield "data: [DONE]\n\n"

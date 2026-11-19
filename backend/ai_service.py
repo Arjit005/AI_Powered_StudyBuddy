@@ -582,8 +582,8 @@ class AIService:
                             if chunk.text:
                                 combined = overlap_buffer + chunk.text
                                 sanitized = sanitize_output(combined)
-                                if len(sanitized) > 60:
-                                    emit_len = len(sanitized) - 60
+                                if len(sanitized) > 20:
+                                    emit_len = len(sanitized) - 20
                                     to_yield = sanitized[:emit_len]
                                     overlap_buffer = sanitized[emit_len:]
                                     has_yielded = True
@@ -598,12 +598,6 @@ class AIService:
                         return
                     except Exception as me:
                         print(f"Gemini Stream model {model_name} failed: {me}")
-                        if has_yielded:
-                            # Stream was already in progress and partially emitted. Signal interrupted state cleanly to consumer.
-                            if overlap_buffer:
-                                yield sanitize_output(overlap_buffer)
-                            yield "\n\n*(Generation interrupted)*"
-                            return
                         continue
                 if not gemini_succeeded:
                     circuit_breaker.record_failure("gemini")
