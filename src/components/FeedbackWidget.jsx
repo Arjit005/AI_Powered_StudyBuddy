@@ -112,16 +112,23 @@ const FeedbackWidget = () => {
         }
     };
 
+    // On dense routes (/chat, /progress, /canvas), do not float over interactive elements
+    const isDenseRoute = ['/chat', '/progress', '/canvas'].includes(location.pathname);
+
     return (
-        <div className="fixed bottom-6 right-6 z-50">
+        <div className={`fixed z-50 transition-all ${
+            isDenseRoute 
+                ? 'bottom-[max(1rem,env(safe-area-inset-bottom))] right-4 sm:right-6' 
+                : 'bottom-[max(1.5rem,env(safe-area-inset-bottom))] right-6'
+        }`}>
             {!isOpen ? (
                 <button
                     onClick={handleOpen}
-                    className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 text-slate-950 font-bold text-xs shadow-[0_0_20px_rgba(16,185,129,0.35)] hover:scale-105 transition-all group cursor-pointer"
+                    className="flex items-center gap-2 px-3.5 py-2 sm:px-4 sm:py-2.5 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 text-slate-950 font-bold text-xs shadow-[0_0_20px_rgba(16,185,129,0.35)] hover:scale-105 active:scale-95 transition-all group cursor-pointer border border-emerald-400/30"
                     title="Send Feedback"
                 >
                     <MessageSquarePlus className="w-4 h-4 group-hover:rotate-12 transition-transform" />
-                    <span>Feedback</span>
+                    <span className="hidden sm:inline">Feedback</span>
                 </button>
             ) : (
                 <div className="glass-panel w-80 p-5 rounded-3xl border border-emerald-500/40 shadow-2xl relative animate-in fade-in slide-in-from-bottom-4 duration-200">

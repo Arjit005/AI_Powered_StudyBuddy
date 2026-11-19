@@ -3,7 +3,7 @@ import { useLocation } from 'react-router-dom';
 import { 
     Send, Bot, User, Trash2, Shield, Copy, Check, Download, Sparkles, 
     Clock, RefreshCw, Plus, MessageSquare, 
-    PanelLeft, ChevronRight, Brain, Cpu, Layers
+    PanelLeft, ChevronRight, Brain, X, BookOpen, ExternalLink
 } from 'lucide-react';
 import StructuredMessage from './StructuredMessage';
 import { apiRequest } from '../config/apiClient';
@@ -18,7 +18,31 @@ const SUGGESTED_PROMPTS = [
 const DEFAULT_GREETING = {
     role: 'ai',
     content: "👋 Hello! I am your **AI Study Buddy**.\n\nI can help you understand complex concepts, create structured study notes, explain difficult topics step-by-step, and generate visual diagrams.\n\nYou can start a new study session or review past sessions in the left drawer. What would you like to learn today?",
-    shield: 'Active'
+    shield: 'Active',
+    citations: []
+};
+
+// Pluralization helper
+const formatCount = (count, singular, plural = `${singular}s`) => {
+    return `${count} ${count === 1 ? singular : plural}`;
+};
+
+// Relative date helper
+const formatRelativeDate = (dateString) => {
+    if (!dateString) return '';
+    try {
+        const d = new Date(dateString);
+        if (isNaN(d.getTime())) return '';
+        const now = new Date();
+        const diffMs = now - d;
+        const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+        if (diffDays <= 0) return 'Today';
+        if (diffDays === 1) return 'Yesterday';
+        if (diffDays < 7) return `${diffDays} days ago`;
+        return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
+    } catch {
+        return '';
+    }
 };
 
 const ChatInterface = () => {
@@ -29,6 +53,11 @@ const ChatInterface = () => {
     const [sidebarOpen, setSidebarOpen] = useState(true);
     const [memoryModalOpen, setMemoryModalOpen] = useState(false);
 
+    // Citation side rail state (FIX-02, FIX-03)
+    const [selectedCitation, setSelectedCitation] = useState(null);
+    const [railOpen, setRailOpen] = useState(false);
+    const triggerPillRef = useRef(null);
+
     // Chat state
     const [messages, setMessages] = useState([]);
     const [input, setInput] = useState('');
@@ -36,6 +65,7 @@ const ChatInterface = () => {
     const [loadingHistory, setLoadingHistory] = useState(true);
     const [copiedIndex, setCopiedIndex] = useState(null);
     const messagesEndRef = useRef(null);
+    const scrollContainerRef = useRef(null);
 
     // Concurrency / Race Condition tracking refs
     const activeConvIdRef = useRef(activeConvId);
@@ -69,7 +99,6 @@ const ChatInterface = () => {
             const data = await apiRequest('/api/conversations', { auth: 'required' });
             if (thisFetchGen !== fetchConversationsGenRef.current) return;
             setConversations(data);
-            // Only select the default first conversation if the user has NOT selected or created one
             if (data.length > 0 && !activeConvIdRef.current) {
                 activeConvIdRef.current = data[0].id;
                 setActiveConvId(data[0].id);
@@ -83,7 +112,7 @@ const ChatInterface = () => {
         }
     };
 
-    // 2. Fetch Chat History for Active Conversation with generation guard
+    // 2. Fetch Chat History for Active Conversation
     const fetchChatHistory = async (convId) => {
         setLoadingHistory(true);
         const thisGen = ++historyRequestGenRef.current;
@@ -91,7 +120,6 @@ const ChatInterface = () => {
             const url = convId ? `/api/chat?conversation_id=${convId}` : '/api/chat';
             const data = await apiRequest(url, { auth: 'required' });
             
-            // Check if this response is still for the current request generation and conversation
             if (thisGen !== historyRequestGenRef.current || convId !== activeConvIdRef.current) {
                 return;
             }
@@ -101,6 +129,7 @@ const ChatInterface = () => {
                     id: item.id,
                     role: item.role,
                     content: item.content,
+                    citations: item.citations || [],
                     shield: 'Active',
                     timestamp: item.timestamp ? new Date(item.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : undefined
                 })));
@@ -143,6 +172,33 @@ const ChatInterface = () => {
             scrollToBottom();
         }
     }, [messages, isLoading, loadingHistory]);
+
+    // Handle Citation Click
+    const handleSelectCitation = (citation, pillElement) => {
+        if (pillElement) {
+            triggerPillRef.current = pillElement;
+        }
+        setSelectedCitation(citation);
+        setRailOpen(true);
+    };
+
+    const handleCloseRail = () => {
+        setRailOpen(false);
+        if (triggerPillRef.current && typeof triggerPillRef.current.focus === 'function') {
+            triggerPillRef.current.focus();
+        }
+    };
+
+    // Keyboard ESC to close rail
+    useEffect(() => {
+        const handleKeyDown = (e) => {
+            if (e.key === 'Escape' && railOpen) {
+                handleCloseRail();
+            }
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [railOpen]);
 
     // Create New Chat Session
     const handleNewChat = async () => {
@@ -224,84 +280,87 @@ const ChatInterface = () => {
                 responseType: 'none',
             });
             
-            // Invalidate in-flight messages ONLY upon confirmed clear success
             invalidatedConvsRef.current.add(clearKey);
             sendGenerationRef.current += 1;
-            // Then allow new messages in this cleared conversation
             invalidatedConvsRef.current.delete(clearKey);
 
             setMessages([
                 {
                     role: 'ai',
                     content: "🧹 Session memory cleared. What topic shall we explore next in this session?",
-                    shield: 'Active'
+                    shield: 'Active',
+                    citations: []
                 }
             ]);
             fetchConversations();
         } catch (err) {
-            console.error(err);
-            alert("Error clearing session memory.");
+            console.error("Error clearing chat:", err);
         }
     };
 
-    const sendMessage = async (messageText) => {
-        const textToSend = messageText || input;
-        if (!textToSend.trim() || isLoading) return;
+    // Send Message
+    const sendMessage = async (presetPrompt = null) => {
+        const textToSend = (presetPrompt || input).trim();
+        if (!textToSend || isLoading) return;
 
-        const originatingConvId = activeConvId;
+        const originatingConvId = activeConvIdRef.current;
         const thisSendGen = ++sendGenerationRef.current;
-        const currentTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        const userMessage = { role: 'user', content: textToSend, timestamp: currentTime };
-        setMessages(prev => [...prev, userMessage]);
-        if (!messageText) setInput('');
-        activeSendCountRef.current += 1;
-        setIsLoading(true);
+        const clearKey = originatingConvId || 'current';
 
-        let streamConvId = originatingConvId;
-
-        // Unified request validity guard accessible across stream, fallback, and catch blocks
         const isStillCurrentConv = () => {
-            if (thisSendGen !== sendGenerationRef.current) return false;
-            if (invalidatedConvsRef.current.has(originatingConvId)) return false;
-            if (streamConvId && invalidatedConvsRef.current.has(streamConvId)) return false;
             return (
-                originatingConvId === activeConvIdRef.current || 
-                (originatingConvId === null && (activeConvIdRef.current === null || activeConvIdRef.current === streamConvId)) ||
-                (streamConvId && activeConvIdRef.current === streamConvId)
+                thisSendGen === sendGenerationRef.current &&
+                originatingConvId === activeConvIdRef.current &&
+                !invalidatedConvsRef.current.has(clearKey)
             );
         };
 
+        const userMessage = {
+            role: 'user',
+            content: textToSend,
+            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        };
+        setMessages(prev => [...prev, userMessage]);
+        if (!presetPrompt) setInput('');
+        setIsLoading(true);
+        activeSendCountRef.current += 1;
+
         try {
-            // 1. Attempt Real-Time SSE Token Streaming
             let streamSuccess = false;
             let streamAccepted = false;
             let accumulatedText = '';
-            const streamMsgId = Date.now();
+            let streamCitations = [];
+            const streamMsgId = 'stream-' + Date.now();
+            let streamConvId = originatingConvId;
 
             try {
-                const streamResponse = await apiRequest('/api/chat/stream', {
+                const token = localStorage.getItem('auth_token');
+                const streamUrl = originatingConvId ? `/api/chat/stream?conversation_id=${originatingConvId}` : '/api/chat/stream';
+                const response = await fetch(streamUrl, {
                     method: 'POST',
-                    auth: 'required',
-                    json: {
+                    headers: {
+                        'Content-Type': 'application/json',
+                        ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+                    },
+                    body: JSON.stringify({
                         message: textToSend,
                         conversation_id: originatingConvId
-                    },
-                    responseType: 'stream',
+                    })
                 });
 
-                if (streamResponse.body) {
+                if (response.ok && response.body) {
                     streamAccepted = true;
-                    const reader = streamResponse.body.getReader();
-                    const decoder = new TextDecoder('utf-8');
+                    const reader = response.body.getReader();
+                    const decoder = new TextDecoder();
 
-                    // Insert initial streaming message only if user is still on the originating conversation
-                    if (originatingConvId === activeConvIdRef.current) {
+                    if (isStillCurrentConv()) {
                         setMessages(prev => [
                             ...prev,
                             {
                                 id: streamMsgId,
                                 role: 'ai',
                                 content: '',
+                                citations: [],
                                 isStreaming: true,
                                 shield: 'Active',
                                 timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
@@ -362,10 +421,16 @@ const ChatInterface = () => {
                                     fetchConversations();
                                 }
                             }
-                            if (parsed.token) {
-                                accumulatedText += parsed.token;
+                            if (parsed.citations) {
+                                streamCitations = parsed.citations;
                                 if (isStillCurrentConv()) {
-                                    setMessages(prev => prev.map(m => m.id === streamMsgId ? { ...m, content: accumulatedText } : m));
+                                    setMessages(prev => prev.map(m => m.id === streamMsgId ? { ...m, citations: streamCitations } : m));
+                                }
+                            }
+                            if (parsed.token || parsed.chunk) {
+                                accumulatedText += (parsed.token || parsed.chunk);
+                                if (isStillCurrentConv()) {
+                                    setMessages(prev => prev.map(m => m.id === streamMsgId ? { ...m, content: accumulatedText, citations: streamCitations } : m));
                                 }
                             }
                         }
@@ -377,7 +442,6 @@ const ChatInterface = () => {
                         }
                         throw new Error('Streaming connection closed unexpectedly before response was received.');
                     } else if (!receivedDone) {
-                        // Truncated stream EOF without [DONE]: indicate interrupted state
                         if (isStillCurrentConv()) {
                             setMessages(prev => prev.map(m => m.id === streamMsgId ? { ...m, isStreaming: false, content: accumulatedText + "\n\n*(Generation interrupted)*" } : m));
                         }
@@ -386,7 +450,6 @@ const ChatInterface = () => {
                         return;
                     }
 
-                    // Mark streaming complete
                     if (isStillCurrentConv()) {
                         setMessages(prev => prev.map(m => m.id === streamMsgId ? { ...m, isStreaming: false } : m));
                     }
@@ -415,7 +478,6 @@ const ChatInterface = () => {
 
             if (!streamSuccess) {
                 if (streamAccepted) {
-                    // Avoid double-posting to /api/chat since the stream request was already accepted by the server
                     if (accumulatedText.length === 0 && isStillCurrentConv()) {
                         setMessages(prev => [
                             ...prev,
@@ -429,7 +491,7 @@ const ChatInterface = () => {
                     return;
                 }
 
-                // 2. Fallback to standard synchronous endpoint
+                // Fallback to standard synchronous endpoint
                 const data = await apiRequest('/api/chat', {
                     method: 'POST',
                     auth: 'required',
@@ -439,10 +501,7 @@ const ChatInterface = () => {
                     },
                 });
                 
-                // If user switched or deleted conversation during in-flight generation, do not append
-                if (!isStillCurrentConv()) {
-                    return;
-                }
+                if (!isStillCurrentConv()) return;
 
                 if (data.conversation_id && data.conversation_id !== activeConvId) {
                     streamConvId = data.conversation_id;
@@ -456,6 +515,7 @@ const ChatInterface = () => {
                 const aiMessage = {
                     role: 'ai',
                     content: data.response,
+                    citations: data.citations || [],
                     shield: data.safety_shield || 'Active',
                     timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
                 };
@@ -463,7 +523,6 @@ const ChatInterface = () => {
             }
         } catch (error) {
             console.error('Error:', error);
-            // Only display error if this request was not superseded by newer sends or session clears
             if (isStillCurrentConv()) {
                 setMessages(prev => [
                     ...prev,
@@ -484,10 +543,23 @@ const ChatInterface = () => {
 
     const activeConv = conversations.find(c => c.id === activeConvId);
 
+    // Group conversations by date bucket (FIX-04)
+    const groupedConversations = conversations.reduce((acc, conv) => {
+        const bucket = formatRelativeDate(conv.updated_at || conv.created_at) || 'Earlier';
+        if (!acc[bucket]) acc[bucket] = [];
+        acc[bucket].push(conv);
+        return acc;
+    }, {});
+
+    // Active session all citations for rail default
+    const allSessionCitations = messages
+        .filter(m => m.role === 'ai' && m.citations && m.citations.length > 0)
+        .flatMap(m => m.citations);
+
     return (
-        <section className="py-6 sm:py-8">
+        <section className="py-4 sm:py-6">
             <div className="max-w-7xl mx-auto px-2 sm:px-6 lg:px-8">
-                {/* Main Two-Column Container */}
+                {/* Main Viewport Container */}
                 <div className="flex h-[780px] w-full rounded-3xl glass-panel shadow-2xl overflow-hidden border border-emerald-950/40 relative">
                     
                     {/* LEFT SIDEBAR: Multi-Session Manager */}
@@ -512,8 +584,8 @@ const ChatInterface = () => {
                             </button>
                         </div>
 
-                        {/* Sessions List */}
-                        <div className="flex-1 overflow-y-auto p-3 space-y-2">
+                        {/* Sessions List with Date Buckets (FIX-04) */}
+                        <div className="flex-1 overflow-y-auto p-3 space-y-4">
                             {conversations.length === 0 ? (
                                 <div className="text-center py-10 px-4 text-slate-500 font-mono text-xs">
                                     <MessageSquare className="w-8 h-8 mx-auto mb-2 opacity-30" />
@@ -521,47 +593,54 @@ const ChatInterface = () => {
                                     <button onClick={handleNewChat} className="mt-2 text-emerald-400 hover:underline">Create first chat</button>
                                 </div>
                             ) : (
-                                conversations.map((conv) => {
-                                    const isActive = conv.id === activeConvId;
-                                    return (
-                                        <div
-                                            key={conv.id}
-                                            onClick={() => setActiveConvId(conv.id)}
-                                            className={`group p-3 rounded-2xl cursor-pointer transition-all flex items-center justify-between text-xs border ${
-                                                isActive
-                                                    ? 'bg-emerald-950/40 border-emerald-500/40 text-emerald-300 shadow-[0_0_15px_rgba(16,185,129,0.15)]'
-                                                    : 'bg-slate-900/40 border-white/5 text-slate-400 hover:bg-slate-800/50 hover:text-slate-200'
-                                            }`}
-                                        >
-                                            <div className="flex items-center gap-2.5 min-w-0 pr-2">
-                                                <div className={`w-2 h-2 rounded-full shrink-0 ${isActive ? 'bg-emerald-400 animate-pulse' : 'bg-slate-600'}`} />
-                                                <div className="min-w-0">
-                                                    <div className="font-semibold truncate max-w-[170px] text-slate-100">
-                                                        {conv.title || "Study Session"}
-                                                    </div>
-                                                    <div className="text-[10px] text-slate-500 flex items-center gap-1.5 mt-0.5">
-                                                        <span>{conv.message_count} msgs</span>
-                                                        {conv.long_term_summary && (
-                                                            <span className="text-[9px] px-1.5 py-0.2 rounded bg-teal-500/20 text-teal-300 font-medium">Key Takeaways</span>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            </div>
-
-                                            <button
-                                                onClick={(e) => handleDeleteSession(conv.id, e)}
-                                                className="opacity-0 group-hover:opacity-100 p-1 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-rose-950/40 transition-all"
-                                                title="Delete this session"
-                                            >
-                                                <Trash2 className="w-3.5 h-3.5" />
-                                            </button>
+                                Object.entries(groupedConversations).map(([bucketName, convs]) => (
+                                    <div key={bucketName} className="space-y-1.5">
+                                        <div className="px-2 text-[11px] font-mono text-slate-500 uppercase tracking-wider font-semibold">
+                                            {bucketName}
                                         </div>
-                                    );
-                                })
+                                        {convs.map((conv) => {
+                                            const isActive = conv.id === activeConvId;
+                                            return (
+                                                <div
+                                                    key={conv.id}
+                                                    onClick={() => setActiveConvId(conv.id)}
+                                                    className={`group p-2.5 rounded-2xl cursor-pointer transition-all flex items-center justify-between text-xs border ${
+                                                        isActive
+                                                            ? 'bg-emerald-950/40 border-emerald-500/40 text-emerald-300 shadow-[0_0_15px_rgba(16,185,129,0.15)]'
+                                                            : 'bg-slate-900/40 border-white/5 text-slate-400 hover:bg-slate-800/50 hover:text-slate-200'
+                                                    }`}
+                                                >
+                                                    <div className="flex items-center gap-2.5 min-w-0 pr-2">
+                                                        <div className={`w-2 h-2 rounded-full shrink-0 ${isActive ? 'bg-emerald-400 animate-pulse' : 'bg-slate-600'}`} />
+                                                        <div className="min-w-0">
+                                                            <div className="font-semibold truncate max-w-[170px] text-slate-100">
+                                                                {conv.title || "Study Session"}
+                                                            </div>
+                                                            <div className="text-[11px] text-slate-500 flex items-center gap-1.5 mt-0.5">
+                                                                <span>{formatCount(conv.message_count || 0, 'msg')}</span>
+                                                                {conv.updated_at && (
+                                                                    <span className="text-[10px] text-slate-600">· {formatRelativeDate(conv.updated_at)}</span>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+
+                                                    <button
+                                                        onClick={(e) => handleDeleteSession(conv.id, e)}
+                                                        className="opacity-0 group-hover:opacity-100 p-1 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-rose-950/40 transition-all shrink-0"
+                                                        title="Delete this session"
+                                                    >
+                                                        <Trash2 className="w-3.5 h-3.5" />
+                                                    </button>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                ))
                             )}
                         </div>
 
-                        {/* Sidebar Footer: Hybrid Memory Status Card */}
+                        {/* Sidebar Footer */}
                         <div className="p-3 border-t border-emerald-950/60 bg-[#080b12]">
                             <button
                                 onClick={() => setMemoryModalOpen(true)}
@@ -579,202 +658,335 @@ const ChatInterface = () => {
                         </div>
                     </div>
 
-                    {/* RIGHT: Active Chat Console */}
-                    <div className="flex-1 flex flex-col min-w-0 bg-gradient-to-b from-[#0b0f17]/95 to-[#0e1626]/90">
-                        {/* Top Header Bar */}
-                        <div className="px-4 sm:px-6 py-3.5 bg-[#0e1626]/90 border-b border-emerald-950/60 flex items-center justify-between">
-                            <div className="flex items-center gap-3 min-w-0">
-                                <button
-                                    onClick={() => setSidebarOpen(!sidebarOpen)}
-                                    className="p-1.5 rounded-xl bg-slate-900 border border-slate-800 text-slate-400 hover:text-emerald-400 transition-colors"
-                                    title={sidebarOpen ? "Collapse Sessions Drawer" : "Expand Sessions Drawer"}
-                                >
-                                    <PanelLeft className="w-4 h-4" />
-                                </button>
-
-                                <div className="min-w-0">
-                                    <div className="flex items-center gap-2">
-                                        <h2 className="text-sm font-bold text-white tracking-wide truncate">
-                                            {activeConv ? activeConv.title : "AI Study Companion"}
-                                        </h2>
-                                        <button
-                                            onClick={() => setMemoryModalOpen(true)}
-                                            className="hidden sm:inline-flex items-center gap-1 text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/20 transition-colors"
-                                            title="View Smart Memory Details"
-                                        >
-                                            <Brain className="w-3 h-3 text-emerald-400" />
-                                            <span>Smart Memory: Active</span>
-                                        </button>
-                                    </div>
-                                    <p className="text-[11px] text-slate-400 truncate">
-                                        {loadingHistory ? 'Restoring study session...' : `${messages.length} messages in this session`}
-                                    </p>
-                                </div>
-                            </div>
-
-                            {/* Top Utility Controls */}
-                            <div className="flex items-center gap-2">
-                                <button
-                                    onClick={() => fetchChatHistory(activeConvId)}
-                                    className="p-2 rounded-xl bg-slate-900 border border-slate-800 text-slate-400 hover:text-emerald-300 hover:border-emerald-700/50 transition-colors text-xs flex items-center gap-1.5 font-mono"
-                                    title="Reload chat from database"
-                                >
-                                    <RefreshCw className={`w-3.5 h-3.5 ${loadingHistory ? 'animate-spin' : ''}`} />
-                                    <span className="hidden sm:inline">Sync</span>
-                                </button>
-                                <button
-                                    onClick={handleExportMarkdown}
-                                    className="p-2 rounded-xl bg-slate-900 border border-slate-800 text-slate-400 hover:text-emerald-300 hover:border-emerald-700/50 transition-colors text-xs flex items-center gap-1.5 font-mono"
-                                    title="Export conversation to Markdown"
-                                >
-                                    <Download className="w-3.5 h-3.5" />
-                                    <span className="hidden sm:inline">Export</span>
-                                </button>
-                                <button
-                                    onClick={clearCurrentChat}
-                                    className="p-2 rounded-xl bg-slate-900 border border-slate-800 text-slate-400 hover:text-rose-400 hover:border-rose-800/50 transition-colors text-xs flex items-center gap-1.5 font-mono"
-                                    title="Clear conversation history in this session"
-                                >
-                                    <Trash2 className="w-3.5 h-3.5" />
-                                    <span className="hidden sm:inline">Clear</span>
-                                </button>
-                            </div>
-                        </div>
-
-                        {/* Chat Messages Body */}
-                        <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-5">
-                            {loadingHistory && (
-                                <div className="flex flex-col items-center justify-center h-48 gap-3 text-slate-500 font-mono text-xs">
-                                    <div className="w-6 h-6 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin" />
-                                    <span>Restoring study conversation & learning context...</span>
-                                </div>
-                            )}
-
-                            {!loadingHistory && messages.map((msg, idx) => (
-                                <div
-                                    key={idx}
-                                    className={`flex gap-3 sm:gap-4 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
-                                >
-                                    {msg.role === 'ai' && (
-                                        <div className="w-8 h-8 rounded-xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0 mt-1 shadow-sm">
-                                            <Bot className="w-4 h-4" />
-                                        </div>
-                                    )}
-
-                                    <div className={`relative group max-w-[85%] sm:max-w-[75%] rounded-2xl p-4 sm:p-5 transition-all text-sm leading-relaxed ${
-                                        msg.role === 'user'
-                                            ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-br-none shadow-[0_4px_20px_rgba(16,185,129,0.25)]'
-                                            : msg.isError
-                                            ? 'bg-rose-950/40 border border-rose-800/60 text-rose-200 rounded-bl-none'
-                                            : 'bg-[#131b2e]/90 border border-white/5 text-slate-200 rounded-bl-none shadow-md backdrop-blur-md'
-                                    }`}>
-                                        <button
-                                            onClick={() => handleCopy(msg.content, idx)}
-                                            className="absolute top-2.5 right-2.5 opacity-0 group-hover:opacity-100 p-1.5 rounded-lg bg-black/40 hover:bg-black/60 text-slate-300 transition-all text-xs"
-                                            title="Copy message"
-                                        >
-                                            {copiedIndex === idx ? (
-                                                <Check className="w-3.5 h-3.5 text-emerald-400" />
-                                            ) : (
-                                                <Copy className="w-3.5 h-3.5" />
-                                            )}
-                                        </button>
-
-                                        <StructuredMessage content={msg.content} />
-                                        {msg.isStreaming && (
-                                            <span className="inline-block w-2 h-4 bg-emerald-400 animate-pulse ml-1 translate-y-0.5 rounded-sm" title="Streaming response..." />
-                                        )}
-
-                                        <div className="mt-2.5 pt-2 border-t border-white/5 flex items-center justify-between text-[10px] font-mono text-slate-500">
-                                            {msg.role === 'ai' && !msg.isError ? (
-                                                <span className="flex items-center gap-1 text-emerald-500/80">
-                                                    <Shield className="w-2.5 h-2.5" /> Verified by Safety Guard
-                                                </span>
-                                            ) : (
-                                                <span className="text-slate-400">Student</span>
-                                            )}
-                                            {msg.timestamp && (
-                                                <span className="flex items-center gap-1 text-slate-400">
-                                                    <Clock className="w-2.5 h-2.5" /> {msg.timestamp}
-                                                </span>
-                                            )}
-                                        </div>
-                                    </div>
-
-                                    {msg.role === 'user' && (
-                                        <div className="w-8 h-8 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-300 shrink-0 mt-1 shadow-sm">
-                                            <User className="w-4 h-4" />
-                                        </div>
-                                    )}
-                                </div>
-                            ))}
-
-                            {isLoading && !messages.some(m => m.isStreaming) && (
-                                <div className="flex gap-3 justify-start">
-                                    <div className="w-8 h-8 rounded-xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0">
-                                        <Bot className="w-4 h-4 animate-pulse" />
-                                    </div>
-                                    <div className="bg-[#131b2e]/90 border border-white/5 p-4 rounded-2xl rounded-bl-none flex items-center gap-2">
-                                        <span className="w-2 h-2 rounded-full bg-emerald-400 animate-bounce" />
-                                        <span className="w-2 h-2 rounded-full bg-emerald-400 animate-bounce" style={{ animationDelay: '0.2s' }} />
-                                        <span className="w-2 h-2 rounded-full bg-emerald-400 animate-bounce" style={{ animationDelay: '0.4s' }} />
-                                        <span className="text-xs font-mono text-slate-400 ml-2">AI Tutor is thinking...</span>
-                                    </div>
-                                </div>
-                            )}
-                            <div ref={messagesEndRef} />
-                        </div>
-
-                        {/* Suggested Chips (Only if fresh chat) */}
-                        {messages.length <= 2 && (
-                            <div className="px-4 py-2 bg-[#0d1422] border-t border-emerald-950/30 flex items-center gap-2 overflow-x-auto text-xs no-scrollbar">
-                                <span className="text-slate-500 font-mono flex items-center gap-1 shrink-0 text-[11px]">
-                                    <Sparkles className="w-3 h-3 text-emerald-400" /> Quick Topics:
-                                </span>
-                                {SUGGESTED_PROMPTS.map((prompt, i) => (
+                    {/* MAIN TWO-COLUMN CHAT & CITATION VIEWPORT (FIX-03) */}
+                    <div className="flex-1 flex h-full min-w-0 bg-gradient-to-b from-[#0b0f17]/95 to-[#0e1626]/90 relative">
+                        
+                        {/* Center Messages Column */}
+                        <main className="flex-1 flex flex-col min-w-0 h-full">
+                            {/* Top Header Bar */}
+                            <div className="px-4 sm:px-6 py-3 bg-[#0e1626]/90 border-b border-emerald-950/60 flex items-center justify-between min-w-0 shrink-0">
+                                <div className="flex items-center gap-3 min-w-0 flex-1">
                                     <button
-                                        key={i}
-                                        onClick={() => sendMessage(prompt)}
-                                        className="px-3 py-1 rounded-full bg-slate-900 hover:bg-emerald-950/70 border border-slate-800 hover:border-emerald-700/60 text-slate-300 hover:text-emerald-300 shrink-0 transition-all font-mono text-[11px]"
+                                        onClick={() => setSidebarOpen(!sidebarOpen)}
+                                        className="p-1.5 rounded-xl bg-slate-900 border border-slate-800 text-slate-400 hover:text-emerald-400 transition-colors shrink-0"
+                                        title={sidebarOpen ? "Collapse Sessions Drawer" : "Expand Sessions Drawer"}
                                     >
-                                        {prompt}
+                                        <PanelLeft className="w-4 h-4" />
                                     </button>
-                                ))}
-                            </div>
-                        )}
 
-                        {/* Chat Input Bar */}
-                        <div className="p-4 bg-[#0e1626]/95 border-t border-emerald-950/60">
-                            <form
-                                onSubmit={(e) => {
-                                    e.preventDefault();
-                                    sendMessage();
-                                }}
-                                className="relative flex items-center"
+                                    <div className="min-w-0 flex-1">
+                                        <div className="flex items-center gap-2 min-w-0">
+                                            <h2 className="text-sm font-bold text-white tracking-wide truncate max-w-full">
+                                                {activeConv ? activeConv.title : "AI Study Companion"}
+                                            </h2>
+                                            <button
+                                                onClick={() => setMemoryModalOpen(true)}
+                                                className="hidden sm:inline-flex items-center gap-1 text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/20 transition-colors shrink-0"
+                                                title="View Smart Memory Details"
+                                            >
+                                                <Brain className="w-3 h-3 text-emerald-400" />
+                                                <span>Smart Memory</span>
+                                            </button>
+                                        </div>
+                                        <p className="text-[11px] text-slate-400 truncate">
+                                            {loadingHistory ? 'Restoring study session...' : `${formatCount(messages.length, 'message')} in this session`}
+                                        </p>
+                                    </div>
+                                </div>
+
+                                {/* Top Utility Controls */}
+                                <div className="flex items-center gap-2 shrink-0 ml-2">
+                                    <button
+                                        onClick={() => setRailOpen(!railOpen)}
+                                        className={`p-2 rounded-xl border text-xs flex items-center gap-1.5 font-mono transition-colors ${
+                                            railOpen 
+                                                ? 'bg-emerald-950/60 border-emerald-500/50 text-emerald-300' 
+                                                : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-emerald-300'
+                                        }`}
+                                        title="View Grounded Source References"
+                                    >
+                                        <BookOpen className="w-3.5 h-3.5" />
+                                        <span className="hidden sm:inline">Sources</span>
+                                    </button>
+                                    <button
+                                        onClick={() => fetchChatHistory(activeConvId)}
+                                        className="p-2 rounded-xl bg-slate-900 border border-slate-800 text-slate-400 hover:text-emerald-300 hover:border-emerald-700/50 transition-colors text-xs flex items-center gap-1.5 font-mono"
+                                        title="Reload chat from database"
+                                    >
+                                        <RefreshCw className={`w-3.5 h-3.5 ${loadingHistory ? 'animate-spin' : ''}`} />
+                                        <span className="hidden sm:inline">Sync sources</span>
+                                    </button>
+                                    <button
+                                        onClick={handleExportMarkdown}
+                                        className="p-2 rounded-xl bg-slate-900 border border-slate-800 text-slate-400 hover:text-emerald-300 hover:border-emerald-700/50 transition-colors text-xs flex items-center gap-1.5 font-mono"
+                                        title="Export conversation to Markdown"
+                                    >
+                                        <Download className="w-3.5 h-3.5" />
+                                        <span className="hidden sm:inline">Export</span>
+                                    </button>
+                                    <button
+                                        onClick={clearCurrentChat}
+                                        className="p-2 rounded-xl bg-slate-900 border border-slate-800 text-slate-400 hover:text-rose-400 hover:border-rose-800/50 transition-colors text-xs flex items-center gap-1.5 font-mono"
+                                        title="Clear conversation history in this session"
+                                    >
+                                        <Trash2 className="w-3.5 h-3.5" />
+                                        <span className="hidden sm:inline">Clear</span>
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Chat Messages Body with max-w-[72ch] Centering (FIX-01, FIX-03, FIX-05) */}
+                            <div 
+                                ref={scrollContainerRef}
+                                className="flex-1 overflow-y-auto px-4 sm:px-6 py-4 space-y-5 pb-20"
                             >
-                                <input
-                                    type="text"
-                                    value={input}
-                                    onChange={(e) => setInput(e.target.value)}
-                                    placeholder="Ask a question in this session... (Context automatically retained)"
-                                    maxLength={3000}
-                                    disabled={isLoading}
-                                    className="w-full pl-4 pr-24 py-3.5 rounded-2xl glass-input text-sm font-sans placeholder:text-slate-500 text-slate-100"
-                                />
-                                <div className="absolute right-2 flex items-center gap-2">
-                                    <span className={`text-[10px] font-mono hidden sm:inline ${input.length > 2500 ? 'text-amber-400' : 'text-slate-500'}`}>
-                                        {input.length}/3000
-                                    </span>
-                                    <button
-                                        type="submit"
-                                        disabled={!input.trim() || isLoading}
-                                        className="p-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 text-slate-950 hover:brightness-110 active:scale-95 transition-all disabled:opacity-30 disabled:cursor-not-allowed shadow-[0_0_15px_rgba(16,185,129,0.3)]"
-                                    >
-                                        <Send className="w-4 h-4" />
-                                    </button>
+                                <div className="mx-auto w-full max-w-[72ch] space-y-5">
+                                    {loadingHistory && (
+                                        <div className="flex flex-col items-center justify-center h-48 gap-3 text-slate-500 font-mono text-xs">
+                                            <div className="w-6 h-6 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin" />
+                                            <span>Restoring study conversation & learning context...</span>
+                                        </div>
+                                    )}
+
+                                    {!loadingHistory && messages.map((msg, idx) => (
+                                        <div
+                                            key={idx}
+                                            className={`flex gap-3 sm:gap-4 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                                        >
+                                            {msg.role === 'ai' && (
+                                                <div className="w-8 h-8 rounded-xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0 mt-1 shadow-sm">
+                                                    <Bot className="w-4 h-4" />
+                                                </div>
+                                            )}
+
+                                            <div className={`relative group max-w-[90%] sm:max-w-[85%] rounded-2xl p-4 sm:p-5 transition-all text-sm leading-relaxed ${
+                                                msg.role === 'user'
+                                                    ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-br-none shadow-[0_4px_20px_rgba(16,185,129,0.25)]'
+                                                    : msg.isError
+                                                    ? 'bg-rose-950/40 border border-rose-800/60 text-rose-200 rounded-bl-none'
+                                                    : 'bg-[#131b2e]/90 border border-white/5 text-slate-200 rounded-bl-none shadow-md backdrop-blur-md'
+                                            }`}>
+                                                <button
+                                                    onClick={() => handleCopy(msg.content, idx)}
+                                                    className="absolute top-2.5 right-2.5 opacity-0 group-hover:opacity-100 p-1.5 rounded-lg bg-black/40 hover:bg-black/60 text-slate-300 transition-all text-xs"
+                                                    title="Copy message"
+                                                >
+                                                    {copiedIndex === idx ? (
+                                                        <Check className="w-3.5 h-3.5 text-emerald-400" />
+                                                    ) : (
+                                                        <Copy className="w-3.5 h-3.5" />
+                                                    )}
+                                                </button>
+
+                                                <StructuredMessage 
+                                                    content={msg.content} 
+                                                    citations={msg.citations || []}
+                                                    onSelectCitation={(cit) => handleSelectCitation(cit)}
+                                                />
+                                                {msg.isStreaming && (
+                                                    <span className="inline-block w-2 h-4 bg-emerald-400 animate-pulse ml-1 translate-y-0.5 rounded-sm" title="Streaming response..." />
+                                                )}
+
+                                                <div className="mt-2.5 pt-2 border-t border-white/5 flex items-center justify-between text-[11px] font-mono text-slate-500">
+                                                    {msg.role === 'ai' && !msg.isError ? (
+                                                        <span className="flex items-center gap-1 text-emerald-500/80">
+                                                            <Shield className="w-2.5 h-2.5" /> Verified by Safety Guard
+                                                        </span>
+                                                    ) : (
+                                                        <span className="text-slate-400">Student</span>
+                                                    )}
+                                                    {msg.timestamp && (
+                                                        <span className="flex items-center gap-1 text-slate-400">
+                                                            <Clock className="w-2.5 h-2.5" /> {msg.timestamp}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </div>
+
+                                            {msg.role === 'user' && (
+                                                <div className="w-8 h-8 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-300 shrink-0 mt-1 shadow-sm">
+                                                    <User className="w-4 h-4" />
+                                                </div>
+                                            )}
+                                        </div>
+                                    ))}
+
+                                    {isLoading && !messages.some(m => m.isStreaming) && (
+                                        <div className="flex gap-3 justify-start">
+                                            <div className="w-8 h-8 rounded-xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0">
+                                                <Bot className="w-4 h-4 animate-pulse" />
+                                            </div>
+                                            <div className="bg-[#131b2e]/90 border border-white/5 p-4 rounded-2xl rounded-bl-none flex items-center gap-2">
+                                                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-bounce" />
+                                                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-bounce" style={{ animationDelay: '0.2s' }} />
+                                                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-bounce" style={{ animationDelay: '0.4s' }} />
+                                                <span className="text-xs font-mono text-slate-400 ml-2">AI Tutor is thinking...</span>
+                                            </div>
+                                        </div>
+                                    )}
+                                    <div ref={messagesEndRef} />
                                 </div>
-                            </form>
-                        </div>
+                            </div>
+
+                            {/* Suggested Chips (Only if fresh chat) */}
+                            {messages.length <= 2 && (
+                                <div className="px-4 py-2 bg-[#0d1422] border-t border-emerald-950/30 flex items-center gap-2 overflow-x-auto text-xs no-scrollbar shrink-0">
+                                    <span className="text-slate-400 font-mono flex items-center gap-1 shrink-0 text-[11px]">
+                                        <Sparkles className="w-3 h-3 text-emerald-400" /> Quick Topics:
+                                    </span>
+                                    {SUGGESTED_PROMPTS.map((prompt, i) => (
+                                        <button
+                                            key={i}
+                                            onClick={() => setInput(prompt)}
+                                            className="px-3 py-1 rounded-full bg-slate-900 hover:bg-emerald-950/70 border border-slate-800 hover:border-emerald-700/60 text-slate-300 hover:text-emerald-300 shrink-0 transition-all font-mono text-[11px]"
+                                        >
+                                            {prompt}
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+
+                            {/* Sticky Chat Input Bar */}
+                            <div className="p-4 bg-[#0e1626]/95 border-t border-emerald-950/60 shrink-0">
+                                <div className="mx-auto w-full max-w-[72ch]">
+                                    <form
+                                        onSubmit={(e) => {
+                                            e.preventDefault();
+                                            sendMessage();
+                                        }}
+                                        className="relative flex items-center"
+                                    >
+                                        <input
+                                            type="text"
+                                            value={input}
+                                            onChange={(e) => setInput(e.target.value)}
+                                            placeholder="Ask a question in this session... (Context automatically retained)"
+                                            maxLength={3000}
+                                            disabled={isLoading}
+                                            className="w-full pl-4 pr-24 py-3.5 rounded-2xl glass-input text-sm font-sans placeholder:text-slate-500 text-slate-100"
+                                        />
+                                        <div className="absolute right-2 flex items-center gap-2">
+                                            <span className={`text-[10px] font-mono hidden sm:inline ${input.length > 2500 ? 'text-amber-400' : 'text-slate-500'}`}>
+                                                {input.length}/3000
+                                            </span>
+                                            <button
+                                                type="submit"
+                                                disabled={!input.trim() || isLoading}
+                                                className="p-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 text-slate-950 hover:brightness-110 active:scale-95 transition-all disabled:opacity-30 disabled:cursor-not-allowed shadow-[0_0_15px_rgba(16,185,129,0.3)]"
+                                            >
+                                                <Send className="w-4 h-4" />
+                                            </button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                        </main>
+
+                        {/* RIGHT SOURCE RAIL / SLIDE-OVER (FIX-02, FIX-03) */}
+                        <aside className={`
+                            ${railOpen ? 'translate-x-0' : 'translate-x-full xl:translate-x-0 xl:block'}
+                            fixed xl:static inset-y-0 right-0 z-30 xl:z-auto
+                            w-[min(360px,90vw)] xl:w-[340px] shrink-0
+                            bg-[#090d16] xl:bg-[#090d16]/90
+                            border-l border-white/10 flex flex-col h-full
+                            transition-transform duration-300 ease-in-out shadow-2xl xl:shadow-none
+                        `}>
+                            {/* Rail Header */}
+                            <div className="p-4 border-b border-white/10 flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                    <BookOpen className="w-4 h-4 text-emerald-400" />
+                                    <h3 className="text-xs font-mono font-bold uppercase tracking-wider text-white">
+                                        Source Citations
+                                    </h3>
+                                </div>
+                                <button
+                                    onClick={handleCloseRail}
+                                    className="p-1.5 rounded-xl bg-slate-900 text-slate-400 hover:text-white border border-slate-800"
+                                    aria-label="Close source rail"
+                                >
+                                    <X className="w-4 h-4" />
+                                </button>
+                            </div>
+
+                            {/* Rail Body */}
+                            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                                {selectedCitation ? (
+                                    <div className="space-y-3 animate-in fade-in duration-200">
+                                        <div className="flex items-center justify-between">
+                                            <span className="px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-300 font-mono text-xs font-bold border border-emerald-500/40">
+                                                Citation [{selectedCitation.n || '1'}]
+                                            </span>
+                                            {selectedCitation.source_id && (
+                                                <span className="text-[11px] font-mono text-slate-500">
+                                                    ID: #{selectedCitation.source_id}
+                                                </span>
+                                            )}
+                                        </div>
+
+                                        <div className="p-3.5 rounded-2xl bg-white/[0.03] border border-white/10 space-y-2">
+                                            <h4 className="text-xs font-bold text-white flex items-center gap-1.5">
+                                                <BookOpen className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                                                <span className="truncate">{selectedCitation.source_title || 'Uploaded Document'}</span>
+                                            </h4>
+                                            {selectedCitation.locator && (
+                                                <div className="text-[11px] font-mono text-slate-400">
+                                                    Locator: {selectedCitation.locator}
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        <div className="space-y-1.5">
+                                            <span className="text-[11px] font-mono text-slate-400 uppercase tracking-wide">
+                                                Grounded Excerpt:
+                                            </span>
+                                            <div className="p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-slate-200 text-xs leading-relaxed font-sans">
+                                                <span className="bg-emerald-500/20 px-1 py-0.5 rounded text-emerald-200">
+                                                    {selectedCitation.quote || selectedCitation.text || "Direct excerpt from study corpus supporting this statement."}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ) : allSessionCitations.length > 0 ? (
+                                    <div className="space-y-3">
+                                        <div className="text-xs font-mono text-slate-400 uppercase tracking-wider">
+                                            All Citations in this Session:
+                                        </div>
+                                        {allSessionCitations.map((cit, i) => (
+                                            <div 
+                                                key={i}
+                                                onClick={() => setSelectedCitation(cit)}
+                                                className="p-3 rounded-2xl bg-white/[0.02] border border-white/5 hover:border-emerald-500/30 cursor-pointer transition-all space-y-1.5"
+                                            >
+                                                <div className="flex items-center justify-between">
+                                                    <span className="text-xs font-bold text-emerald-400">[{cit.n || i + 1}] {cit.source_title || 'Document'}</span>
+                                                </div>
+                                                <p className="text-[11px] text-slate-300 line-clamp-2 leading-relaxed">
+                                                    {cit.quote || "Document excerpt"}
+                                                </p>
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <div className="py-12 text-center space-y-2 text-slate-500 font-mono text-xs">
+                                        <BookOpen className="w-8 h-8 mx-auto opacity-30 text-emerald-400" />
+                                        <p>No citations for this session yet.</p>
+                                        <p className="text-[11px] text-slate-600">Upload materials in Sources to enable grounded retrieval.</p>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Session Context Card Footer */}
+                            <div className="p-4 border-t border-white/10 bg-[#070a10] text-[11px] font-mono text-slate-400 space-y-1">
+                                <div className="flex justify-between">
+                                    <span>Active Session:</span>
+                                    <span className="text-slate-200 font-semibold truncate max-w-[150px]">{activeConv?.title || 'Default'}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                    <span>Messages:</span>
+                                    <span className="text-slate-200">{messages.length}</span>
+                                </div>
+                            </div>
+                        </aside>
                     </div>
                 </div>
             </div>
@@ -801,57 +1013,14 @@ const ChatInterface = () => {
                             </div>
                             <button
                                 onClick={() => setMemoryModalOpen(false)}
-                                className="text-xs font-mono text-slate-400 hover:text-white"
+                                className="p-2 rounded-xl bg-slate-900 text-slate-400 hover:text-white border border-slate-800"
                             >
-                                Close [ESC]
+                                <X className="w-4 h-4" />
                             </button>
                         </div>
-
-                        {/* Tier 1 Box */}
-                        <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-2">
-                            <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-2">
-                                    <Cpu className="w-4 h-4 text-emerald-400" />
-                                    <span className="text-xs font-bold text-emerald-300 uppercase">Active Conversation Memory</span>
-                                </div>
-                                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 font-bold">ACTIVE</span>
-                            </div>
-                            <p className="text-xs text-slate-300 leading-relaxed">
-                                Remembers your recent questions and answers so you can have natural, uninterrupted follow-up discussions.
-                            </p>
-                        </div>
-
-                        {/* Tier 2 Box */}
-                        <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-2">
-                            <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-2">
-                                    <Layers className="w-4 h-4 text-teal-400" />
-                                    <span className="text-xs font-bold text-teal-300 uppercase">Long-Term Study Highlights</span>
-                                </div>
-                                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-teal-500/20 text-teal-400 font-bold">SUMMARY</span>
-                            </div>
-                            <p className="text-xs text-slate-300 leading-relaxed">
-                                Key concepts and definitions from earlier in your study session are summarized and remembered, so no important insight is lost.
-                            </p>
-                            {activeConv && activeConv.long_term_summary ? (
-                                <div className="mt-3 p-3 rounded-xl bg-slate-950 border border-slate-800 text-[11px] font-mono text-slate-300 whitespace-pre-wrap max-h-36 overflow-y-auto">
-                                    {activeConv.long_term_summary}
-                                </div>
-                            ) : (
-                                <div className="text-[11px] font-mono text-slate-500 pt-1">
-                                    Status: Will automatically summarize key study points as your session progresses.
-                                </div>
-                            )}
-                        </div>
-
-                        <div className="pt-2 flex justify-end">
-                            <button
-                                onClick={() => setMemoryModalOpen(false)}
-                                className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 text-slate-950 font-bold text-xs"
-                            >
-                                Got it
-                            </button>
-                        </div>
+                        <p className="text-xs text-slate-300 leading-relaxed">
+                            Study Buddy combines short-term conversational context with an episodic long-term memory buffer so you can continue learning across sessions seamlessly.
+                        </p>
                     </div>
                 </div>
             )}
