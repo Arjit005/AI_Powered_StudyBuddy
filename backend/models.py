@@ -247,6 +247,10 @@ def run_migrations(target_engine=None):
             config.attributes["connection"] = connection
             command.upgrade(config, "head")
             connection.commit()
+
+        # Ensure all tables defined in Base metadata exist (auto-create new tables like session_artifacts)
+        Base.metadata.create_all(bind=connection)
+        connection.commit()
     finally:
         if postgres_lock_acquired:
             if connection.in_transaction():
