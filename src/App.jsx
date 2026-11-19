@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, Suspense, lazy } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Header from './components/Header';
 import Layout from './components/Layout';
@@ -6,19 +6,21 @@ import CommandPalette from './components/CommandPalette';
 
 import Home from './pages/Home';
 import Chat from './pages/Chat';
-import CanvasStudio from './pages/CanvasStudio';
 import Library from './pages/Library';
 import Summarize from './pages/Summarize';
-import Quiz from './pages/Quiz';
-import Flashcards from './pages/Flashcards';
 import Progress from './pages/Progress';
 import Timer from './pages/Timer';
 import Voice from './pages/Voice';
-import Maps from './pages/Maps';
 import Sources from './pages/Sources';
 import Pricing from './pages/Pricing';
 import LoginPage from './pages/LoginPage';
 import SignupPage from './pages/SignupPage';
+
+// Lazy-load heavy visualization routes (Mermaid, Cytoscape, ELK, KaTeX)
+const CanvasStudio = lazy(() => import('./pages/CanvasStudio'));
+const Maps = lazy(() => import('./pages/Maps'));
+const Flashcards = lazy(() => import('./pages/Flashcards'));
+const Quiz = lazy(() => import('./pages/Quiz'));
 import { apiRequest } from './config/apiClient';
 
 // Helper to check JWT format and valid expiration
@@ -209,10 +211,10 @@ function App() {
           } />
           <Route path="/canvas" element={
             <ProtectedRoute>
-              <>
+              <Suspense fallback={<div className="min-h-screen bg-slate-950 flex items-center justify-center text-emerald-400 font-mono text-sm">Loading Canvas Studio...</div>}>
                 <Header />
                 <CanvasStudio />
-              </>
+              </Suspense>
             </ProtectedRoute>
           } />
           <Route path="/library" element={
@@ -241,18 +243,18 @@ function App() {
           } />
           <Route path="/quiz" element={
             <ProtectedRoute>
-              <>
+              <Suspense fallback={<div className="min-h-screen bg-slate-950 flex items-center justify-center text-emerald-400 font-mono text-sm">Loading Quiz Studio...</div>}>
                 <Header />
                 <Quiz />
-              </>
+              </Suspense>
             </ProtectedRoute>
           } />
           <Route path="/flashcards" element={
             <ProtectedRoute>
-              <>
+              <Suspense fallback={<div className="min-h-screen bg-slate-950 flex items-center justify-center text-emerald-400 font-mono text-sm">Loading Flashcards...</div>}>
                 <Header />
                 <Flashcards />
-              </>
+              </Suspense>
             </ProtectedRoute>
           } />
           <Route path="/timer" element={
@@ -281,10 +283,10 @@ function App() {
           } />
           <Route path="/maps" element={
             <ProtectedRoute>
-              <>
+              <Suspense fallback={<div className="min-h-screen bg-slate-950 flex items-center justify-center text-emerald-400 font-mono text-sm">Loading Maps Studio...</div>}>
                 <Header />
                 <Maps />
-              </>
+              </Suspense>
             </ProtectedRoute>
           } />
           <Route path="/pricing" element={

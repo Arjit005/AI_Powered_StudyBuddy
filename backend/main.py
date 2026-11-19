@@ -25,6 +25,16 @@ app = FastAPI(
     version="1.4.0"
 )
 
+BUILD_SHA = os.getenv("RENDER_GIT_COMMIT") or os.getenv("GIT_COMMIT") or "unknown"
+
+@app.get("/api/version", tags=["System"])
+def get_version():
+    return {
+        "commit": BUILD_SHA,
+        "env": os.getenv("ENVIRONMENT", "production"),
+        "build_time": os.getenv("RENDER_DEPLOY_STARTED_AT", "unknown")
+    }
+
 
 @app.exception_handler(ai_service.AIServiceError)
 async def handle_ai_service_error(_request: Request, exc: ai_service.AIServiceError):
@@ -1354,6 +1364,14 @@ def get_chat_history(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth.get_current_user_required)
 ):
+    if conversation_id:
+        conv = db.query(models.Conversation).filter(
+            models.Conversation.id == conversation_id,
+            models.Conversation.user_id == current_user.id
+        ).first()
+        if not conv:
+            raise HTTPException(status_code=404, detail="Session not found.")
+
     query = db.query(models.ChatHistory).filter(
         models.ChatHistory.user_id == current_user.id
     )

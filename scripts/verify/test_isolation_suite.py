@@ -21,10 +21,21 @@ print('Logged in User A and User B.')
 
 SESSION_ID = 21
 
-# Setup: User A sets a flashcard artifact on SESSION_ID
+# Setup: User A sets a flashcard artifact on SESSION_ID (fetch current revision first)
+req = urllib.request.Request(
+    f'{BASE_URL}/api/sessions/{SESSION_ID}/artifacts/flashcards',
+    headers={'Authorization': f'Bearer {token_a}'}
+)
+try:
+    with urllib.request.urlopen(req) as resp:
+        cur_data = json.loads(resp.read().decode('utf-8'))
+        next_rev = cur_data['revision']
+except Exception:
+    next_rev = 1
+
 init_payload = {
     'schema_version': 1,
-    'revision': 1,
+    'revision': next_rev,
     'payload': {'deckId': 99, 'cards': [{'id': 'c1', 'front': 'Cell', 'back': 'Unit of life'}]}
 }
 req = urllib.request.Request(

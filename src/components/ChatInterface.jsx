@@ -354,19 +354,39 @@ const ChatInterface = () => {
             const streamMsgId = 'stream-' + Date.now();
             let streamConvId = originatingConvId;
 
-            // RAF throttling state
-            let rafPending = false;
-            let pendingText = '';
-            const scheduleUpdate = () => {
-                if (rafPending) return;
-                rafPending = true;
-                requestAnimationFrame(() => {
-                    rafPending = false;
+            // Smooth Human-Reading Typewriter Queue
+            let targetText = '';
+            let displayedChars = 0;
+            let typewriterActive = true;
+            let typewriterRaf = null;
+            const prefersReducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+            const runTypewriterTick = () => {
+                if (!typewriterActive) return;
+                if (prefersReducedMotion) {
+                    // Instant reveal for reduced-motion preference
+                    displayedChars = targetText.length;
+                    setMessages(prev => prev.map(m => m.id === streamMsgId ? { ...m, content: targetText, citations: streamCitations } : m));
+                    return;
+                }
+
+                if (displayedChars < targetText.length) {
+                    const lag = targetText.length - displayedChars;
+                    // Dynamic acceleration: 2 chars/tick normal (~60-90 cps), 6 chars/tick when buffer lags > 100 chars
+                    const step = lag > 300 ? 12 : lag > 100 ? 5 : 2;
+                    displayedChars = Math.min(targetText.length, displayedChars + step);
+                    const visibleSlice = targetText.slice(0, displayedChars);
+
                     if (isStillCurrentConv()) {
-                        setMessages(prev => prev.map(m => m.id === streamMsgId ? { ...m, content: pendingText, citations: streamCitations } : m));
+                        setMessages(prev => prev.map(m => m.id === streamMsgId ? { ...m, content: visibleSlice, citations: streamCitations } : m));
                     }
-                });
+                }
+
+                if (typewriterActive) {
+                    typewriterRaf = requestAnimationFrame(runTypewriterTick);
+                }
             };
+            typewriterRaf = requestAnimationFrame(runTypewriterTick);
 
             try {
                 const token = localStorage.getItem('auth_token');
@@ -465,8 +485,7 @@ const ChatInterface = () => {
                             }
                             if (parsed.token || parsed.chunk) {
                                 accumulatedText += (parsed.token || parsed.chunk);
-                                pendingText = accumulatedText;
-                                scheduleUpdate();
+                                targetText = accumulatedText;
                             }
                         }
                     }
@@ -485,6 +504,9 @@ const ChatInterface = () => {
                         return;
                     }
 
+                    // Wait for typewriter catch-up before marking isStreaming: false
+                    typewriterActive = false;
+                    if (typewriterRaf) cancelAnimationFrame(typewriterRaf);
                     if (isStillCurrentConv()) {
                         setMessages(prev => prev.map(m => m.id === streamMsgId ? { ...m, isStreaming: false, content: accumulatedText, citations: streamCitations } : m));
                     }
